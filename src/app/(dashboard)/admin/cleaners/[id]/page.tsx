@@ -1,0 +1,64 @@
+import Link from 'next/link'
+import { notFound } from 'next/navigation'
+import { createClient } from '@/utils/supabase/server'
+import CleanerEditForm from './cleaner-edit-form'
+
+type Cleaner = {
+  id: string
+  full_name: string
+  phone: string | null
+  branch_id: string | null
+  is_active: boolean
+  created_at: string
+  branches: { name: string } | null
+}
+
+type Branch = { id: string; name: string; region: string }
+
+export default async function CleanerDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
+  const supabase = await createClient()
+
+  const [{ data: cleaner }, { data: branches }, { count: jobsDone }] = await Promise.all([
+    supabase.from('profiles').select('id, full_name, phone, branch_id, is_active, created_at, branches (name)').eq('id', id).eq('role', 'cleaner').single(),
+    supabase.from('branches').select('id, name, region').order('name'),
+    supabase.from('cleaner_assignments').select('*', { count: 'exact', head: true }).eq('cleaner_id', id).eq('status', 'completed'),
+  ])
+
+  if (!cleaner) notFound()
+
+  const c = cleaner as unknown as Cleaner
+  const branchList = (branches ?? []) as Branch[]
+
+  return (
+    <div className="max-w-lg space-y-6">
+      <div>
+        <Link href="/admin/cleaners" className="text-sm text-gray-400 hover:text-gray-600 transition-colors">← Cleaners</Link>
+        <h1 className="text-xl font-bold text-gray-900 mt-2">Edit Cleaner</h1>
+      </div>
+
+      <div className="bg-white rounded-xl border border-gray-200 p-6">
+        <div className="flex items-center gap-4 mb-6 pb-5 border-b border-gray-100">
+          <div className="w-12 h-12 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-lg font-bold shrink-0">
+            {c.full_name.charAt(0).toUpperCase()}
+          </div>
+          <div>
+            <p className="text-base font-semibold text-gray-900">{c.full_name}</p>
+            <p className="text-xs text-gray-500">
+              {c.branches?.name ?? 'No branch'} · {jobsDone ?? 0} jobs completed
+            </p>
+          </div>
+        </div>
+
+        <CleanerEditForm
+          cleanerId={c.id}
+          fullName={c.full_name}
+          phone={c.phone}
+          branchId={c.branch_id}
+          isActive={c.is_active}
+          branches={branchList}
+        />
+      </div>
+    </div>
+  )
+}
