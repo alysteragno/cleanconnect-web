@@ -1,20 +1,15 @@
+import Link from 'next/link'
 import { createClient } from '@/utils/supabase/server'
-import NewBookingForm from './new-booking-form'
-
-type Branch = { id: string; name: string; region: string }
 
 type Booking = {
   id: string
   service_date: string
   service_time: string
+  service_type: string
   property_sqm: number
-  required_cleaners: number
-  duration_hours: number
   base_price: number
   status: 'pending' | 'confirmed' | 'in_progress' | 'completed' | 'cancelled'
-  payment_status: 'unpaid' | 'partial' | 'paid' | 'refunded'
-  created_at: string
-  branches: { name: string; region: string } | null
+  branches: { name: string } | null
 }
 
 const STATUS_STYLES: Record<string, string> = {
@@ -33,18 +28,19 @@ const STATUS_LABELS: Record<string, string> = {
   cancelled: 'Cancelled',
 }
 
-const PAYMENT_STYLES: Record<string, string> = {
-  unpaid: 'text-red-600',
-  partial: 'text-yellow-600',
-  paid: 'text-green-600',
-  refunded: 'text-gray-400',
+const SERVICE_LABELS: Record<string, string> = {
+  general: 'General Cleaning',
+  premium_mattress: 'Mattress & Upholstery',
+  complete: 'Complete Package',
+  disinfection: 'Disinfection',
+  post_construction: 'Post-Construction',
 }
 
 function formatDate(dateStr: string) {
   return new Date(dateStr + 'T00:00:00').toLocaleDateString('en-PH', {
-    year: 'numeric',
-    month: 'long',
+    month: 'short',
     day: 'numeric',
+    year: 'numeric',
   })
 }
 
@@ -52,98 +48,121 @@ function formatTime(timeStr: string) {
   const [h, m] = timeStr.split(':')
   const hour = parseInt(h)
   const suffix = hour >= 12 ? 'PM' : 'AM'
-  const display = hour % 12 || 12
-  return `${display}:${m} ${suffix}`
+  return `${hour % 12 || 12}:${m} ${suffix}`
 }
 
-export default async function CustomerPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ booked?: string }>
-}) {
-  const { booked } = await searchParams
+const NAV_CARDS = [
+  {
+    href: '/customer/book',
+    label: 'Book a Service',
+    description: 'Schedule a new cleaning',
+    icon: '📋',
+    accent: 'border-blue-200 hover:border-blue-400 hover:bg-blue-50',
+  },
+  {
+    href: '/customer/bookings',
+    label: 'My Bookings',
+    description: 'View status & history',
+    icon: '📅',
+    accent: 'border-purple-200 hover:border-purple-400 hover:bg-purple-50',
+  },
+  {
+    href: '/customer/profile',
+    label: 'Profile & Settings',
+    description: 'Update your account',
+    icon: '👤',
+    accent: 'border-green-200 hover:border-green-400 hover:bg-green-50',
+  },
+  {
+    href: '/customer/help',
+    label: 'Help & Support',
+    description: 'FAQs and contact',
+    icon: '💬',
+    accent: 'border-orange-200 hover:border-orange-400 hover:bg-orange-50',
+  },
+]
+
+export default async function CustomerPage() {
   const supabase = await createClient()
 
-  const [{ data: branches }, { data: bookings }] = await Promise.all([
-    supabase.from('branches').select('id, name, region').order('name'),
-    supabase
-      .from('bookings')
-      .select(
-        'id, service_date, service_time, property_sqm, required_cleaners, duration_hours, base_price, status, payment_status, created_at, branches (name, region)'
-      )
-      .order('created_at', { ascending: false }),
-  ])
+  const { data: bookings } = await supabase
+    .from('bookings')
+    .select('id, service_date, service_time, service_type, property_sqm, base_price, status, branches (name)')
+    .order('created_at', { ascending: false })
+    .limit(3)
 
-  const bookingList = (bookings ?? []) as unknown as Booking[]
+  const recentBookings = (bookings ?? []) as unknown as Booking[]
 
   return (
     <div className="max-w-3xl space-y-8">
-      {booked && (
-        <div className="p-4 bg-green-50 border border-green-200 rounded-xl text-sm text-green-800">
-          <span className="font-semibold">Booking confirmed!</span> Your service has been scheduled.
-          Check below for details.
-        </div>
-      )}
+      {/* Nav cards */}
+      <div className="grid grid-cols-2 gap-4">
+        {NAV_CARDS.map((card) => (
+          <Link
+            key={card.href}
+            href={card.href}
+            className={`bg-white rounded-xl border p-5 flex items-start gap-4 transition-all ${card.accent}`}
+          >
+            <span className="text-2xl shrink-0">{card.icon}</span>
+            <div>
+              <p className="text-sm font-semibold text-gray-900">{card.label}</p>
+              <p className="text-xs text-gray-500 mt-0.5">{card.description}</p>
+            </div>
+          </Link>
+        ))}
+      </div>
 
+      {/* Recent bookings */}
       <section className="bg-white rounded-xl border border-gray-200 p-6">
-        <h2 className="text-base font-semibold text-gray-900 mb-1">Book a service</h2>
-        <p className="text-sm text-gray-500 mb-6">
-          Enter your property details for an instant price estimate.
-        </p>
-        <NewBookingForm branches={(branches ?? []) as Branch[]} />
-      </section>
-
-      <section className="bg-white rounded-xl border border-gray-200 p-6">
-        <div className="flex items-baseline justify-between mb-6">
-          <h2 className="text-base font-semibold text-gray-900">Your bookings</h2>
-          <span className="text-sm text-gray-400">
-            {bookingList.length} {bookingList.length === 1 ? 'booking' : 'bookings'}
-          </span>
+        <div className="flex items-baseline justify-between mb-5">
+          <h2 className="text-base font-semibold text-gray-900">Recent Bookings</h2>
+          <Link href="/customer/bookings" className="text-xs text-blue-600 hover:underline font-medium">
+            View all
+          </Link>
         </div>
 
-        {bookingList.length === 0 ? (
-          <p className="text-sm text-gray-400 text-center py-10">
-            No bookings yet. Schedule your first service above.
-          </p>
+        {recentBookings.length === 0 ? (
+          <div className="text-center py-10">
+            <p className="text-sm text-gray-400 mb-4">No bookings yet.</p>
+            <Link
+              href="/customer/book"
+              className="text-sm px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors"
+            >
+              Book your first cleaning
+            </Link>
+          </div>
         ) : (
           <div className="space-y-3">
-            {bookingList.map((booking) => (
-              <div
-                key={booking.id}
-                className="border border-gray-100 rounded-lg p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
+            {recentBookings.map((b) => (
+              <Link
+                key={b.id}
+                href={`/customer/bookings/${b.id}`}
+                className="flex items-center justify-between p-3 border border-gray-100 rounded-lg hover:border-gray-300 transition-colors group"
               >
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap mb-1">
+                <div>
+                  <div className="flex items-center gap-2 mb-0.5">
                     <span className="text-sm font-medium text-gray-900">
-                      {booking.branches?.name ?? 'Unknown branch'}
+                      {SERVICE_LABELS[b.service_type] ?? 'Cleaning Service'}
                     </span>
                     <span
-                      className={`text-xs px-2 py-0.5 rounded-full border font-medium ${STATUS_STYLES[booking.status] ?? 'bg-gray-50 text-gray-600 border-gray-200'}`}
+                      className={`text-xs px-1.5 py-0.5 rounded-full border font-medium ${STATUS_STYLES[b.status] ?? ''}`}
                     >
-                      {STATUS_LABELS[booking.status] ?? booking.status}
+                      {STATUS_LABELS[b.status] ?? b.status}
                     </span>
                   </div>
-                  <p className="text-sm text-gray-500">
-                    {formatDate(booking.service_date)} at {formatTime(booking.service_time)}
-                  </p>
-                  <p className="text-xs text-gray-400 mt-0.5">
-                    {booking.property_sqm} sqm &middot; {booking.required_cleaners}{' '}
-                    {booking.required_cleaners === 1 ? 'cleaner' : 'cleaners'} &middot;{' '}
-                    {booking.duration_hours}h
+                  <p className="text-xs text-gray-400">
+                    {b.branches?.name} · {formatDate(b.service_date)} at {formatTime(b.service_time)}
                   </p>
                 </div>
-
-                <div className="text-right shrink-0">
-                  <p className="text-lg font-bold text-gray-900">
-                    ₱{Number(booking.base_price).toLocaleString()}
+                <div className="text-right">
+                  <p className="text-sm font-bold text-gray-900">
+                    ₱{Number(b.base_price).toLocaleString()}
                   </p>
-                  <p
-                    className={`text-xs font-medium capitalize ${PAYMENT_STYLES[booking.payment_status] ?? 'text-gray-500'}`}
-                  >
-                    {booking.payment_status}
+                  <p className="text-xs text-gray-400 mt-0.5 group-hover:text-blue-600 transition-colors">
+                    View →
                   </p>
                 </div>
-              </div>
+              </Link>
             ))}
           </div>
         )}

@@ -28,6 +28,8 @@ CREATE TABLE profiles (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+
+ 
 -- Table: bookings
 CREATE TABLE bookings (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -54,7 +56,7 @@ CREATE TABLE cleaner_assignments (
     -- A cleaner can only be assigned to a specific booking once
     UNIQUE(booking_id, cleaner_id)
 );
-
+--inputed in sql editor up until this here :)--
 -- 3. CORE BUSINESS ENGINE (POSTGRESQL TRIGGERS)
 
 -- Trigger Function: apply_cleanconnect_operational_rules
