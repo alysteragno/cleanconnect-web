@@ -9,11 +9,33 @@ const ROLE_LABELS: Record<string, string> = {
   customer: 'Customer',
 }
 
-const ROLE_HOME: Record<string, string> = {
-  super_admin: '/admin',
-  branch_manager: '/manager',
-  cleaner: '/cleaner',
-  customer: '/customer',
+const ROLE_NAV: Record<string, { href: string; label: string; icon: string }[]> = {
+  customer: [
+    { href: '/customer', label: 'Dashboard', icon: '🏠' },
+    { href: '/customer/book', label: 'Book a Service', icon: '📋' },
+    { href: '/customer/bookings', label: 'My Bookings', icon: '📅' },
+    { href: '/customer/profile', label: 'Profile', icon: '👤' },
+    { href: '/customer/help', label: 'Help & Support', icon: '💬' },
+  ],
+  cleaner: [
+    { href: '/cleaner', label: 'Dashboard', icon: '🏠' },
+    { href: '/cleaner/jobs', label: 'My Jobs', icon: '📋' },
+    { href: '/cleaner/schedule', label: 'Schedule', icon: '📅' },
+    { href: '/cleaner/profile', label: 'Profile', icon: '👤' },
+  ],
+  branch_manager: [
+    { href: '/manager', label: 'Dashboard', icon: '🏠' },
+    { href: '/manager/bookings', label: 'Bookings', icon: '📋' },
+    { href: '/manager/cleaners', label: 'Cleaners', icon: '👷' },
+  ],
+  super_admin: [
+    { href: '/admin', label: 'Dashboard', icon: '🏠' },
+    { href: '/admin/bookings', label: 'All Bookings', icon: '📋' },
+    { href: '/admin/cleaners', label: 'Cleaners', icon: '👷' },
+    { href: '/admin/branches', label: 'Branches', icon: '🏢' },
+    { href: '/admin/feedback', label: 'Feedback', icon: '⭐' },
+    { href: '/admin/reports', label: 'Reports', icon: '📊' },
+  ],
 }
 
 export default async function DashboardLayout({
@@ -35,46 +57,65 @@ export default async function DashboardLayout({
     .single()
 
   const role = profile?.role ?? 'customer'
-  const homeRoute = ROLE_HOME[role] ?? '/customer'
+  const navLinks = ROLE_NAV[role] ?? ROLE_NAV.customer
+  const displayName = profile?.full_name ?? user.email ?? 'User'
+  const initials = displayName.charAt(0).toUpperCase()
 
   return (
     <div className="min-h-screen bg-gray-50 flex">
-      <aside className="w-64 bg-white border-r border-gray-200 flex flex-col shrink-0">
-        <div className="p-6 border-b border-gray-100">
-          <a href={homeRoute} className="text-lg font-bold text-blue-600">
-            CleanConnect
-          </a>
+      {/* Sidebar */}
+      <aside className="w-60 bg-white border-r border-gray-200 flex flex-col shrink-0">
+        {/* Logo */}
+        <div className="px-5 py-4 border-b border-gray-100">
+          <span className="text-base font-bold text-blue-600">CleanConnect</span>
         </div>
 
-        <nav className="flex-1 p-4 space-y-1">
-          <a
-            href={homeRoute}
-            className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-gray-700 hover:bg-gray-50 transition-colors"
-          >
-            Dashboard
-          </a>
+        {/* User identity */}
+        <div className="px-5 py-4 border-b border-gray-100 flex items-center gap-3">
+          <div className="w-8 h-8 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-sm font-bold shrink-0">
+            {initials}
+          </div>
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-gray-900 truncate">{displayName}</p>
+            <p className="text-xs text-gray-400">{ROLE_LABELS[role]}</p>
+          </div>
+        </div>
+
+        {/* Nav links */}
+        <nav className="flex-1 px-3 py-3 space-y-0.5 overflow-y-auto">
+          {navLinks.map((link) => (
+            <a
+              key={link.href}
+              href={link.href}
+              className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-50 transition-colors"
+            >
+              <span className="text-base shrink-0">{link.icon}</span>
+              {link.label}
+            </a>
+          ))}
         </nav>
 
-        <div className="p-4 border-t border-gray-100">
+        {/* Sign out — prominent at bottom */}
+        <div className="px-3 py-3 border-t border-gray-100">
           <form action={logout}>
             <button
               type="submit"
-              className="w-full text-left px-3 py-2 text-sm text-gray-500 hover:text-gray-900 rounded-lg hover:bg-gray-50 transition-colors"
+              className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium text-red-500 hover:text-red-700 hover:bg-red-50 transition-colors"
             >
+              <span className="text-base">🚪</span>
               Sign out
             </button>
           </form>
         </div>
       </aside>
 
+      {/* Main content */}
       <div className="flex-1 flex flex-col min-w-0">
-        <header className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-end gap-3">
-          <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">
+        <header className="bg-white border-b border-gray-200 px-6 py-3 flex items-center justify-end gap-3">
+          <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full font-medium">
             {ROLE_LABELS[role]}
           </span>
-          <span className="text-sm font-medium text-gray-900">
-            {profile?.full_name ?? user.email}
-          </span>
+          <span className="text-sm font-medium text-gray-700">{displayName}</span>
         </header>
 
         <main className="flex-1 p-6">{children}</main>

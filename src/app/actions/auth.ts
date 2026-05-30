@@ -2,7 +2,7 @@
 
 import { redirect } from 'next/navigation'
 import { cookies } from 'next/headers'
-import { createClient } from '@/utils/supabase/server'
+import { createClient, createAdminClient } from '@/utils/supabase/server'
 
 export type AuthState = { error: string } | undefined
 
@@ -58,7 +58,8 @@ export async function register(state: AuthState, formData: FormData): Promise<Au
   if (error) return { error: error.message }
   if (!data.user) return { error: 'Registration failed. Please try again.' }
 
-  const { error: profileError } = await supabase.from('profiles').insert({
+  const adminClient = createAdminClient()
+  const { error: profileError } = await adminClient.from('profiles').insert({
     id: data.user.id,
     full_name: name,
     role: 'customer',
