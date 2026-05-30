@@ -2,8 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
-import { createClient } from '@/utils/supabase/server'
-import { createAnonClient } from '@/utils/supabase/anon-client'
+import { createClient, createAdminClient } from '@/utils/supabase/server'
 
 export type AdminActionState = { error?: string; success?: string } | undefined
 
@@ -35,15 +34,17 @@ export async function createCleanerAccount(
   if (!full_name || !email || !password || !branch_id) return { error: 'All fields are required.' }
   if (password.length < 8) return { error: 'Password must be at least 8 characters.' }
 
-  // Create the auth user using a session-less client so we don't disturb the admin session
-  const anonClient = createAnonClient()
-  const { data: signUpData, error: signUpError } = await anonClient.auth.signUp({ email, password })
+  const adminClient = createAdminClient()
+  const { data: signUpData, error: signUpError } = await adminClient.auth.admin.createUser({
+    email,
+    password,
+    email_confirm: true,
+  })
 
   if (signUpError) return { error: signUpError.message }
   if (!signUpData.user) return { error: 'Failed to create user account.' }
 
-  // Insert the profile using the admin's privileged client
-  const { error: profileError } = await supabase.from('profiles').insert({
+  const { error: profileError } = await adminClient.from('profiles').insert({
     id: signUpData.user.id,
     full_name,
     phone,

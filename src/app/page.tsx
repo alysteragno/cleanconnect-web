@@ -1,92 +1,13 @@
 import Link from 'next/link'
-
-const SERVICES = [
-  {
-    title: 'General Home Cleaning',
-    description: 'Complete top-to-bottom cleaning of your home — floors, surfaces, bathrooms, and kitchen included.',
-    icon: '🏠',
-  },
-  {
-    title: 'Premium Mattress & Upholstery',
-    description: 'Deep cleaning and sanitizing of mattresses, sofas, and upholstered furniture.',
-    icon: '🛋️',
-  },
-  {
-    title: 'Complete Home Package',
-    description: 'Comprehensive cleaning with steam sterilization for a hygienic, hotel-quality result.',
-    icon: '✨',
-  },
-  {
-    title: 'Disinfection Services',
-    description: 'Professional-grade disinfection to eliminate bacteria, viruses, and allergens from your space.',
-    icon: '🧴',
-  },
-  {
-    title: 'Post-Construction Cleaning',
-    description: 'Thorough removal of construction dust, debris, and residues after renovation or building work.',
-    icon: '🔨',
-  },
-  {
-    title: 'Deep Cleaning Add-ons',
-    description: 'Customize your service with extra hours, additional cleaners, or specialized cleaning tasks.',
-    icon: '➕',
-  },
-]
-
-const BRANCHES = [
-  { city: 'Manila', type: 'Main Branch' },
-  { city: 'Cebu', type: 'Branch' },
-  { city: 'Baguio', type: 'Branch' },
-  { city: 'Quezon City', type: 'Franchise' },
-  { city: 'Muntinlupa', type: 'Franchise' },
-]
-
-const STEPS = [
-  {
-    step: '01',
-    title: 'Book Online',
-    description:
-      'Enter your address and property details. Get an instant price estimate powered by our pricing engine.',
-  },
-  {
-    step: '02',
-    title: 'We Assign a Cleaner',
-    description:
-      'Our system matches you with the nearest available, qualified cleaner from your branch.',
-  },
-  {
-    step: '03',
-    title: 'Sit Back & Relax',
-    description:
-      "Your cleaner arrives, completes the job, and you rate the service when it's done.",
-  },
-]
+import MarketingHeader from '@/components/marketing/header'
+import MarketingFooter from '@/components/marketing/footer'
+import SectionHeader from '@/components/marketing/section-header'
+import { SERVICES, BRANCHES, STEPS } from '@/lib/marketing-data'
 
 export default function HomePage() {
   return (
     <div className="min-h-screen bg-white">
-      {/* Header */}
-      <header className="sticky top-0 z-50 bg-white/95 backdrop-blur border-b border-gray-100">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
-          <span className="text-xl font-bold text-blue-600">CleanConnect</span>
-          <nav className="hidden sm:flex items-center gap-6 text-sm text-gray-500">
-            <a href="#services" className="hover:text-gray-900 transition-colors">Services</a>
-            <a href="#how-it-works" className="hover:text-gray-900 transition-colors">How it works</a>
-            <a href="#coverage" className="hover:text-gray-900 transition-colors">Coverage</a>
-          </nav>
-          <div className="flex items-center gap-3">
-            <Link href="/login" className="text-sm text-gray-500 hover:text-gray-900 transition-colors">
-              Sign in
-            </Link>
-            <Link
-              href="/register"
-              className="text-sm px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors"
-            >
-              Get started
-            </Link>
-          </div>
-        </div>
-      </header>
+      <MarketingHeader />
 
       {/* Hero */}
       <section className="max-w-6xl mx-auto px-4 sm:px-6 py-20 sm:py-28 text-center">
@@ -99,8 +20,8 @@ export default function HomePage() {
           <span className="text-blue-600"> You Can Trust</span>
         </h1>
         <p className="text-lg text-gray-500 max-w-2xl mx-auto mb-10">
-          Cleaning Lady PH brings certified cleaners to your home across 5 locations in
-          the Philippines. Book online in minutes and track your service in real time.
+          Cleaning Lady PH brings certified cleaners to your home across 5 locations in the
+          Philippines. Book online in minutes and track your service in real time.
         </p>
         <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
           <Link
@@ -121,10 +42,10 @@ export default function HomePage() {
       {/* Services */}
       <section id="services" className="bg-gray-50 py-16 sm:py-20">
         <div className="max-w-6xl mx-auto px-4 sm:px-6">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl font-bold text-gray-900 mb-3">Our Services</h2>
-            <p className="text-gray-500">Professional cleaning for every need, done right every time.</p>
-          </div>
+          <SectionHeader
+            title="Our Services"
+            subtitle="Professional cleaning for every need, done right every time."
+          />
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
             {SERVICES.map((service) => (
               <div
@@ -143,10 +64,10 @@ export default function HomePage() {
       {/* How it Works */}
       <section id="how-it-works" className="py-16 sm:py-20">
         <div className="max-w-6xl mx-auto px-4 sm:px-6">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl font-bold text-gray-900 mb-3">How It Works</h2>
-            <p className="text-gray-500">Three simple steps to a cleaner home.</p>
-          </div>
+          <SectionHeader
+            title="How It Works"
+            subtitle="Three simple steps to a cleaner home."
+          />
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-8 max-w-3xl mx-auto">
             {STEPS.map((item) => (
               <div key={item.step} className="text-center">
@@ -198,17 +119,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Footer */}
-      <footer className="border-t border-gray-100 py-8">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-gray-400">
-          <span className="font-semibold text-blue-600">CleanConnect</span>
-          <span>© 2026 Cleaning Lady PH. All rights reserved.</span>
-          <div className="flex gap-4">
-            <Link href="/login" className="hover:text-gray-600 transition-colors">Sign in</Link>
-            <Link href="/register" className="hover:text-gray-600 transition-colors">Register</Link>
-          </div>
-        </div>
-      </footer>
+      <MarketingFooter />
     </div>
   )
 }

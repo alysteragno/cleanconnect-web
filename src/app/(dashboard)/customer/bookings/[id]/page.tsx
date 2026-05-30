@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { createClient } from '@/utils/supabase/server'
+import { getSettings } from '@/app/actions/settings'
 
 type Booking = {
   id: string
@@ -66,13 +67,16 @@ function formatTime(timeStr: string) {
 
 export default async function BookingDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>
+  searchParams: Promise<{ new?: string }>
 }) {
   const { id } = await params
+  const { new: isNew } = await searchParams
   const supabase = await createClient()
 
-  const [{ data: booking }, { data: feedback }] = await Promise.all([
+  const [{ data: booking }, { data: feedback }, settings] = await Promise.all([
     supabase
       .from('bookings')
       .select(
@@ -81,6 +85,7 @@ export default async function BookingDetailPage({
       .eq('id', id)
       .single(),
     supabase.from('feedback').select('id, rating, comment').eq('booking_id', id).maybeSingle(),
+    getSettings(),
   ])
 
   if (!booking) notFound()
@@ -98,6 +103,16 @@ export default async function BookingDetailPage({
 
   return (
     <div className="max-w-2xl space-y-6">
+      {/* New booking confirmation banner */}
+      {isNew && (
+        <div className="bg-green-50 border border-green-200 rounded-xl px-5 py-4">
+          <p className="text-sm font-semibold text-green-800">Booking submitted!</p>
+          <p className="text-xs text-green-600 mt-0.5">
+            Your booking is now pending confirmation. {b.payment_method !== 'cash' ? 'See payment instructions below.' : 'Pay your cleaner upon job completion.'}
+          </p>
+        </div>
+      )}
+
       <div>
         <Link href="/customer/bookings" className="text-sm text-gray-400 hover:text-gray-600 transition-colors">
           ← My Bookings
@@ -201,6 +216,33 @@ export default async function BookingDetailPage({
           </span>
         </div>
       </div>
+
+      {/* Payment instructions */}
+      {b.payment_status === 'unpaid' && b.payment_method !== 'cash' && (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-6">
+          <p className="text-xs font-semibold text-amber-700 uppercase tracking-wide mb-4">Payment Instructions</p>
+          {b.payment_method === 'gcash' && (
+            <div className="space-y-2">
+              <Row label="Send to" value={settings['gcash_number'] ?? '—'} />
+              <Row label="Account name" value={settings['gcash_name'] ?? '—'} />
+              <Row label="Amount" value={`₱${Number(b.base_price).toLocaleString()}`} />
+              <Row label="Reference" value={b.id} />
+            </div>
+          )}
+          {b.payment_method === 'bank_transfer' && (
+            <div className="space-y-2">
+              <Row label="Bank" value={settings['bank_name'] ?? '—'} />
+              <Row label="Account number" value={settings['bank_account_number'] ?? '—'} />
+              <Row label="Account name" value={settings['bank_account_name'] ?? '—'} />
+              <Row label="Amount" value={`₱${Number(b.base_price).toLocaleString()}`} />
+              <Row label="Reference" value={b.id} />
+            </div>
+          )}
+          <p className="text-xs text-amber-600 mt-4 border-t border-amber-200 pt-3">
+            {settings['payment_reference_note']} Once verified, your payment status will be updated by our team.
+          </p>
+        </div>
+      )}
 
       {/* Feedback */}
       {isCompleted && (

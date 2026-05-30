@@ -43,7 +43,7 @@ export async function createBooking(
   const today = new Date().toISOString().split('T')[0]
   if (service_date <= today) return { error: 'Service date must be at least one day from today.' }
 
-  const { error } = await supabase.from('bookings').insert({
+  const { data: booking, error } = await supabase.from('bookings').insert({
     customer_id: user.id,
     branch_id,
     property_sqm,
@@ -57,11 +57,11 @@ export async function createBooking(
     space_type,
     special_notes,
     payment_method,
-  })
+  }).select('id').single()
 
   if (error) return { error: error.message }
 
   revalidatePath('/customer')
   revalidatePath('/customer/bookings')
-  redirect('/customer?booked=true')
+  redirect(`/customer/bookings/${booking.id}?new=true`)
 }

@@ -33,9 +33,9 @@ const SERVICE_TYPES = [
 ]
 
 const PAYMENT_METHODS = [
-  { value: 'cash', label: 'Cash', desc: 'Pay the cleaner upon job completion' },
-  { value: 'gcash', label: 'GCash', desc: 'Online payment via GCash (coming soon)' },
-  { value: 'card', label: 'Card', desc: 'Credit or debit card (coming soon)' },
+  { value: 'cash', label: 'Cash', desc: 'Pay the cleaner directly upon job completion' },
+  { value: 'gcash', label: 'GCash', desc: 'Send payment to our GCash number — details shown after booking' },
+  { value: 'bank_transfer', label: 'Bank Transfer', desc: 'Transfer to our bank account — details shown after booking' },
 ]
 
 function computeEstimate(sqm: number) {

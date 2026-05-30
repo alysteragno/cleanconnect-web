@@ -35,6 +35,7 @@ const ROLE_NAV: Record<string, { href: string; label: string; icon: string }[]> 
     { href: '/admin/branches', label: 'Branches', icon: '🏢' },
     { href: '/admin/feedback', label: 'Feedback', icon: '⭐' },
     { href: '/admin/reports', label: 'Reports', icon: '📊' },
+    { href: '/admin/settings', label: 'Settings', icon: '⚙️' },
   ],
 }
 
