@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/utils/supabase/server'
 import { logout } from '@/app/actions/auth'
+import NotificationBell from '@/components/dashboard/notification-bell'
 
 const ROLE_LABELS: Record<string, string> = {
   super_admin: 'Super Admin',
@@ -15,6 +16,7 @@ const ROLE_NAV: Record<string, { href: string; label: string; icon: string }[]> 
     { href: '/customer/book', label: 'Book a Service', icon: '📋' },
     { href: '/customer/bookings', label: 'My Bookings', icon: '📅' },
     { href: '/customer/profile', label: 'Profile', icon: '👤' },
+    { href: '/customer/complaints', label: 'Complaints', icon: '🗣️' },
     { href: '/customer/help', label: 'Help & Support', icon: '💬' },
   ],
   cleaner: [
@@ -34,6 +36,7 @@ const ROLE_NAV: Record<string, { href: string; label: string; icon: string }[]> 
     { href: '/admin/cleaners', label: 'Cleaners', icon: '👷' },
     { href: '/admin/branches', label: 'Branches', icon: '🏢' },
     { href: '/admin/feedback', label: 'Feedback', icon: '⭐' },
+    { href: '/admin/complaints', label: 'Complaints', icon: '🗣️' },
     { href: '/admin/reports', label: 'Reports', icon: '📊' },
     { href: '/admin/settings', label: 'Settings', icon: '⚙️' },
   ],
@@ -61,6 +64,15 @@ export default async function DashboardLayout({
   const navLinks = ROLE_NAV[role] ?? ROLE_NAV.customer
   const displayName = profile?.full_name ?? user.email ?? 'User'
   const initials = displayName.charAt(0).toUpperCase()
+
+  const { data: notifData } = await supabase
+    .from('notifications')
+    .select('id, title, body, type, booking_id, complaint_id, is_read, created_at')
+    .eq('user_id', user.id)
+    .order('created_at', { ascending: false })
+    .limit(10)
+
+  const initialNotifications = notifData ?? []
 
   return (
     <div className="min-h-screen bg-gray-50 flex">
@@ -113,6 +125,11 @@ export default async function DashboardLayout({
       {/* Main content */}
       <div className="flex-1 flex flex-col min-w-0">
         <header className="bg-white border-b border-gray-200 px-6 py-3 flex items-center justify-end gap-3">
+          <NotificationBell
+            userId={user.id}
+            role={role}
+            initialNotifications={initialNotifications}
+          />
           <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full font-medium">
             {ROLE_LABELS[role]}
           </span>

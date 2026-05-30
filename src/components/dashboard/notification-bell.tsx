@@ -1,0 +1,131 @@
+'use client'
+
+import { useState, useEffect, useRef } from 'react'
+import Link from 'next/link'
+import { createClient } from '@/utils/supabase/client'
+import { markAllNotificationsRead } from '@/app/actions/notifications'
+
+type Notification = {
+  id: string
+  title: string
+  body: string
+  type: string
+  booking_id: string | null
+  complaint_id: string | null
+  is_read: boolean
+  created_at: string
+}
+
+function getHref(n: Notification, role: string): string {
+  if (n.booking_id) {
+    if (role === 'super_admin' || role === 'branch_manager') return `/admin/bookings/${n.booking_id}`
+    if (role === 'cleaner') return `/cleaner/jobs`
+    return `/customer/bookings/${n.booking_id}`
+  }
+  if (n.complaint_id) {
+    if (role === 'super_admin' || role === 'branch_manager') return `/admin/complaints/${n.complaint_id}`
+    return `/customer/complaints/${n.complaint_id}`
+  }
+  return '#'
+}
+
+export default function NotificationBell({
+  userId,
+  role,
+  initialNotifications,
+}: {
+  userId: string
+  role: string
+  initialNotifications: Notification[]
+}) {
+  const [notifications, setNotifications] = useState(initialNotifications)
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+
+  const unread = notifications.filter((n) => !n.is_read).length
+
+  useEffect(() => {
+    const supabase = createClient()
+    const channel = supabase
+      .channel('notification-bell')
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${userId}` },
+        (payload) => setNotifications((prev) => [payload.new as Notification, ...prev])
+      )
+      .subscribe()
+    return () => { supabase.removeChannel(channel) }
+  }, [userId])
+
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [])
+
+  async function handleMarkAll() {
+    setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })))
+    await markAllNotificationsRead()
+    setOpen(false)
+  }
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        onClick={() => setOpen((o) => !o)}
+        className="relative p-2 text-gray-400 hover:text-gray-600 transition-colors"
+        aria-label="Notifications"
+      >
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+            d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+        </svg>
+        {unread > 0 && (
+          <span className="absolute top-1 right-1 w-3.5 h-3.5 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center">
+            {unread > 9 ? '9+' : unread}
+          </span>
+        )}
+      </button>
+
+      {open && (
+        <div className="absolute right-0 mt-1 w-80 bg-white border border-gray-200 rounded-xl shadow-lg z-50 overflow-hidden">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+            <p className="text-sm font-semibold text-gray-900">Notifications</p>
+            {unread > 0 && (
+              <button onClick={handleMarkAll} className="text-xs text-blue-600 hover:underline">
+                Mark all as read
+              </button>
+            )}
+          </div>
+
+          <div className="max-h-80 overflow-y-auto divide-y divide-gray-50">
+            {notifications.length === 0 ? (
+              <p className="text-sm text-gray-400 text-center py-8">No notifications yet.</p>
+            ) : (
+              notifications.slice(0, 10).map((n) => (
+                <Link
+                  key={n.id}
+                  href={getHref(n, role)}
+                  onClick={() => setOpen(false)}
+                  className={`block px-4 py-3 hover:bg-gray-50 transition-colors ${!n.is_read ? 'bg-blue-50/40' : ''}`}
+                >
+                  <p className={`text-sm font-medium ${!n.is_read ? 'text-gray-900' : 'text-gray-500'}`}>
+                    {n.title}
+                  </p>
+                  <p className="text-xs text-gray-400 mt-0.5">{n.body}</p>
+                  <p className="text-xs text-gray-300 mt-1">
+                    {new Date(n.created_at).toLocaleDateString('en-PH', {
+                      month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
+                    })}
+                  </p>
+                </Link>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}

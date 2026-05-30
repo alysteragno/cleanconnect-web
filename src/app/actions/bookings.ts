@@ -2,7 +2,8 @@
 
 import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
-import { createClient } from '@/utils/supabase/server'
+import { createClient, createAdminClient } from '@/utils/supabase/server'
+import { createNotification } from './notifications'
 
 export type BookingState = { error: string } | undefined
 
@@ -60,6 +61,33 @@ export async function createBooking(
   }).select('id').single()
 
   if (error) return { error: error.message }
+
+  // Notify customer
+  await createNotification({
+    userId: user.id,
+    title: 'Booking Submitted',
+    body: 'Your booking is pending confirmation. We will assign a cleaner shortly.',
+    type: 'booking_submitted',
+    bookingId: booking.id,
+  })
+
+  // Notify admins and branch managers of the selected branch
+  const admin = createAdminClient()
+  const { data: staff } = await admin
+    .from('profiles')
+    .select('id')
+    .in('role', ['super_admin', 'branch_manager'])
+    .or(`branch_id.eq.${branch_id},role.eq.super_admin`)
+
+  for (const s of staff ?? []) {
+    await createNotification({
+      userId: s.id,
+      title: 'New Booking',
+      body: `A new ${service_type} booking was submitted for ${service_date}.`,
+      type: 'booking_new',
+      bookingId: booking.id,
+    })
+  }
 
   revalidatePath('/customer')
   revalidatePath('/customer/bookings')
