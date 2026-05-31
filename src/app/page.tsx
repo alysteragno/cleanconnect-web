@@ -78,28 +78,25 @@ export default function HomePage() {
             </div>
           </ScrollReveal>
 
-          {/* Photo strip — horizontal scroll on mobile, 3-up on desktop */}
+          {/* Photo strip — vertical on mobile, 3-up on desktop */}
           <ScrollReveal delay={80}>
-            <div className="flex gap-4 overflow-x-auto pb-1 mb-10 snap-x snap-mandatory scrollbar-hide">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-10">
               {[
-                { src: '/services/s1.jpg', label: 'Home & Condo Cleaning' },
-                { src: '/services/s2.jpg', label: 'Sofa & Upholstery Cleaning' },
-                { src: '/services/s3.jpg', label: 'Carpet & Mattress Cleaning' },
-              ].map((photo) => (
+                '/services/s1.jpg',
+                '/services/s2.jpg',
+                '/services/s3.jpg',
+              ].map((src) => (
                 <div
-                  key={photo.src}
-                  className="relative flex-none w-72 sm:flex-1 h-56 rounded-2xl overflow-hidden snap-center group"
+                  key={src}
+                  className="relative aspect-[3/4] sm:aspect-auto sm:h-56 rounded-2xl overflow-hidden group"
                 >
                   <Image
-                    src={photo.src}
-                    alt={photo.label}
+                    src={src}
+                    alt="Maid For You Cleaning Services"
                     fill
                     className="object-cover transition-transform duration-500 group-hover:scale-105"
                   />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/65 via-black/10 to-transparent" />
-                  <div className="absolute bottom-0 left-0 right-0 p-4">
-                    <p className="text-white text-sm font-semibold leading-tight">{photo.label}</p>
-                  </div>
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-black/10 to-transparent" />
                 </div>
               ))}
             </div>
