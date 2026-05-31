@@ -19,14 +19,13 @@ export async function aiDispatchCleaners(
   } = await supabase.auth.getUser()
   if (!user) return { error: 'Not authenticated.' }
 
-  // Only branch managers and super admins may trigger AI dispatch
   const { data: profile } = await supabase
     .from('profiles')
     .select('role')
     .eq('id', user.id)
     .single()
 
-  if (!profile || !['branch_manager', 'super_admin'].includes(profile.role)) {
+  if (!profile || profile.role !== 'super_admin') {
     return { error: 'Unauthorized.' }
   }
 
@@ -35,7 +34,6 @@ export async function aiDispatchCleaners(
 
   try {
     const result = await runAIDispatch(bookingId)
-    revalidatePath(`/manager/bookings/${bookingId}`)
     revalidatePath(`/admin/bookings/${bookingId}`)
     return { dispatched: result.dispatched, reasoning: result.reasoning }
   } catch (e) {

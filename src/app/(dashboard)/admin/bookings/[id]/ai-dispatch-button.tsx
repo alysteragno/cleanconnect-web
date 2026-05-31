@@ -19,28 +19,21 @@ export default function AIDispatchButton({ bookingId }: { bookingId: string }) {
 
   return (
     <div className="space-y-4">
-      {/* AI Dispatch button */}
       {!isSuccess && (
         <form action={action}>
           <input type="hidden" name="booking_id" value={bookingId} />
-          <button
-            type="submit"
-            disabled={pending}
-            className="w-full py-3 px-4 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl text-sm font-semibold hover:from-blue-700 hover:to-indigo-700 disabled:opacity-60 disabled:cursor-not-allowed transition-all shadow-sm"
-          >
+          <button type="submit" disabled={pending}
+            className="w-full py-3 px-4 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl text-sm font-semibold hover:from-blue-700 hover:to-indigo-700 disabled:opacity-60 disabled:cursor-not-allowed transition-all shadow-sm">
             {pending ? (
               <span className="flex items-center justify-center gap-2">
                 <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
                 AI is evaluating cleaners...
               </span>
-            ) : (
-              '🤖 Run AI Dispatch'
-            )}
+            ) : '🤖 Run AI Dispatch'}
           </button>
         </form>
       )}
 
-      {/* Error */}
       {isError && (
         <div className="p-4 bg-red-50 border border-red-200 rounded-xl">
           <p className="text-sm font-semibold text-red-700 mb-1">AI Dispatch Failed</p>
@@ -52,7 +45,6 @@ export default function AIDispatchButton({ bookingId }: { bookingId: string }) {
         </div>
       )}
 
-      {/* Success — show reasoning and result */}
       {isSuccess && (
         <div className="space-y-3">
           <div className="p-4 bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 rounded-xl">
@@ -63,31 +55,21 @@ export default function AIDispatchButton({ bookingId }: { bookingId: string }) {
                 {state.dispatched} offer{state.dispatched !== 1 ? 's' : ''} sent
               </span>
             </div>
-
-            {/* Reasoning trace */}
             <div className="space-y-1.5">
               {state.reasoning.map((step, i) => (
                 <div key={i} className="flex items-start gap-2">
-                  <span className="w-5 h-5 bg-blue-600 text-white rounded-full flex items-center justify-center text-xs font-bold shrink-0 mt-0.5">
-                    {i + 1}
-                  </span>
+                  <span className="w-5 h-5 bg-blue-600 text-white rounded-full flex items-center justify-center text-xs font-bold shrink-0 mt-0.5">{i + 1}</span>
                   <p className="text-xs text-blue-800 leading-relaxed">{step}</p>
                 </div>
               ))}
             </div>
           </div>
-
           {state.dispatched === 0 && (
-            <p className="text-sm text-gray-500 text-center">
-              No eligible cleaners found. Use manual force-assign below.
-            </p>
+            <p className="text-sm text-gray-500 text-center">No eligible cleaners found. Use manual dispatch below.</p>
           )}
-
-          {/* Re-run option */}
           <form action={action}>
             <input type="hidden" name="booking_id" value={bookingId} />
-            <button type="submit" disabled={pending}
-              className="w-full text-xs text-blue-600 hover:underline disabled:opacity-50">
+            <button type="submit" disabled={pending} className="w-full text-xs text-blue-600 hover:underline disabled:opacity-50">
               Re-run AI Dispatch
             </button>
           </form>

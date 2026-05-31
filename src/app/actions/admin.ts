@@ -137,13 +137,99 @@ export async function updatePaymentStatus(
   return { success: `Payment status updated to "${payment_status}".` }
 }
 
+// ── Booking dispatch & cancellation ───────────────────────────────────────
+
+export async function dispatchCleaners(
+  state: AdminActionState,
+  formData: FormData
+): Promise<AdminActionState> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user || !(await assertSuperAdmin(supabase, user.id))) return { error: 'Unauthorized.' }
+
+  const bookingId = formData.get('booking_id') as string
+  const cleanerIds = formData.getAll('cleaner_ids') as string[]
+
+  if (!bookingId) return { error: 'Missing booking.' }
+  if (cleanerIds.length === 0) return { error: 'Select at least one cleaner.' }
+
+  const rows = cleanerIds.map((cleaner_id) => ({
+    booking_id: bookingId,
+    cleaner_id,
+    status: 'offered' as const,
+  }))
+
+  const { error } = await supabase
+    .from('cleaner_assignments')
+    .upsert(rows, { onConflict: 'booking_id,cleaner_id', ignoreDuplicates: true })
+
+  if (error) return { error: error.message }
+
+  revalidatePath(`/admin/bookings/${bookingId}`)
+  return { success: `Offer sent to ${cleanerIds.length} cleaner(s).` }
+}
+
+export async function forceAssignCleaner(
+  state: AdminActionState,
+  formData: FormData
+): Promise<AdminActionState> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user || !(await assertSuperAdmin(supabase, user.id))) return { error: 'Unauthorized.' }
+
+  const bookingId = formData.get('booking_id') as string
+  const cleanerId = formData.get('cleaner_id') as string
+  if (!bookingId || !cleanerId) return { error: 'Missing booking or cleaner.' }
+
+  const { error: e1 } = await supabase
+    .from('cleaner_assignments')
+    .upsert(
+      { booking_id: bookingId, cleaner_id: cleanerId, status: 'accepted' },
+      { onConflict: 'booking_id,cleaner_id' }
+    )
+  if (e1) return { error: e1.message }
+
+  const { error: e2 } = await supabase
+    .from('bookings')
+    .update({ status: 'confirmed' })
+    .eq('id', bookingId)
+  if (e2) return { error: e2.message }
+
+  revalidatePath(`/admin/bookings/${bookingId}`)
+  revalidatePath('/admin')
+  redirect(`/admin/bookings/${bookingId}`)
+}
+
+export async function cancelBooking(
+  state: AdminActionState,
+  formData: FormData
+): Promise<AdminActionState> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user || !(await assertSuperAdmin(supabase, user.id))) return { error: 'Unauthorized.' }
+
+  const bookingId = formData.get('booking_id') as string
+  const feeRaw = formData.get('cancellation_fee') as string
+  const cancellation_fee = feeRaw && parseFloat(feeRaw) > 0 ? parseFloat(feeRaw) : null
+
+  const { error } = await supabase
+    .from('bookings')
+    .update({ status: 'cancelled', cancellation_fee })
+    .eq('id', bookingId)
+
+  if (error) return { error: error.message }
+
+  revalidatePath('/admin/bookings')
+  revalidatePath(`/admin/bookings/${bookingId}`)
+  redirect('/admin/bookings')
+}
+
 // ── Cleaner availability override ─────────────────────────────────────────
-// Admin and branch managers can set or remove day-offs on behalf of cleaners.
 // Uses admin client to bypass the cleaner-only RLS on cleaner_availability.
 
 async function assertStaff(supabase: Awaited<ReturnType<typeof createClient>>, userId: string) {
   const { data } = await supabase.from('profiles').select('role').eq('id', userId).single()
-  return data?.role === 'super_admin' || data?.role === 'branch_manager'
+  return data?.role === 'super_admin'
 }
 
 export async function addCleanerDayOff(

@@ -11,7 +11,7 @@
 -- 1. ENUMS
 -- ─────────────────────────────────────────────────────────────────────────────
 
-CREATE TYPE user_role AS ENUM ('super_admin', 'branch_manager', 'cleaner', 'customer');
+CREATE TYPE user_role AS ENUM ('super_admin', 'cleaner', 'customer');
 CREATE TYPE booking_status AS ENUM ('pending', 'confirmed', 'in_progress', 'completed', 'cancelled');
 CREATE TYPE payment_status AS ENUM ('unpaid', 'partial', 'paid', 'refunded');
 CREATE TYPE assignment_status AS ENUM ('offered', 'accepted', 'declined', 'completed');
@@ -195,7 +195,7 @@ CREATE POLICY "Users can read own profile"
 
 CREATE POLICY "Admins read all profiles"
     ON profiles FOR SELECT USING (
-        EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('super_admin', 'branch_manager'))
+        EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'super_admin')
     );
 
 CREATE POLICY "Super admins can insert profiles"
@@ -219,7 +219,7 @@ CREATE POLICY "Staff read all bookings"
 
 CREATE POLICY "Admins update any booking"
     ON bookings FOR UPDATE USING (
-        EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('super_admin', 'branch_manager'))
+        EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'super_admin')
     );
 
 -- cleaner_assignments
@@ -231,7 +231,7 @@ CREATE POLICY "Cleaners update own assignments"
 
 CREATE POLICY "Staff manage all assignments"
     ON cleaner_assignments FOR ALL USING (
-        EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('super_admin', 'branch_manager'))
+        EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'super_admin')
     );
 
 -- cleaner_availability
@@ -240,7 +240,7 @@ CREATE POLICY "Cleaners manage own availability"
 
 CREATE POLICY "Admins read all availability"
     ON cleaner_availability FOR SELECT USING (
-        EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('super_admin', 'branch_manager'))
+        EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'super_admin')
     );
 
 -- feedback
@@ -249,7 +249,7 @@ CREATE POLICY "Customers manage own feedback"
 
 CREATE POLICY "Admins read all feedback"
     ON feedback FOR SELECT USING (
-        EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('super_admin', 'branch_manager'))
+        EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'super_admin')
     );
 
 -- complaints
@@ -258,7 +258,7 @@ CREATE POLICY "Customers manage own complaints"
 
 CREATE POLICY "Admins read all complaints"
     ON complaints FOR SELECT USING (
-        EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('super_admin', 'branch_manager'))
+        EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'super_admin')
     );
 
 -- notifications
@@ -282,7 +282,7 @@ CREATE POLICY "Participants read messages"
     ON complaint_messages FOR SELECT USING (
         auth.uid() = sender_id
         OR EXISTS (SELECT 1 FROM complaints WHERE id = complaint_id AND customer_id = auth.uid())
-        OR EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('super_admin', 'branch_manager'))
+        OR EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'super_admin')
     );
 
 

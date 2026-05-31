@@ -8,7 +8,6 @@ export type AuthState = { error: string } | undefined
 
 const ROLE_ROUTES: Record<string, string> = {
   super_admin: '/admin',
-  branch_manager: '/manager',
   cleaner: '/cleaner',
   customer: '/customer',
 }

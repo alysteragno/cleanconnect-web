@@ -1,19 +1,17 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
-const PROTECTED_PATHS = ['/admin', '/manager', '/cleaner', '/customer'] as const
+const PROTECTED_PATHS = ['/admin', '/cleaner', '/customer'] as const
 const AUTH_PATHS = ['/login', '/register'] as const
 
 const ROLE_ROUTES: Record<string, string> = {
   super_admin: '/admin',
-  branch_manager: '/manager',
   cleaner: '/cleaner',
   customer: '/customer',
 }
 
 const PATH_ROLES: Record<string, string> = {
   '/admin': 'super_admin',
-  '/manager': 'branch_manager',
   '/cleaner': 'cleaner',
   '/customer': 'customer',
 }
