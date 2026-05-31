@@ -2,52 +2,42 @@ export const SERVICES = [
   {
     title: 'General Cleaning',
     description: 'Complete top-to-bottom cleaning of your home — floors, surfaces, bathrooms, and kitchen included.',
-    icon: '🏠',
   },
   {
     title: 'Air Conditioning Cleaning',
     description: 'Professional cleaning and maintenance of aircon units to improve efficiency and air quality.',
-    icon: '❄️',
   },
   {
     title: 'Curtain Dry Cleaning',
     description: 'Specialized dry cleaning for curtains and drapes to remove dust, stains, and allergens.',
-    icon: '🪟',
   },
   {
     title: 'Carpet Cleaning',
     description: 'Deep extraction cleaning for carpets to lift embedded dirt, stains, and odors.',
-    icon: '🧹',
   },
   {
     title: 'Sofa Cleaning',
     description: 'Thorough cleaning and sanitizing of sofas and upholstered furniture.',
-    icon: '🛋️',
   },
   {
     title: 'Post-Construction Cleaning',
     description: 'Thorough removal of construction dust, debris, and residues after renovation or building work.',
-    icon: '🔨',
   },
   {
     title: 'Mattress Cleaning',
     description: 'Deep cleaning and sanitizing of mattresses to eliminate dust mites, stains, and allergens.',
-    icon: '🛏️',
   },
   {
     title: 'Carpet Shampooing',
     description: 'Hot water extraction shampooing to revive and deep-clean heavily soiled carpets.',
-    icon: '🫧',
   },
   {
     title: 'Office Cleaning',
     description: 'Professional cleaning of office spaces, workstations, common areas, and restrooms.',
-    icon: '🏢',
   },
   {
     title: 'Condo Cleaning',
     description: 'Specialized cleaning packages tailored for condo units — flexible scheduling available.',
-    icon: '🏙️',
   },
 ]
 

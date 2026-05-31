@@ -2,7 +2,6 @@ import Link from 'next/link'
 import Image from 'next/image'
 import MarketingHeader from '@/components/marketing/header'
 import MarketingFooter from '@/components/marketing/footer'
-import SectionHeader from '@/components/marketing/section-header'
 import { SERVICES, BRANCH, STEPS } from '@/lib/marketing-data'
 
 export default function HomePage() {
@@ -11,88 +10,89 @@ export default function HomePage() {
       <MarketingHeader />
 
       {/* Hero */}
-      <section className="max-w-6xl mx-auto px-4 sm:px-6 py-20 sm:py-28 text-center">
-        <div className="flex justify-center mb-8">
-          <Image
-            src="/Logo.jpg"
-            alt="Maid For You Cleaning Services"
-            width={200}
-            height={60}
-            className="h-16 w-auto object-contain"
-            priority
-          />
-        </div>
-        <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold text-gray-900 leading-tight mb-6">
-          Professional Cleaning
-          <br className="hidden sm:block" />
-          <span className="text-blue-600"> You Can Trust</span>
-        </h1>
-        <p className="text-lg text-gray-500 max-w-2xl mx-auto mb-4">
-          Maid For You Cleaning Services in Metro Manila offers different kinds of services.
-        </p>
-        <p className="text-base text-gray-400 max-w-2xl mx-auto mb-10">
-          We understand the needs of every unit owner, and our team has the quality and integrity
-          to provide you with the best service we offer at an affordable price.
-        </p>
-        <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
-          <Link
-            href="/register"
-            className="w-full sm:w-auto px-8 py-3.5 bg-blue-600 text-white rounded-xl font-semibold text-base hover:bg-blue-700 transition-colors"
-          >
-            Create an account
-          </Link>
-          <a
-            href="#services"
-            className="w-full sm:w-auto px-8 py-3.5 bg-gray-100 text-gray-700 rounded-xl font-semibold text-base hover:bg-gray-200 transition-colors"
-          >
-            Our services
-          </a>
-        </div>
-
-        {/* Mobile app notice */}
-        <div className="mt-10 inline-flex items-center gap-2 bg-blue-50 border border-blue-100 text-blue-700 text-sm px-4 py-2.5 rounded-full">
-          <span>📱</span>
-          <span>Book your service via our mobile app — coming soon on iOS &amp; Android</span>
+      <section className="max-w-6xl mx-auto px-4 sm:px-6 py-20 sm:py-28">
+        <div className="max-w-3xl">
+          <div className="mb-6">
+            <Image
+              src="/Logo.jpg"
+              alt="Maid For You Cleaning Services"
+              width={180}
+              height={54}
+              className="h-14 w-auto object-contain"
+              priority
+            />
+          </div>
+          <h1 className="text-4xl sm:text-5xl font-bold text-gray-900 leading-tight tracking-tight mb-5">
+            Professional cleaning
+            <br />
+            <span className="text-blue-600">you can count on.</span>
+          </h1>
+          <p className="text-lg text-gray-500 leading-relaxed mb-4">
+            Maid For You Cleaning Services in Metro Manila offers different kinds of services.
+          </p>
+          <p className="text-base text-gray-400 leading-relaxed mb-8 max-w-xl">
+            We understand the needs of every unit owner, and our team has the quality and integrity
+            to provide you with the best service at an affordable price.
+          </p>
+          <div className="flex flex-col sm:flex-row items-start gap-3">
+            <Link
+              href="/register"
+              className="px-6 py-3 bg-blue-600 text-white rounded-lg font-semibold text-sm hover:bg-blue-700 transition-colors"
+            >
+              Download the App
+            </Link>
+            <a
+              href="#services"
+              className="px-6 py-3 bg-gray-100 text-gray-700 rounded-lg font-semibold text-sm hover:bg-gray-200 transition-colors"
+            >
+              View services
+            </a>
+          </div>
+          <p className="mt-6 text-xs text-gray-400 border border-gray-200 rounded-full inline-flex items-center gap-2 px-4 py-2">
+            <span className="w-2 h-2 rounded-full bg-blue-500 inline-block" />
+            Book via our mobile app &mdash; coming soon on iOS &amp; Android
+          </p>
         </div>
       </section>
 
       {/* Services */}
       <section id="services" className="bg-gray-50 py-16 sm:py-20">
         <div className="max-w-6xl mx-auto px-4 sm:px-6">
-          <SectionHeader
-            title="Our Services"
-            subtitle="Professional cleaning for every need, done right every time."
-          />
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+          <div className="mb-10">
+            <h2 className="text-2xl font-bold text-gray-900 tracking-tight">Our Services</h2>
+            <p className="text-sm text-gray-500 mt-1">Professional cleaning for every need.</p>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-px bg-gray-200 rounded-xl overflow-hidden border border-gray-200">
             {SERVICES.map((service) => (
               <div
                 key={service.title}
-                className="bg-white rounded-xl p-6 border border-gray-100 hover:border-blue-100 hover:shadow-sm transition-all"
+                className="bg-white px-6 py-5 hover:bg-blue-50 transition-colors"
               >
-                <span className="text-3xl mb-4 block">{service.icon}</span>
-                <h3 className="text-base font-semibold text-gray-900 mb-2">{service.title}</h3>
-                <p className="text-sm text-gray-500 leading-relaxed">{service.description}</p>
+                <p className="text-sm font-semibold text-gray-900 mb-1.5">{service.title}</p>
+                <p className="text-xs text-gray-500 leading-relaxed">{service.description}</p>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* How it Works */}
+      {/* How it works */}
       <section id="how-it-works" className="py-16 sm:py-20">
         <div className="max-w-6xl mx-auto px-4 sm:px-6">
-          <SectionHeader
-            title="How It Works"
-            subtitle="Three simple steps to a cleaner home."
-          />
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-8 max-w-3xl mx-auto">
-            {STEPS.map((item) => (
-              <div key={item.step} className="text-center">
-                <div className="w-12 h-12 bg-blue-600 text-white rounded-xl flex items-center justify-center text-lg font-bold mx-auto mb-4">
-                  {item.step}
+          <div className="mb-10">
+            <h2 className="text-2xl font-bold text-gray-900 tracking-tight">How It Works</h2>
+            <p className="text-sm text-gray-500 mt-1">Three steps to a cleaner space.</p>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-8">
+            {STEPS.map((item, i) => (
+              <div key={item.step} className="flex gap-4">
+                <div className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center text-xs font-bold shrink-0 mt-0.5">
+                  {i + 1}
                 </div>
-                <h3 className="text-base font-semibold text-gray-900 mb-2">{item.title}</h3>
-                <p className="text-sm text-gray-500 leading-relaxed">{item.description}</p>
+                <div>
+                  <p className="text-sm font-semibold text-gray-900 mb-1">{item.title}</p>
+                  <p className="text-sm text-gray-500 leading-relaxed">{item.description}</p>
+                </div>
               </div>
             ))}
           </div>
@@ -100,37 +100,35 @@ export default function HomePage() {
       </section>
 
       {/* Coverage */}
-      <section id="coverage" className="bg-blue-600 py-16 sm:py-20">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 text-center">
-          <h2 className="text-3xl font-bold text-white mb-3">Where We Operate</h2>
-          <p className="text-blue-200 mb-10">
-            Proudly serving Metro Manila (NCR) — bringing professional cleaning to your doorstep.
-          </p>
-          <div className="flex justify-center">
-            <div className="bg-white/10 border border-white/20 rounded-xl px-8 py-4 text-white">
-              <p className="font-semibold text-lg">{BRANCH.name}</p>
-              <p className="text-sm text-blue-200 mt-1">{BRANCH.area}</p>
-              <p className="text-sm text-blue-200 mt-0.5">{BRANCH.phone}</p>
-            </div>
+      <section className="bg-blue-600 py-14">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-6">
+          <div>
+            <p className="text-xs font-semibold text-blue-300 uppercase tracking-widest mb-2">Service Area</p>
+            <h2 className="text-2xl font-bold text-white">{BRANCH.name}</h2>
+            <p className="text-blue-200 mt-1 text-sm">{BRANCH.area} &mdash; {BRANCH.phone}</p>
           </div>
+          <Link
+            href="/register"
+            className="px-6 py-3 bg-white text-blue-600 rounded-lg font-semibold text-sm hover:bg-blue-50 transition-colors shrink-0"
+          >
+            Create account
+          </Link>
         </div>
       </section>
 
-      {/* Final CTA */}
+      {/* CTA */}
       <section className="py-16 sm:py-20">
         <div className="max-w-2xl mx-auto px-4 sm:px-6 text-center">
-          <h2 className="text-3xl font-bold text-gray-900 mb-3">Ready for a cleaner home?</h2>
-          <p className="text-gray-500 mb-2">
-            Book through our mobile app — available soon on iOS and Android.
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">Ready for a cleaner home?</h2>
+          <p className="text-gray-500 text-sm mb-2">
+            Book through our mobile app &mdash; available soon on iOS and Android.
           </p>
-          <p className="text-gray-400 text-sm mb-8">
-            Create a free account now to be ready when the app launches.
-          </p>
+          <p className="text-gray-400 text-xs mb-8">Create a free account now to be ready when the app launches.</p>
           <Link
             href="/register"
-            className="inline-block px-10 py-3.5 bg-blue-600 text-white rounded-xl font-semibold text-base hover:bg-blue-700 transition-colors"
+            className="inline-block px-8 py-3 bg-blue-600 text-white rounded-lg font-semibold text-sm hover:bg-blue-700 transition-colors"
           >
-            Create free account
+            Download the App
           </Link>
         </div>
       </section>

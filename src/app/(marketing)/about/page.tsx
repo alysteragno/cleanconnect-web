@@ -54,15 +54,14 @@ export default function AboutPage() {
             title="What We Offer"
             subtitle="Professional cleaning services tailored to every need."
           />
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-px bg-gray-200 rounded-xl overflow-hidden border border-gray-200">
             {SERVICES.map((service) => (
               <div
                 key={service.title}
-                className="bg-white rounded-xl p-6 border border-gray-100 hover:border-blue-100 hover:shadow-sm transition-all"
+                className="bg-white px-6 py-5 hover:bg-blue-50 transition-colors"
               >
-                <span className="text-3xl mb-4 block">{service.icon}</span>
-                <h3 className="text-base font-semibold text-gray-900 mb-2">{service.title}</h3>
-                <p className="text-sm text-gray-500 leading-relaxed">{service.description}</p>
+                <p className="text-sm font-semibold text-gray-900 mb-1.5">{service.title}</p>
+                <p className="text-xs text-gray-500 leading-relaxed">{service.description}</p>
               </div>
             ))}
           </div>

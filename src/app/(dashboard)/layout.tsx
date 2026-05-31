@@ -1,57 +1,29 @@
+import Image from 'next/image'
+import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/utils/supabase/server'
 import { logout } from '@/app/actions/auth'
 import NotificationBell from '@/components/dashboard/notification-bell'
+import { SidebarNav } from '@/components/dashboard/sidebar-nav'
+import {
+  IconDashboard, IconCalendar, IconUsers, IconBuilding,
+  IconStar, IconChat, IconChart, IconSettings, IconSignOut,
+} from '@/components/icons'
 
-const ROLE_LABELS: Record<string, string> = {
-  super_admin: 'Super Admin',
-  branch_manager: 'Branch Manager',
-  cleaner: 'Cleaner',
-  customer: 'Customer',
-}
+const ADMIN_NAV = [
+  { href: '/admin',            label: 'Dashboard',  icon: <IconDashboard /> },
+  { href: '/admin/bookings',   label: 'Bookings',   icon: <IconCalendar /> },
+  { href: '/admin/cleaners',   label: 'Cleaners',   icon: <IconUsers /> },
+  { href: '/admin/branches',   label: 'Branch',     icon: <IconBuilding /> },
+  { href: '/admin/feedback',   label: 'Feedback',   icon: <IconStar /> },
+  { href: '/admin/complaints', label: 'Complaints', icon: <IconChat /> },
+  { href: '/admin/reports',    label: 'Reports',    icon: <IconChart /> },
+  { href: '/admin/settings',   label: 'Settings',   icon: <IconSettings /> },
+]
 
-const ROLE_NAV: Record<string, { href: string; label: string; icon: string }[]> = {
-  customer: [
-    { href: '/customer', label: 'Dashboard', icon: '🏠' },
-    { href: '/customer/book', label: 'Book a Service', icon: '📋' },
-    { href: '/customer/bookings', label: 'My Bookings', icon: '📅' },
-    { href: '/customer/profile', label: 'Profile', icon: '👤' },
-    { href: '/customer/complaints', label: 'Complaints', icon: '🗣️' },
-    { href: '/customer/help', label: 'Help & Support', icon: '💬' },
-  ],
-  cleaner: [
-    { href: '/cleaner', label: 'Dashboard', icon: '🏠' },
-    { href: '/cleaner/jobs', label: 'My Jobs', icon: '📋' },
-    { href: '/cleaner/schedule', label: 'Schedule', icon: '📅' },
-    { href: '/cleaner/profile', label: 'Profile', icon: '👤' },
-  ],
-  branch_manager: [
-    { href: '/manager', label: 'Dashboard', icon: '🏠' },
-    { href: '/manager/bookings', label: 'Bookings', icon: '📋' },
-    { href: '/manager/cleaners', label: 'Cleaners', icon: '👷' },
-  ],
-  super_admin: [
-    { href: '/admin', label: 'Dashboard', icon: '🏠' },
-    { href: '/admin/bookings', label: 'All Bookings', icon: '📋' },
-    { href: '/admin/cleaners', label: 'Cleaners', icon: '👷' },
-    { href: '/admin/branches', label: 'Branches', icon: '🏢' },
-    { href: '/admin/feedback', label: 'Feedback', icon: '⭐' },
-    { href: '/admin/complaints', label: 'Complaints', icon: '🗣️' },
-    { href: '/admin/reports', label: 'Reports', icon: '📊' },
-    { href: '/admin/settings', label: 'Settings', icon: '⚙️' },
-  ],
-}
-
-export default async function DashboardLayout({
-  children,
-}: {
-  children: React.ReactNode
-}) {
+export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
+  const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
   const { data: profile } = await supabase
@@ -61,9 +33,12 @@ export default async function DashboardLayout({
     .single()
 
   const role = profile?.role ?? 'customer'
-  const navLinks = ROLE_NAV[role] ?? ROLE_NAV.customer
   const displayName = profile?.full_name ?? user.email ?? 'User'
-  const initials = displayName.charAt(0).toUpperCase()
+
+  // customer / cleaner roles see mobile placeholder fullscreen — no sidebar needed
+  if (role === 'customer' || role === 'cleaner') {
+    return <>{children}</>
+  }
 
   const { data: notifData } = await supabase
     .from('notifications')
@@ -72,71 +47,63 @@ export default async function DashboardLayout({
     .order('created_at', { ascending: false })
     .limit(10)
 
-  const initialNotifications = notifData ?? []
-
   return (
     <div className="min-h-screen bg-gray-50 flex">
-      {/* Sidebar */}
-      <aside className="w-60 bg-white border-r border-gray-200 flex flex-col shrink-0">
+      {/* Fixed sidebar */}
+      <aside className="w-56 bg-white border-r border-gray-100 flex flex-col fixed inset-y-0 left-0 z-20">
         {/* Logo */}
-        <div className="px-5 py-4 border-b border-gray-100">
-          <span className="text-base font-bold text-blue-600">CleanConnect</span>
-        </div>
-
-        {/* User identity */}
-        <div className="px-5 py-4 border-b border-gray-100 flex items-center gap-3">
-          <div className="w-8 h-8 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-sm font-bold shrink-0">
-            {initials}
-          </div>
-          <div className="min-w-0">
-            <p className="text-sm font-semibold text-gray-900 truncate">{displayName}</p>
-            <p className="text-xs text-gray-400">{ROLE_LABELS[role]}</p>
-          </div>
+        <div className="h-14 px-4 flex items-center border-b border-gray-100 shrink-0">
+          <Link href="/admin">
+            <Image
+              src="/Logo.jpg"
+              alt="Maid For You Cleaning Services"
+              width={110}
+              height={32}
+              className="h-8 w-auto object-contain"
+              priority
+            />
+          </Link>
         </div>
 
         {/* Nav links */}
-        <nav className="flex-1 px-3 py-3 space-y-0.5 overflow-y-auto">
-          {navLinks.map((link) => (
-            <a
-              key={link.href}
-              href={link.href}
-              className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-50 transition-colors"
-            >
-              <span className="text-base shrink-0">{link.icon}</span>
-              {link.label}
-            </a>
-          ))}
-        </nav>
+        <SidebarNav links={ADMIN_NAV} />
 
-        {/* Sign out — prominent at bottom */}
-        <div className="px-3 py-3 border-t border-gray-100">
+        {/* User info + sign out */}
+        <div className="border-t border-gray-100 px-3 py-3 space-y-0.5 shrink-0">
+          <div className="flex items-center gap-2.5 px-3 py-2 rounded-lg">
+            <div className="w-7 h-7 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-xs font-semibold shrink-0">
+              {displayName.charAt(0).toUpperCase()}
+            </div>
+            <div className="min-w-0">
+              <p className="text-xs font-semibold text-gray-900 truncate">{displayName}</p>
+              <p className="text-xs text-gray-400">Admin</p>
+            </div>
+          </div>
           <form action={logout}>
             <button
               type="submit"
-              className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium text-red-500 hover:text-red-700 hover:bg-red-50 transition-colors"
+              className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-gray-500 hover:text-red-600 hover:bg-red-50 transition-colors"
             >
-              <span className="text-base">🚪</span>
+              <span className="shrink-0"><IconSignOut /></span>
               Sign out
             </button>
           </form>
         </div>
       </aside>
 
-      {/* Main content */}
-      <div className="flex-1 flex flex-col min-w-0">
-        <header className="bg-white border-b border-gray-200 px-6 py-3 flex items-center justify-end gap-3">
+      {/* Content — offset by sidebar width */}
+      <div className="flex-1 flex flex-col min-w-0 ml-56">
+        <header className="h-14 bg-white border-b border-gray-100 px-6 flex items-center justify-end gap-3 sticky top-0 z-10">
           <NotificationBell
             userId={user.id}
             role={role}
-            initialNotifications={initialNotifications}
+            initialNotifications={notifData ?? []}
           />
-          <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full font-medium">
-            {ROLE_LABELS[role]}
-          </span>
-          <span className="text-sm font-medium text-gray-700">{displayName}</span>
+          <span className="w-px h-4 bg-gray-200" />
+          <span className="text-sm text-gray-600 font-medium">{displayName}</span>
         </header>
 
-        <main className="flex-1 p-6">{children}</main>
+        <main className="flex-1 p-6 max-w-screen-xl">{children}</main>
       </div>
     </div>
   )

@@ -42,12 +42,6 @@ export default function MarketingHeader() {
           <Link href="/login" className="text-sm text-gray-500 hover:text-gray-900 transition-colors">
             Sign in
           </Link>
-          <Link
-            href="/register"
-            className="text-sm px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors"
-          >
-            Get started
-          </Link>
         </div>
       </div>
     </header>
