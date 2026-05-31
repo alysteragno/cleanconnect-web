@@ -1,4 +1,4 @@
-import Link from 'next/link'
+﻿import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { createClient } from '@/utils/supabase/server'
 import CleanerEditForm from './cleaner-edit-form'
@@ -42,7 +42,7 @@ export default async function CleanerDetailPage({ params }: { params: Promise<{ 
 
       <div className="bg-white rounded-xl border border-gray-200 p-6">
         <div className="flex items-center gap-4 mb-6 pb-5 border-b border-gray-100">
-          <div className="w-12 h-12 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-lg font-bold shrink-0">
+          <div className="w-12 h-12 bg-pink-100 text-pink-600 rounded-full flex items-center justify-center text-lg font-bold shrink-0">
             {c.full_name.charAt(0).toUpperCase()}
           </div>
           <div>

@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useActionState } from 'react'
 import { updatePaymentStatus } from '@/app/actions/admin'
@@ -27,7 +27,7 @@ export default function PaymentForm({
           <label
             key={s.value}
             className={`flex items-center gap-2 p-3 border rounded-lg cursor-pointer transition-colors ${
-              currentStatus === s.value ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300'
+              currentStatus === s.value ? 'border-pink-500 bg-pink-50' : 'border-gray-200 hover:border-gray-300'
             }`}
           >
             <input
@@ -35,7 +35,7 @@ export default function PaymentForm({
               name="payment_status"
               value={s.value}
               defaultChecked={currentStatus === s.value}
-              className="accent-blue-600"
+              className="accent-pink-600"
             />
             <span className="text-sm font-medium text-gray-900">{s.label}</span>
           </label>
@@ -52,7 +52,7 @@ export default function PaymentForm({
       <button
         type="submit"
         disabled={pending}
-        className="w-full py-2.5 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700 disabled:opacity-50 transition-colors"
+        className="w-full py-2.5 bg-pink-600 text-white rounded-lg text-sm font-semibold hover:bg-pink-700 disabled:opacity-50 transition-colors"
       >
         {pending ? 'Updating...' : 'Update Payment Status'}
       </button>

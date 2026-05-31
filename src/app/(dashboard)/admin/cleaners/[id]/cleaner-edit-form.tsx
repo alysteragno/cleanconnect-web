@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useActionState } from 'react'
 import { updateCleanerProfile, toggleCleanerStatus } from '@/app/actions/admin'
@@ -30,7 +30,7 @@ export default function CleanerEditForm({ cleanerId, fullName, phone, branchId, 
             type="text"
             required
             defaultValue={fullName}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-pink-500"
           />
         </div>
 
@@ -43,7 +43,7 @@ export default function CleanerEditForm({ cleanerId, fullName, phone, branchId, 
             type="tel"
             defaultValue={phone ?? ''}
             placeholder="+63 9XX XXX XXXX"
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-pink-500"
           />
         </div>
 
@@ -53,7 +53,7 @@ export default function CleanerEditForm({ cleanerId, fullName, phone, branchId, 
             name="branch_id"
             required
             defaultValue={branchId ?? ''}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-pink-500 bg-white"
           >
             <option value="" disabled>Select branch...</option>
             {branches.map((b) => (
@@ -72,7 +72,7 @@ export default function CleanerEditForm({ cleanerId, fullName, phone, branchId, 
         <button
           type="submit"
           disabled={editPending}
-          className="w-full py-2.5 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700 disabled:opacity-50 transition-colors"
+          className="w-full py-2.5 bg-pink-600 text-white rounded-lg text-sm font-semibold hover:bg-pink-700 disabled:opacity-50 transition-colors"
         >
           {editPending ? 'Saving...' : 'Save Changes'}
         </button>

@@ -1,9 +1,9 @@
-import Link from 'next/link'
+﻿import Link from 'next/link'
 import { createClient } from '@/utils/supabase/server'
 
 const STATUS_STYLES: Record<string, string> = {
   open: 'bg-yellow-50 text-yellow-700 border-yellow-200',
-  in_progress: 'bg-blue-50 text-blue-700 border-blue-200',
+  in_progress: 'bg-pink-50 text-pink-700 border-pink-200',
   resolved: 'bg-green-50 text-green-700 border-green-200',
 }
 const STATUS_LABELS: Record<string, string> = {

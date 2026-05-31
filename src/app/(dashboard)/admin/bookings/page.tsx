@@ -1,4 +1,4 @@
-import Link from 'next/link'
+﻿import Link from 'next/link'
 import { createClient } from '@/utils/supabase/server'
 
 type Booking = {
@@ -18,7 +18,7 @@ type Branch = { id: string; name: string }
 
 const STATUS_STYLES: Record<string, string> = {
   pending: 'bg-yellow-50 text-yellow-700 border-yellow-200',
-  confirmed: 'bg-blue-50 text-blue-700 border-blue-200',
+  confirmed: 'bg-pink-50 text-pink-700 border-pink-200',
   in_progress: 'bg-purple-50 text-purple-700 border-purple-200',
   completed: 'bg-green-50 text-green-700 border-green-200',
   cancelled: 'bg-red-50 text-red-700 border-red-200',
@@ -95,7 +95,7 @@ export default async function AdminBookingsPage({
               href={filterLink('status', s || undefined)}
               className={`text-xs px-3 py-1.5 rounded-full border font-medium transition-colors capitalize ${
                 (status ?? '') === s
-                  ? 'bg-blue-600 text-white border-blue-600'
+                  ? 'bg-pink-600 text-white border-pink-600'
                   : 'bg-white text-gray-600 border-gray-300 hover:border-gray-400'
               }`}
             >
@@ -145,7 +145,7 @@ export default async function AdminBookingsPage({
                 </div>
                 <div className="text-right shrink-0 ml-4">
                   <p className="text-sm font-bold text-gray-900">₱{Number(b.base_price).toLocaleString()}</p>
-                  <p className="text-xs text-gray-400 capitalize mt-0.5 group-hover:text-blue-600 transition-colors">
+                  <p className="text-xs text-gray-400 capitalize mt-0.5 group-hover:text-pink-600 transition-colors">
                     {b.payment_status} →
                   </p>
                 </div>

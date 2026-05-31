@@ -1,4 +1,4 @@
-import Link from 'next/link'
+﻿import Link from 'next/link'
 import { createClient } from '@/utils/supabase/server'
 
 type CompletedBooking = {
@@ -102,7 +102,7 @@ export default async function ReportsPage() {
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
           <Stat label="Total Bookings" value={String(all.length)} />
           <Stat label="Completed" value={String(statusCounts['completed'] ?? 0)} color="text-green-600" />
-          <Stat label="Revenue Collected" value={`₱${totalRevenue.toLocaleString()}`} color="text-blue-600" />
+          <Stat label="Revenue Collected" value={`₱${totalRevenue.toLocaleString()}`} color="text-pink-600" />
           <Stat label="Receivables" value={`₱${unpaidRevenue.toLocaleString()}`} color="text-yellow-600" />
         </div>
         <div className="bg-white rounded-xl border border-gray-200">

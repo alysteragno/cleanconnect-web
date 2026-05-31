@@ -1,4 +1,4 @@
-import Link from 'next/link'
+﻿import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { createClient } from '@/utils/supabase/server'
 import ComplaintThread from '@/components/dashboard/complaint-thread'
@@ -11,7 +11,7 @@ const STATUS_OPTIONS = [
 ]
 const STATUS_STYLES: Record<string, string> = {
   open: 'bg-yellow-50 text-yellow-700 border-yellow-200',
-  in_progress: 'bg-blue-50 text-blue-700 border-blue-200',
+  in_progress: 'bg-pink-50 text-pink-700 border-pink-200',
   resolved: 'bg-green-50 text-green-700 border-green-200',
 }
 

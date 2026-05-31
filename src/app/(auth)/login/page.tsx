@@ -1,4 +1,4 @@
-import Image from 'next/image'
+﻿import Image from 'next/image'
 import LoginForm from './login-form'
 
 export default async function LoginPage({
@@ -11,7 +11,7 @@ export default async function LoginPage({
   return (
     <div className="min-h-screen bg-gray-50 flex">
       {/* Left panel — branding */}
-      <div className="hidden lg:flex lg:w-1/2 bg-blue-600 flex-col justify-between p-12">
+      <div className="hidden lg:flex lg:w-1/2 bg-pink-600 flex-col justify-between p-12">
         <Image
           src="/Logo.jpg"
           alt="Maid For You Cleaning Services"
@@ -21,7 +21,7 @@ export default async function LoginPage({
           priority
         />
         <div>
-          <p className="text-blue-100 text-sm font-medium uppercase tracking-widest mb-4">
+          <p className="text-pink-100 text-sm font-medium uppercase tracking-widest mb-4">
             Admin Portal
           </p>
           <h2 className="text-white text-3xl font-bold leading-snug">
@@ -29,11 +29,11 @@ export default async function LoginPage({
             <br />
             managed in one place.
           </h2>
-          <p className="text-blue-200 text-sm mt-4 leading-relaxed">
+          <p className="text-pink-200 text-sm mt-4 leading-relaxed">
             Maid For You Cleaning Services — serving Metro Manila since 2016.
           </p>
         </div>
-        <p className="text-blue-300 text-xs">
+        <p className="text-pink-300 text-xs">
           &copy; {new Date().getFullYear()} Maid For You Cleaning Services
         </p>
       </div>

@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useActionState, useState } from 'react'
 import { dispatchCleaners, forceAssignCleaner, cancelBooking } from '@/app/actions/admin'
@@ -12,7 +12,7 @@ const ASSIGNMENT_BADGE: Record<string, string> = {
   offered: 'bg-yellow-50 text-yellow-700 border-yellow-200',
   accepted: 'bg-green-50 text-green-700 border-green-200',
   declined: 'bg-red-50 text-red-600 border-red-200',
-  completed: 'bg-blue-50 text-blue-700 border-blue-200',
+  completed: 'bg-pink-50 text-pink-700 border-pink-200',
 }
 
 export default function DispatchPanel({
@@ -93,8 +93,8 @@ export default function DispatchPanel({
                   <>
                     <div className="space-y-2">
                       {availableForDispatch.map((c) => (
-                        <label key={c.id} className={`flex items-center gap-3 p-3 border rounded-lg cursor-pointer transition-colors ${selected.includes(c.id) ? 'border-blue-400 bg-blue-50' : 'border-gray-200 hover:border-gray-300'}`}>
-                          <input type="checkbox" checked={selected.includes(c.id)} onChange={() => toggle(c.id)} className="accent-blue-600" />
+                        <label key={c.id} className={`flex items-center gap-3 p-3 border rounded-lg cursor-pointer transition-colors ${selected.includes(c.id) ? 'border-pink-400 bg-pink-50' : 'border-gray-200 hover:border-gray-300'}`}>
+                          <input type="checkbox" checked={selected.includes(c.id)} onChange={() => toggle(c.id)} className="accent-pink-600" />
                           <div>
                             <p className="text-sm font-medium text-gray-900">{c.full_name}</p>
                             {c.phone && <p className="text-xs text-gray-400">{c.phone}</p>}
@@ -127,7 +127,7 @@ export default function DispatchPanel({
             <form action={forceAction} className="flex gap-2">
               <input type="hidden" name="booking_id" value={bookingId} />
               <select name="cleaner_id" required defaultValue=""
-                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-pink-500 bg-white">
                 <option value="" disabled>Select cleaner...</option>
                 {cleaners.map((c) => <option key={c.id} value={c.id}>{c.full_name}</option>)}
               </select>

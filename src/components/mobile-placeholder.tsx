@@ -1,4 +1,4 @@
-import Image from 'next/image'
+﻿import Image from 'next/image'
 import Link from 'next/link'
 import { logout } from '@/app/actions/auth'
 
@@ -20,8 +20,8 @@ export default function MobileAppPlaceholder({ role }: { role: 'customer' | 'cle
           />
         </div>
 
-        <div className="w-12 h-12 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center mx-auto">
-          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" className="text-blue-600 stroke-current" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <div className="w-12 h-12 rounded-xl bg-pink-50 border border-pink-100 flex items-center justify-center mx-auto">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" className="text-pink-600 stroke-current" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
             <rect x="5" y="1" width="10" height="18" rx="2" />
             <path d="M8.5 15.5h3" />
           </svg>

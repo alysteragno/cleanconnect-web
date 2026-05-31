@@ -1,4 +1,4 @@
-import Image from 'next/image'
+﻿import Image from 'next/image'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/utils/supabase/server'
@@ -71,7 +71,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
         {/* User info + sign out */}
         <div className="border-t border-gray-100 px-3 py-3 space-y-0.5 shrink-0">
           <div className="flex items-center gap-2.5 px-3 py-2 rounded-lg">
-            <div className="w-7 h-7 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-xs font-semibold shrink-0">
+            <div className="w-7 h-7 rounded-full bg-pink-100 text-pink-700 flex items-center justify-center text-xs font-semibold shrink-0">
               {displayName.charAt(0).toUpperCase()}
             </div>
             <div className="min-w-0">

@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useActionState, useEffect } from 'react'
 import { updateSettings } from '@/app/actions/settings'
@@ -12,7 +12,7 @@ function SubmitButton() {
     <button
       type="submit"
       disabled={pending}
-      className="px-6 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700 disabled:opacity-50 transition-colors"
+      className="px-6 py-2.5 bg-pink-600 text-white rounded-lg text-sm font-semibold hover:bg-pink-700 disabled:opacity-50 transition-colors"
     >
       {pending ? 'Saving...' : 'Save changes'}
     </button>
@@ -44,7 +44,7 @@ export default function AdminSettingsPage() {
         key={settings[key]}
         placeholder={placeholder}
         required
-        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-pink-500"
       />
     </div>
   )

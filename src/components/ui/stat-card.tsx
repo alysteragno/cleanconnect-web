@@ -1,11 +1,11 @@
-type Tone = 'neutral' | 'amber' | 'violet' | 'emerald' | 'blue' | 'red'
+﻿type Tone = 'neutral' | 'amber' | 'violet' | 'emerald' | 'blue' | 'red'
 
 const TONE_STYLES: Record<Tone, { value: string; bg: string }> = {
   neutral:  { value: 'text-gray-900',   bg: 'bg-white' },
   amber:    { value: 'text-amber-600',  bg: 'bg-white' },
   violet:   { value: 'text-violet-600', bg: 'bg-white' },
   emerald:  { value: 'text-emerald-600',bg: 'bg-white' },
-  blue:     { value: 'text-blue-600',   bg: 'bg-white' },
+  blue:     { value: 'text-pink-600',   bg: 'bg-white' },
   red:      { value: 'text-red-600',    bg: 'bg-white' },
 }
 

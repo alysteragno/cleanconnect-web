@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useActionState } from 'react'
 import { addCleanerDayOff, removeCleanerDayOff } from '@/app/actions/admin'
@@ -32,12 +32,12 @@ export default function AvailabilityPanel({
           name="unavailable_date"
           min={today}
           required
-          className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-pink-500"
         />
         <button
           type="submit"
           disabled={addPending}
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors whitespace-nowrap"
+          className="px-4 py-2 bg-pink-600 text-white rounded-lg text-sm font-medium hover:bg-pink-700 disabled:opacity-50 transition-colors whitespace-nowrap"
         >
           {addPending ? 'Adding…' : '+ Add Day-off'}
         </button>

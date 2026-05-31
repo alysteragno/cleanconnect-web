@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
@@ -94,7 +94,7 @@ export default function NotificationBell({
           <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
             <p className="text-sm font-semibold text-gray-900">Notifications</p>
             {unread > 0 && (
-              <button onClick={handleMarkAll} className="text-xs text-blue-600 hover:underline">
+              <button onClick={handleMarkAll} className="text-xs text-pink-600 hover:underline">
                 Mark all as read
               </button>
             )}
@@ -109,7 +109,7 @@ export default function NotificationBell({
                   key={n.id}
                   href={getHref(n, role)}
                   onClick={() => setOpen(false)}
-                  className={`block px-4 py-3 hover:bg-gray-50 transition-colors ${!n.is_read ? 'bg-blue-50/40' : ''}`}
+                  className={`block px-4 py-3 hover:bg-gray-50 transition-colors ${!n.is_read ? 'bg-pink-50/40' : ''}`}
                 >
                   <p className={`text-sm font-medium ${!n.is_read ? 'text-gray-900' : 'text-gray-500'}`}>
                     {n.title}

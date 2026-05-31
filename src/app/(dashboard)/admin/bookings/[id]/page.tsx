@@ -1,4 +1,4 @@
-import Link from 'next/link'
+﻿import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { createClient } from '@/utils/supabase/server'
 import PaymentForm from './payment-form'
@@ -47,7 +47,7 @@ const SERVICE_LABELS: Record<string, string> = {
 
 const STATUS_STYLES: Record<string, string> = {
   pending: 'bg-yellow-50 text-yellow-700 border-yellow-200',
-  confirmed: 'bg-blue-50 text-blue-700 border-blue-200',
+  confirmed: 'bg-pink-50 text-pink-700 border-pink-200',
   in_progress: 'bg-purple-50 text-purple-700 border-purple-200',
   completed: 'bg-green-50 text-green-700 border-green-200',
   cancelled: 'bg-red-50 text-red-700 border-red-200',

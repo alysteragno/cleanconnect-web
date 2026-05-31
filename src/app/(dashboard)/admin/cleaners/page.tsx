@@ -1,4 +1,4 @@
-import Link from 'next/link'
+﻿import Link from 'next/link'
 import { createClient } from '@/utils/supabase/server'
 
 type Cleaner = {
@@ -31,7 +31,7 @@ export default async function AdminCleanersPage() {
           <h1 className="text-xl font-bold text-gray-900">Cleaners</h1>
           <Link
             href="/admin/cleaners/new"
-            className="text-sm px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors"
+            className="text-sm px-4 py-2 bg-pink-600 text-white rounded-lg font-medium hover:bg-pink-700 transition-colors"
           >
             + Add Cleaner
           </Link>
@@ -62,7 +62,7 @@ function CleanerSection({ title, cleaners, dimmed = false }: { title: string; cl
               className={`flex items-center justify-between p-4 hover:bg-gray-50 transition-colors group ${dimmed ? 'opacity-60' : ''}`}
             >
               <div className="flex items-center gap-3">
-                <div className="w-9 h-9 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-sm font-bold shrink-0">
+                <div className="w-9 h-9 bg-pink-100 text-pink-600 rounded-full flex items-center justify-center text-sm font-bold shrink-0">
                   {c.full_name.charAt(0).toUpperCase()}
                 </div>
                 <div>
@@ -72,7 +72,7 @@ function CleanerSection({ title, cleaners, dimmed = false }: { title: string; cl
                   </p>
                 </div>
               </div>
-              <p className="text-xs text-blue-600 group-hover:underline">Edit →</p>
+              <p className="text-xs text-pink-600 group-hover:underline">Edit →</p>
             </Link>
           ))}
         </div>

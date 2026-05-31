@@ -44,7 +44,15 @@ export const SERVICES = [
 export const BRANCH = {
   name: 'Maid For You Cleaning Services',
   area: 'Metro Manila (NCR)',
-  phone: '+63 2 8XXX XXXX',
+  phone: '+63458890338',
+}
+
+export const CONTACT = {
+  phone: '0945 889 0338',
+  phoneTel: 'tel:+639458890338',
+  email: 'maid4you20.ph@gmail.com',
+  messengerUrl: 'https://www.facebook.com/messages/t/maid4you20/',
+  whatsappUrl: 'https://wa.me/639458890338',
 }
 
 export const STEPS = [

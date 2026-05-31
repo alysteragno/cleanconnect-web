@@ -1,4 +1,4 @@
-import Link from 'next/link'
+﻿import Link from 'next/link'
 import { createClient } from '@/utils/supabase/server'
 import { StatCard } from '@/components/ui/stat-card'
 
@@ -70,9 +70,9 @@ export default async function AdminPage() {
             <Link
               key={item.href}
               href={item.href}
-              className="bg-white rounded-xl border border-gray-200 px-4 py-3.5 hover:border-blue-300 hover:bg-blue-50 transition-all group"
+              className="bg-white rounded-xl border border-gray-200 px-4 py-3.5 hover:border-pink-300 hover:bg-pink-50 transition-all group"
             >
-              <p className="text-sm font-semibold text-gray-900 group-hover:text-blue-700">{item.label}</p>
+              <p className="text-sm font-semibold text-gray-900 group-hover:text-pink-700">{item.label}</p>
               <p className="text-xs text-gray-400 mt-0.5">{item.sub}</p>
             </Link>
           ))}
@@ -90,7 +90,7 @@ export default async function AdminPage() {
                   <p className="text-sm font-semibold text-gray-900">{b.name}</p>
                   <p className="text-xs text-gray-400">{b.region}</p>
                 </div>
-                <span className="text-xs text-blue-600 bg-blue-50 border border-blue-100 px-2 py-0.5 rounded-full font-medium">
+                <span className="text-xs text-pink-600 bg-pink-50 border border-pink-100 px-2 py-0.5 rounded-full font-medium">
                   {b.cleaners} cleaner{b.cleaners !== 1 ? 's' : ''}
                 </span>
               </div>

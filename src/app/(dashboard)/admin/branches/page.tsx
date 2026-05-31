@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import Link from 'next/link'
 import { useActionState, useEffect, useState } from 'react'
@@ -43,7 +43,7 @@ export default function AdminBranchesPage() {
                   type="text"
                   required
                   defaultValue={branch.name}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-pink-500"
                 />
               </div>
               <div>
@@ -53,7 +53,7 @@ export default function AdminBranchesPage() {
                   type="text"
                   required
                   defaultValue={branch.region}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-pink-500"
                 />
               </div>
             </div>
@@ -64,7 +64,7 @@ export default function AdminBranchesPage() {
                 type="tel"
                 defaultValue={branch.contact_number ?? ''}
                 placeholder="+63 2 XXXX XXXX"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-pink-500"
               />
             </div>
             {state?.error && (
@@ -76,7 +76,7 @@ export default function AdminBranchesPage() {
             <button
               type="submit"
               disabled={pending}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors"
+              className="px-4 py-2 bg-pink-600 text-white rounded-lg text-sm font-medium hover:bg-pink-700 disabled:opacity-50 transition-colors"
             >
               {pending ? 'Saving...' : 'Save Changes'}
             </button>

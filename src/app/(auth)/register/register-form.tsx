@@ -1,9 +1,9 @@
-'use client'
+﻿'use client'
 
 import { useActionState } from 'react'
 import { register } from '@/app/actions/auth'
 
-const inputClass = 'w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition'
+const inputClass = 'w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent transition'
 
 export default function RegisterForm() {
   const [state, action, pending] = useActionState(register, undefined)
@@ -65,7 +65,7 @@ export default function RegisterForm() {
       <button
         type="submit"
         disabled={pending}
-        className="w-full py-2.5 px-4 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors mt-2"
+        className="w-full py-2.5 px-4 bg-pink-600 text-white rounded-lg text-sm font-semibold hover:bg-pink-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors mt-2"
       >
         {pending ? 'Creating account...' : 'Create account'}
       </button>

@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useState, useEffect, useRef } from 'react'
 import { createClient } from '@/utils/supabase/client'
@@ -90,7 +90,7 @@ export default function ComplaintThread({
                 <p className="text-xs text-gray-400">{senderLabel}</p>
                 <div className={`px-3 py-2 rounded-xl text-sm leading-relaxed ${
                   isOwn
-                    ? 'bg-blue-600 text-white rounded-br-sm'
+                    ? 'bg-pink-600 text-white rounded-br-sm'
                     : 'bg-gray-100 text-gray-900 rounded-bl-sm'
                 }`}>
                   {msg.message}
@@ -118,7 +118,7 @@ export default function ComplaintThread({
                 value={text}
                 onChange={(e) => setText(e.target.value)}
                 placeholder="Type your message..."
-                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-pink-500 resize-none"
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend() }
                 }}
@@ -126,7 +126,7 @@ export default function ComplaintThread({
               <button
                 onClick={handleSend}
                 disabled={pending || !text.trim()}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors self-end"
+                className="px-4 py-2 bg-pink-600 text-white rounded-lg text-sm font-medium hover:bg-pink-700 disabled:opacity-50 transition-colors self-end"
               >
                 Send
               </button>

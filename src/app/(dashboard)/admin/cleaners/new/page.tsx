@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import Link from 'next/link'
 import { useActionState } from 'react'
@@ -41,7 +41,7 @@ export default function NewCleanerPage() {
               type="text"
               required
               placeholder="Maria Santos"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-pink-500"
             />
           </div>
 
@@ -52,7 +52,7 @@ export default function NewCleanerPage() {
               type="email"
               required
               placeholder="maria@cleaningladyph.com"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-pink-500"
             />
           </div>
 
@@ -64,7 +64,7 @@ export default function NewCleanerPage() {
               required
               minLength={8}
               placeholder="Min. 8 characters"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-pink-500"
             />
           </div>
 
@@ -76,7 +76,7 @@ export default function NewCleanerPage() {
               name="phone"
               type="tel"
               placeholder="+63 9XX XXX XXXX"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-pink-500"
             />
           </div>
 
@@ -86,7 +86,7 @@ export default function NewCleanerPage() {
               name="branch_id"
               required
               defaultValue=""
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-pink-500 bg-white"
             >
               <option value="" disabled>Select a branch...</option>
               {branches.map((b) => (
@@ -104,7 +104,7 @@ export default function NewCleanerPage() {
           <button
             type="submit"
             disabled={pending}
-            className="w-full py-2.5 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700 disabled:opacity-50 transition-colors"
+            className="w-full py-2.5 bg-pink-600 text-white rounded-lg text-sm font-semibold hover:bg-pink-700 disabled:opacity-50 transition-colors"
           >
             {pending ? 'Creating account...' : 'Create Cleaner Account'}
           </button>
