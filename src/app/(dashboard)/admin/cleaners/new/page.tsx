@@ -6,20 +6,10 @@ import { createCleanerAccount } from '@/app/actions/admin'
 import { useEffect, useState } from 'react'
 import { createClient } from '@/utils/supabase/client'
 
-type Branch = { id: string; name: string; region: string }
 
 export default function NewCleanerPage() {
   const [state, action, pending] = useActionState(createCleanerAccount, undefined)
-  const [branches, setBranches] = useState<Branch[]>([])
-
-  useEffect(() => {
-    createClient()
-      .from('branches')
-      .select('id, name, region')
-      .order('name')
-      .then(({ data }) => setBranches((data ?? []) as Branch[]))
-  }, [])
-
+ 
   return (
     <div className="max-w-lg space-y-6">
       <div>
@@ -80,21 +70,7 @@ export default function NewCleanerPage() {
             />
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Branch *</label>
-            <select
-              name="branch_id"
-              required
-              defaultValue=""
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-pink-500 bg-white"
-            >
-              <option value="" disabled>Select a branch...</option>
-              {branches.map((b) => (
-                <option key={b.id} value={b.id}>{b.name} — {b.region}</option>
-              ))}
-            </select>
-          </div>
-
+        
           {state?.error && (
             <p className="text-sm text-red-600 bg-red-50 border border-red-100 px-3 py-2 rounded-lg">
               {state.error}

@@ -146,47 +146,47 @@ export default function HomePage() {
       </section>
 
       {/* Coverage — address + service areas */}
-      <section className="bg-pink-600 py-14">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6">
-          <div className="flex flex-col gap-8 lg:flex-row lg:items-start lg:justify-between">
+    <section className="bg-gradient-to-b from-pink-600 from-95% via-pink-600 to-[#FFF5EC] py-14">
+  <div className="max-w-6xl mx-auto px-4 sm:px-6">
+    <div className="flex flex-col gap-8 lg:flex-row lg:items-start lg:justify-between">
 
-            {/* Left — address */}
-            <div>
-              <p className="text-xs font-semibold text-pink-300 uppercase tracking-widest mb-3">Our Location</p>
-              <h2 className="text-xl font-bold text-white mb-2">{BRANCH.name}</h2>
-              <div className="flex items-start gap-2">
-                <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-pink-300 shrink-0 mt-0.5">
-                  <path d="M8 1.5a4.5 4.5 0 014.5 4.5c0 3-4.5 8.5-4.5 8.5S3.5 9 3.5 6A4.5 4.5 0 018 1.5z"/>
-                  <circle cx="8" cy="6" r="1.5"/>
-                </svg>
-                <p className="text-pink-100 text-sm">{BRANCH.address}</p>
-              </div>
-            </div>
-
-            {/* Right — service areas */}
-            <div className="lg:max-w-sm">
-              <p className="text-xs font-semibold text-pink-300 uppercase tracking-widest mb-3">Service Areas</p>
-              <div className="flex flex-wrap gap-2">
-                {BRANCH.serviceAreas.map((city) => (
-                  <span
-                    key={city}
-                    className="text-xs bg-white/15 border border-white/25 text-white px-3 py-1 rounded-full"
-                  >
-                    {city}
-                  </span>
-                ))}
-              </div>
-            </div>
-
-            <Link
-              href="/register"
-              className="px-6 py-3 bg-white text-pink-600 rounded-lg font-semibold text-sm hover:bg-pink-50 transition-colors self-start shrink-0"
-            >
-              Create account
-            </Link>
-          </div>
+      {/* Left — address */}
+      <div>
+        <p className="text-xs font-semibold text-pink-300 uppercase tracking-widest mb-3">Our Location</p>
+        <h2 className="text-xl font-bold text-white mb-2">{BRANCH.name}</h2>
+        <div className="flex items-start gap-2">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-pink-300 shrink-0 mt-0.5">
+            <path d="M8 1.5a4.5 4.5 0 014.5 4.5c0 3-4.5 8.5-4.5 8.5S3.5 9 3.5 6A4.5 4.5 0 018 1.5z"/>
+            <circle cx="8" cy="6" r="1.5"/>
+          </svg>
+          <p className="text-pink-100 text-sm">{BRANCH.address}</p>
         </div>
-      </section>
+      </div>
+
+      {/* Right — service areas */}
+      <div className="lg:max-w-sm">
+        <p className="text-xs font-semibold text-pink-300 uppercase tracking-widest mb-3">Service Areas</p>
+        <div className="flex flex-wrap gap-2">
+          {BRANCH.serviceAreas.map((city) => (
+            <span
+              key={city}
+              className="text-xs bg-white/15 border border-white/25 text-white px-3 py-1 rounded-full"
+            >
+              {city}
+            </span>
+          ))}
+        </div>
+      </div>
+
+      <Link
+        href="/register"
+        className="px-6 py-3 bg-white text-pink-600 rounded-lg font-semibold text-sm hover:bg-pink-50 transition-colors self-start shrink-0"
+      >
+        Create account
+      </Link>
+    </div>
+  </div>
+</section>
 
       {/* CTA */}
       <section className="py-16 sm:py-20">

@@ -42,10 +42,14 @@ export default async function AdminPage() {
   )
 
   return (
-    <div className="max-w-5xl space-y-8">
+    <div className="space-y-8">
+
+      {/* Header */}
       <div>
         <h1 className="text-xl font-semibold text-gray-900 tracking-tight">Dashboard</h1>
-        <p className="text-sm text-gray-500 mt-0.5">Operations overview &mdash; {new Date().toLocaleDateString('en-PH', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}</p>
+        <p className="text-sm text-gray-500 mt-0.5">
+          Operations overview &mdash; {new Date().toLocaleDateString('en-PH', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
+        </p>
       </div>
 
       {/* Global stats */}
@@ -79,39 +83,6 @@ export default async function AdminPage() {
         </div>
       </div>
 
-      {/* Branch overview */}
-      <div>
-        <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Branch overview</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {branchStats.map((b) => (
-            <div key={b.id} className="bg-white rounded-xl border border-gray-200 p-5">
-              <div className="flex items-start justify-between mb-4">
-                <div>
-                  <p className="text-sm font-semibold text-gray-900">{b.name}</p>
-                  <p className="text-xs text-gray-400">{b.region}</p>
-                </div>
-                <span className="text-xs text-pink-600 bg-pink-50 border border-pink-100 px-2 py-0.5 rounded-full font-medium">
-                  {b.cleaners} cleaner{b.cleaners !== 1 ? 's' : ''}
-                </span>
-              </div>
-              <div className="grid grid-cols-3 gap-2 text-center">
-                <div className="bg-amber-50 rounded-lg py-2">
-                  <p className="text-base font-bold text-amber-600">{b.pending}</p>
-                  <p className="text-xs text-gray-500 mt-0.5">Pending</p>
-                </div>
-                <div className="bg-violet-50 rounded-lg py-2">
-                  <p className="text-base font-bold text-violet-600">{b.active}</p>
-                  <p className="text-xs text-gray-500 mt-0.5">Active</p>
-                </div>
-                <div className="bg-emerald-50 rounded-lg py-2">
-                  <p className="text-base font-bold text-emerald-600">{b.doneToday}</p>
-                  <p className="text-xs text-gray-500 mt-0.5">Done today</p>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
       </div>
-    </div>
   )
 }

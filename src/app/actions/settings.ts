@@ -36,7 +36,7 @@ export async function updateSettings(
   for (const key of updates) {
     const value = (formData.get(key) as string)?.trim()
     if (!value) return { error: `${key} cannot be empty.` }
-    await admin.from('settings').update({ value, updated_at: new Date().toISOString() }).eq('key', key)
+    await admin.from('settings').upsert({ key, value, updated_at: new Date().toISOString() })
   }
 
   revalidatePath('/admin/settings')

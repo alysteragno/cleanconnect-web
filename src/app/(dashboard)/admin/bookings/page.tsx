@@ -1,5 +1,6 @@
 ﻿import Link from 'next/link'
 import { createClient } from '@/utils/supabase/server'
+import { BranchFilter } from './branch-filter'
 
 type Booking = {
   id: string
@@ -103,20 +104,11 @@ export default async function AdminBookingsPage({
             </Link>
           ))}
         </div>
-        <select
-          className="text-xs px-3 py-1.5 border border-gray-300 rounded-full bg-white text-gray-700 focus:outline-none"
-          defaultValue={branch ?? ''}
-          onChange={(e) => {
-            if (typeof window !== 'undefined') {
-              window.location.href = filterLink('branch', e.target.value || undefined)
-            }
-          }}
-        >
-          <option value="">All Branches</option>
-          {branchList.map((b) => (
-            <option key={b.id} value={b.id}>{b.name}</option>
-          ))}
-        </select>
+        <BranchFilter
+          branches={branchList}
+          selected={branch ?? ''}
+          baseHref="/admin/bookings"
+        />
       </div>
 
       <div className="bg-white rounded-xl border border-gray-200">

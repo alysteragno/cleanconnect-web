@@ -8,9 +8,10 @@ export type AuthState = { error: string } | undefined
 
 const ROLE_ROUTES: Record<string, string> = {
   super_admin: '/admin',
-  cleaner: '/cleaner',
   customer: '/customer',
 }
+
+const MOBILE_ONLY_ROLES = new Set(['branch_manager', 'cleaner'])
 
 export async function login(state: AuthState, formData: FormData): Promise<AuthState> {
   const email = formData.get('email') as string
@@ -23,13 +24,24 @@ export async function login(state: AuthState, formData: FormData): Promise<AuthS
 
   if (error) return { error: error.message }
 
-  const { data: profile } = await supabase
+  const adminClient = createAdminClient()
+  const { data: profile } = await adminClient
     .from('profiles')
     .select('role')
     .eq('id', data.user.id)
     .single()
 
-  const role = profile?.role ?? 'customer'
+  if (!profile) {
+    await supabase.auth.signOut()
+    return { error: 'No account profile found. Please contact the administrator.' }
+  }
+
+  const role = profile.role
+
+  if (MOBILE_ONLY_ROLES.has(role)) {
+    await supabase.auth.signOut()
+    return { error: 'Please use the mobile app to sign in.' }
+  }
 
   const cookieStore = await cookies()
   cookieStore.set('cleanconnect-role', role, {

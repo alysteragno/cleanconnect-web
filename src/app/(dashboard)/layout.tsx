@@ -1,22 +1,22 @@
-﻿import Image from 'next/image'
+import Image from 'next/image'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
+import { cookies } from 'next/headers'
 import { createClient } from '@/utils/supabase/server'
 import { logout } from '@/app/actions/auth'
 import NotificationBell from '@/components/dashboard/notification-bell'
 import { SidebarNav } from '@/components/dashboard/sidebar-nav'
 import {
-  IconDashboard, IconCalendar, IconUsers, IconBuilding,
-  IconStar, IconChat, IconChart, IconSettings, IconSignOut,
+  IconDashboard, IconCalendar, IconUsers, IconChat, IconStar,
+  IconChart, IconSettings, IconSignOut, IconChevronRight,
 } from '@/components/icons'
 
 const ADMIN_NAV = [
   { href: '/admin',            label: 'Dashboard',  icon: <IconDashboard /> },
   { href: '/admin/bookings',   label: 'Bookings',   icon: <IconCalendar /> },
   { href: '/admin/cleaners',   label: 'Cleaners',   icon: <IconUsers /> },
-  { href: '/admin/branches',   label: 'Branch',     icon: <IconBuilding /> },
-  { href: '/admin/feedback',   label: 'Feedback',   icon: <IconStar /> },
   { href: '/admin/complaints', label: 'Complaints', icon: <IconChat /> },
+  { href: '/admin/feedback',   label: 'Feedback',   icon: <IconStar /> },
   { href: '/admin/reports',    label: 'Reports',    icon: <IconChart /> },
   { href: '/admin/settings',   label: 'Settings',   icon: <IconSettings /> },
 ]
@@ -32,10 +32,11 @@ export default async function DashboardLayout({ children }: { children: React.Re
     .eq('id', user.id)
     .single()
 
-  const role = profile?.role ?? 'customer'
+  const cookieStore = await cookies()
+  const roleCookie  = cookieStore.get('cleanconnect-role')?.value
+  const role        = profile?.role ?? roleCookie ?? 'customer'
   const displayName = profile?.full_name ?? user.email ?? 'User'
 
-  // customer / cleaner roles see mobile placeholder fullscreen — no sidebar needed
   if (role === 'customer' || role === 'cleaner') {
     return <>{children}</>
   }
@@ -49,40 +50,60 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
   return (
     <div className="min-h-screen bg-gray-50 flex">
-      {/* Fixed sidebar */}
-      <aside className="w-56 bg-white border-r border-gray-100 flex flex-col fixed inset-y-0 left-0 z-20">
+
+      {/* Sidebar */}
+      <aside className="w-56 bg-pink-700 flex flex-col fixed inset-y-0 left-0 z-20">
+
         {/* Logo */}
-        <div className="h-14 px-4 flex items-center border-b border-gray-100 shrink-0">
-          <Link href="/admin">
+        <div className="h-16 px-4 flex items-center gap-3 shrink-0">
+          <div className="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center shrink-0 overflow-hidden">
             <Image
               src="/Logo.jpg"
               alt="Maid For You Cleaning Services"
-              width={110}
-              height={32}
-              className="h-8 w-auto object-contain"
+              width={36}
+              height={36}
+              className="w-full h-full object-cover"
               priority
             />
-          </Link>
+          </div>
+          <span className="text-white font-semibold text-sm leading-tight">Maid For You</span>
         </div>
 
-        {/* Nav links */}
-        <SidebarNav links={ADMIN_NAV} />
+        {/* Nav */}
+        <nav className="flex-1 px-3 py-3 overflow-y-auto">
+          <SidebarNav links={ADMIN_NAV} />
+        </nav>
 
-        {/* User info + sign out */}
-        <div className="border-t border-gray-100 px-3 py-3 space-y-0.5 shrink-0">
+        {/* User footer */}
+        <div className="px-3 py-3 shrink-0 border-t border-pink-600 space-y-0.5">
+          {/* User row */}
           <div className="flex items-center gap-2.5 px-3 py-2 rounded-lg">
-            <div className="w-7 h-7 rounded-full bg-pink-100 text-pink-700 flex items-center justify-center text-xs font-semibold shrink-0">
+            <div className="w-7 h-7 rounded-full bg-pink-500 text-white flex items-center justify-center text-xs font-bold shrink-0">
               {displayName.charAt(0).toUpperCase()}
             </div>
             <div className="min-w-0">
-              <p className="text-xs font-semibold text-gray-900 truncate">{displayName}</p>
-              <p className="text-xs text-gray-400">Admin</p>
+              <p className="text-xs font-semibold text-white truncate">{displayName}</p>
+              <p className="text-xs text-pink-200 capitalize">{role.replace('_', ' ')}</p>
             </div>
           </div>
+
+          {/* Settings row */}
+          <Link
+            href="/admin/settings"
+            className="w-full flex items-center justify-between px-3 py-2 rounded-lg text-pink-200 hover:bg-pink-600 hover:text-white transition-colors text-sm"
+          >
+            <span className="flex items-center gap-2.5">
+              <IconSettings />
+              Settings
+            </span>
+            <IconChevronRight />
+          </Link>
+
+          {/* Sign out */}
           <form action={logout}>
             <button
               type="submit"
-              className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-gray-500 hover:text-red-600 hover:bg-red-50 transition-colors"
+              className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-pink-200 hover:text-white hover:bg-pink-600 transition-colors"
             >
               <span className="shrink-0"><IconSignOut /></span>
               Sign out
@@ -91,16 +112,23 @@ export default async function DashboardLayout({ children }: { children: React.Re
         </div>
       </aside>
 
-      {/* Content — offset by sidebar width */}
+      {/* Main content area */}
       <div className="flex-1 flex flex-col min-w-0 ml-56">
-        <header className="h-14 bg-white border-b border-gray-100 px-6 flex items-center justify-end gap-3 sticky top-0 z-10">
-          <NotificationBell
-            userId={user.id}
-            role={role}
-            initialNotifications={notifData ?? []}
-          />
-          <span className="w-px h-4 bg-gray-200" />
-          <span className="text-sm text-gray-600 font-medium">{displayName}</span>
+
+        {/* Top bar */}
+        <header className="h-14 bg-white border-b border-gray-100 px-6 flex items-center justify-between sticky top-0 z-10">
+          <div className="text-sm text-gray-400 hidden sm:block">
+            Maid For You Cleaning Services &mdash; Admin Portal
+          </div>
+          <div className="flex items-center gap-3 ml-auto">
+            <NotificationBell
+              userId={user.id}
+              role={role}
+              initialNotifications={notifData ?? []}
+            />
+            <span className="w-px h-4 bg-gray-200" />
+            <span className="text-sm text-gray-700 font-medium">{displayName}</span>
+          </div>
         </header>
 
         <main className="flex-1 p-6 max-w-screen-xl">{children}</main>

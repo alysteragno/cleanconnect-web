@@ -90,6 +90,23 @@ export function IconBell({ className }: IconProps) {
   )
 }
 
+export function IconCreditCard({ className }: IconProps) {
+  return (
+    <svg {...props} className={`${base} ${className ?? ''}`}>
+      <rect x="1.5" y="3.5" width="13" height="9" rx="1.5" />
+      <path d="M1.5 7h13M4 10.5h2M10 10.5h2" />
+    </svg>
+  )
+}
+
+export function IconChevronRight({ className }: IconProps) {
+  return (
+    <svg {...props} className={`${base} ${className ?? ''}`}>
+      <path d="M6 3l5 5-5 5" />
+    </svg>
+  )
+}
+
 export function IconCheck({ className }: IconProps) {
   return (
     <svg {...props} className={`${base} ${className ?? ''}`}>

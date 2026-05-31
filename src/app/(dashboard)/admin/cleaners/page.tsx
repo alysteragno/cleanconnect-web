@@ -7,7 +7,6 @@ type Cleaner = {
   phone: string | null
   is_active: boolean
   created_at: string
-  branches: { name: string } | null
 }
 
 export default async function AdminCleanersPage() {
@@ -15,7 +14,7 @@ export default async function AdminCleanersPage() {
 
   const { data: cleaners } = await supabase
     .from('profiles')
-    .select('id, full_name, phone, is_active, created_at, branches (name)')
+    .select('id, full_name, phone, is_active, created_at')
     .eq('role', 'cleaner')
     .order('full_name')
 
@@ -67,9 +66,7 @@ function CleanerSection({ title, cleaners, dimmed = false }: { title: string; cl
                 </div>
                 <div>
                   <p className="text-sm font-medium text-gray-900">{c.full_name}</p>
-                  <p className="text-xs text-gray-400">
-                    {c.branches?.name ?? 'No branch'} · {c.phone ?? 'No phone'}
-                  </p>
+                  <p className="text-xs text-gray-400">{c.phone ?? 'No phone'}</p>
                 </div>
               </div>
               <p className="text-xs text-pink-600 group-hover:underline">Edit →</p>

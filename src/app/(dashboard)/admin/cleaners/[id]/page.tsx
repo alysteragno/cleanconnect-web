@@ -8,21 +8,16 @@ type Cleaner = {
   id: string
   full_name: string
   phone: string | null
-  branch_id: string | null
   is_active: boolean
   created_at: string
-  branches: { name: string } | null
 }
-
-type Branch = { id: string; name: string; region: string }
 
 export default async function CleanerDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const supabase = await createClient()
 
-  const [{ data: cleaner }, { data: branches }, { count: jobsDone }, { data: dayOffRows }] = await Promise.all([
-    supabase.from('profiles').select('id, full_name, phone, branch_id, is_active, created_at, branches (name)').eq('id', id).eq('role', 'cleaner').single(),
-    supabase.from('branches').select('id, name, region').order('name'),
+  const [{ data: cleaner }, { count: jobsDone }, { data: dayOffRows }] = await Promise.all([
+    supabase.from('profiles').select('id, full_name, phone, is_active, created_at').eq('id', id).eq('role', 'cleaner').single(),
     supabase.from('cleaner_assignments').select('*', { count: 'exact', head: true }).eq('cleaner_id', id).eq('status', 'completed'),
     supabase.from('cleaner_availability').select('id, unavailable_date').eq('cleaner_id', id).order('unavailable_date'),
   ])
@@ -30,7 +25,6 @@ export default async function CleanerDetailPage({ params }: { params: Promise<{ 
   if (!cleaner) notFound()
 
   const c = cleaner as unknown as Cleaner
-  const branchList = (branches ?? []) as Branch[]
   const dayOffs = (dayOffRows ?? []) as { id: string; unavailable_date: string }[]
 
   return (
@@ -47,9 +41,7 @@ export default async function CleanerDetailPage({ params }: { params: Promise<{ 
           </div>
           <div>
             <p className="text-base font-semibold text-gray-900">{c.full_name}</p>
-            <p className="text-xs text-gray-500">
-              {c.branches?.name ?? 'No branch'} · {jobsDone ?? 0} jobs completed
-            </p>
+            <p className="text-xs text-gray-500">{jobsDone ?? 0} jobs completed</p>
           </div>
         </div>
 
@@ -57,9 +49,7 @@ export default async function CleanerDetailPage({ params }: { params: Promise<{ 
           cleanerId={c.id}
           fullName={c.full_name}
           phone={c.phone}
-          branchId={c.branch_id}
           isActive={c.is_active}
-          branches={branchList}
         />
       </div>
 

@@ -70,13 +70,12 @@ export async function updateCleanerProfile(
   const cleaner_id = formData.get('cleaner_id') as string
   const full_name = (formData.get('full_name') as string).trim()
   const phone = (formData.get('phone') as string).trim() || null
-  const branch_id = formData.get('branch_id') as string
 
-  if (!full_name || !branch_id) return { error: 'Name and branch are required.' }
+  if (!full_name) return { error: 'Name is required.' }
 
   const { error } = await supabase
     .from('profiles')
-    .update({ full_name, phone, branch_id })
+    .update({ full_name, phone })
     .eq('id', cleaner_id)
 
   if (error) return { error: error.message }

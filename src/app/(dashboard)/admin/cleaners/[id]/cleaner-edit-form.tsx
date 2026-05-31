@@ -3,18 +3,14 @@
 import { useActionState } from 'react'
 import { updateCleanerProfile, toggleCleanerStatus } from '@/app/actions/admin'
 
-type Branch = { id: string; name: string; region: string }
-
 type Props = {
   cleanerId: string
   fullName: string
   phone: string | null
-  branchId: string | null
   isActive: boolean
-  branches: Branch[]
 }
 
-export default function CleanerEditForm({ cleanerId, fullName, phone, branchId, isActive, branches }: Props) {
+export default function CleanerEditForm({ cleanerId, fullName, phone, isActive }: Props) {
   const [editState, editAction, editPending] = useActionState(updateCleanerProfile, undefined)
   const [toggleState, toggleAction, togglePending] = useActionState(toggleCleanerStatus, undefined)
 
@@ -47,22 +43,7 @@ export default function CleanerEditForm({ cleanerId, fullName, phone, branchId, 
           />
         </div>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Branch *</label>
-          <select
-            name="branch_id"
-            required
-            defaultValue={branchId ?? ''}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-pink-500 bg-white"
-          >
-            <option value="" disabled>Select branch...</option>
-            {branches.map((b) => (
-              <option key={b.id} value={b.id}>{b.name} — {b.region}</option>
-            ))}
-          </select>
-        </div>
-
-        {editState?.error && (
+{editState?.error && (
           <p className="text-sm text-red-600 bg-red-50 border border-red-100 px-3 py-2 rounded-lg">{editState.error}</p>
         )}
         {editState?.success && (
