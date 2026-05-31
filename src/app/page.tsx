@@ -2,6 +2,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import MarketingHeader from '@/components/marketing/header'
 import MarketingFooter from '@/components/marketing/footer'
+import { ScrollReveal } from '@/components/scroll-reveal'
 import { SERVICES, BRANCH, STEPS } from '@/lib/marketing-data'
 
 export default function HomePage() {
@@ -70,42 +71,50 @@ export default function HomePage() {
       {/* Services */}
       <section id="services" className="bg-gray-50 py-16 sm:py-20">
         <div className="max-w-6xl mx-auto px-4 sm:px-6">
-          <div className="mb-10">
-            <h2 className="text-2xl font-bold text-gray-900 tracking-tight">Our Services</h2>
-            <p className="text-sm text-gray-500 mt-1">Professional cleaning for every need.</p>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-px bg-gray-200 rounded-xl overflow-hidden border border-gray-200">
-            {SERVICES.map((service) => (
-              <div
-                key={service.title}
-                className="bg-white px-6 py-5 hover:bg-[#FFF5EC] transition-colors"
-              >
-                <p className="text-sm font-semibold text-gray-900 mb-1.5">{service.title}</p>
-                <p className="text-xs text-gray-500 leading-relaxed">{service.description}</p>
-              </div>
-            ))}
-          </div>
+          <ScrollReveal>
+            <div className="mb-10">
+              <h2 className="text-2xl font-bold text-gray-900 tracking-tight">Our Services</h2>
+              <p className="text-sm text-gray-500 mt-1">Professional cleaning for every need.</p>
+            </div>
+          </ScrollReveal>
+          <ScrollReveal delay={100}>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-px bg-gray-200 rounded-xl overflow-hidden border border-gray-200">
+              {SERVICES.map((service) => (
+                <div
+                  key={service.title}
+                  className="bg-white px-6 py-5 hover:bg-[#FFF5EC] transition-colors"
+                >
+                  <p className="text-sm font-semibold text-gray-900 mb-1.5">{service.title}</p>
+                  <p className="text-xs text-gray-500 leading-relaxed">{service.description}</p>
+                </div>
+              ))}
+            </div>
+          </ScrollReveal>
         </div>
       </section>
 
       {/* How it works — cream background */}
       <section id="how-it-works" className="bg-[#FFF5EC] py-16 sm:py-20">
         <div className="max-w-6xl mx-auto px-4 sm:px-6">
-          <div className="mb-10">
-            <h2 className="text-2xl font-bold text-gray-900 tracking-tight">How It Works</h2>
-            <p className="text-sm text-gray-500 mt-1">Three steps to a cleaner space.</p>
-          </div>
+          <ScrollReveal>
+            <div className="mb-10">
+              <h2 className="text-2xl font-bold text-gray-900 tracking-tight">How It Works</h2>
+              <p className="text-sm text-gray-500 mt-1">Three steps to a cleaner space.</p>
+            </div>
+          </ScrollReveal>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-8">
             {STEPS.map((item, i) => (
-              <div key={item.step} className="flex gap-4">
-                <div className="w-8 h-8 rounded-full bg-pink-600 text-white flex items-center justify-center text-xs font-bold shrink-0 mt-0.5">
-                  {i + 1}
+              <ScrollReveal key={item.step} delay={i * 120}>
+                <div className="flex gap-4">
+                  <div className="w-8 h-8 rounded-full bg-pink-600 text-white flex items-center justify-center text-xs font-bold shrink-0 mt-0.5">
+                    {i + 1}
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-gray-900 mb-1">{item.title}</p>
+                    <p className="text-sm text-gray-500 leading-relaxed">{item.description}</p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-sm font-semibold text-gray-900 mb-1">{item.title}</p>
-                  <p className="text-sm text-gray-500 leading-relaxed">{item.description}</p>
-                </div>
-              </div>
+              </ScrollReveal>
             ))}
           </div>
         </div>
