@@ -1,8 +1,9 @@
 import Link from 'next/link'
+import Image from 'next/image'
 import MarketingHeader from '@/components/marketing/header'
 import MarketingFooter from '@/components/marketing/footer'
 import SectionHeader from '@/components/marketing/section-header'
-import { SERVICES, BRANCHES, STEPS } from '@/lib/marketing-data'
+import { SERVICES, BRANCH, STEPS } from '@/lib/marketing-data'
 
 export default function HomePage() {
   return (
@@ -11,31 +12,47 @@ export default function HomePage() {
 
       {/* Hero */}
       <section className="max-w-6xl mx-auto px-4 sm:px-6 py-20 sm:py-28 text-center">
-        <div className="inline-flex items-center gap-2 bg-blue-50 text-blue-700 text-xs font-semibold px-3 py-1.5 rounded-full mb-6">
-          Serving the Philippines since 2016
+        <div className="flex justify-center mb-8">
+          <Image
+            src="/Logo.jpg"
+            alt="Maid For You Cleaning Services"
+            width={200}
+            height={60}
+            className="h-16 w-auto object-contain"
+            priority
+          />
         </div>
         <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold text-gray-900 leading-tight mb-6">
           Professional Cleaning
           <br className="hidden sm:block" />
           <span className="text-blue-600"> You Can Trust</span>
         </h1>
-        <p className="text-lg text-gray-500 max-w-2xl mx-auto mb-10">
-          Cleaning Lady PH brings certified cleaners to your home across 5 locations in the
-          Philippines. Book online in minutes and track your service in real time.
+        <p className="text-lg text-gray-500 max-w-2xl mx-auto mb-4">
+          Maid For You Cleaning Services in Metro Manila offers different kinds of services.
+        </p>
+        <p className="text-base text-gray-400 max-w-2xl mx-auto mb-10">
+          We understand the needs of every unit owner, and our team has the quality and integrity
+          to provide you with the best service we offer at an affordable price.
         </p>
         <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
           <Link
             href="/register"
             className="w-full sm:w-auto px-8 py-3.5 bg-blue-600 text-white rounded-xl font-semibold text-base hover:bg-blue-700 transition-colors"
           >
-            Book a cleaning
+            Create an account
           </Link>
           <a
-            href="#how-it-works"
+            href="#services"
             className="w-full sm:w-auto px-8 py-3.5 bg-gray-100 text-gray-700 rounded-xl font-semibold text-base hover:bg-gray-200 transition-colors"
           >
-            How it works
+            Our services
           </a>
+        </div>
+
+        {/* Mobile app notice */}
+        <div className="mt-10 inline-flex items-center gap-2 bg-blue-50 border border-blue-100 text-blue-700 text-sm px-4 py-2.5 rounded-full">
+          <span>📱</span>
+          <span>Book your service via our mobile app — coming soon on iOS &amp; Android</span>
         </div>
       </section>
 
@@ -87,18 +104,14 @@ export default function HomePage() {
         <div className="max-w-6xl mx-auto px-4 sm:px-6 text-center">
           <h2 className="text-3xl font-bold text-white mb-3">Where We Operate</h2>
           <p className="text-blue-200 mb-10">
-            5 locations across the Philippines — we&apos;re closer than you think.
+            Proudly serving Metro Manila (NCR) — bringing professional cleaning to your doorstep.
           </p>
-          <div className="flex flex-wrap justify-center gap-3">
-            {BRANCHES.map((b) => (
-              <div
-                key={b.city}
-                className="bg-white/10 border border-white/20 rounded-xl px-6 py-3 text-white"
-              >
-                <p className="font-semibold">{b.city}</p>
-                <p className="text-xs text-blue-200 mt-0.5">{b.type}</p>
-              </div>
-            ))}
+          <div className="flex justify-center">
+            <div className="bg-white/10 border border-white/20 rounded-xl px-8 py-4 text-white">
+              <p className="font-semibold text-lg">{BRANCH.name}</p>
+              <p className="text-sm text-blue-200 mt-1">{BRANCH.area}</p>
+              <p className="text-sm text-blue-200 mt-0.5">{BRANCH.phone}</p>
+            </div>
           </div>
         </div>
       </section>
@@ -107,8 +120,11 @@ export default function HomePage() {
       <section className="py-16 sm:py-20">
         <div className="max-w-2xl mx-auto px-4 sm:px-6 text-center">
           <h2 className="text-3xl font-bold text-gray-900 mb-3">Ready for a cleaner home?</h2>
-          <p className="text-gray-500 mb-8">
-            Create your free account and book your first cleaning in under 2 minutes.
+          <p className="text-gray-500 mb-2">
+            Book through our mobile app — available soon on iOS and Android.
+          </p>
+          <p className="text-gray-400 text-sm mb-8">
+            Create a free account now to be ready when the app launches.
           </p>
           <Link
             href="/register"

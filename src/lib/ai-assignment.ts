@@ -23,6 +23,7 @@ export type RankedCleaner = {
   fullName: string
   workloadScore: number
   distanceKm: number | null
+  avgRating: number | null
   finalScore: number
   rank: number
   dispatched: boolean
@@ -133,7 +134,23 @@ export async function runAIDispatch(bookingId: string): Promise<AIDispatchResult
     return { rankedCleaners: [], dispatched: 0, reasoning: [...reasoning, 'All available cleaners have scheduling conflicts on this day.'] }
   }
 
-  // ── Step 4: Score each eligible cleaner ─────────────────────────────────
+  // ── Step 4a: Fetch average performance ratings for eligible cleaners ────
+  const { data: ratingRows } = await supabase
+    .from('feedback')
+    .select('cleaner_id, rating')
+    .in('cleaner_id', eligible.map((c) => c.id))
+
+  const ratingMap: Record<string, { sum: number; count: number }> = {}
+  for (const r of ratingRows ?? []) {
+    if (!ratingMap[r.cleaner_id]) ratingMap[r.cleaner_id] = { sum: 0, count: 0 }
+    ratingMap[r.cleaner_id].sum += r.rating
+    ratingMap[r.cleaner_id].count += 1
+  }
+
+  const ratedCount = Object.keys(ratingMap).length
+  reasoning.push(`Performance ratings: ${ratedCount} of ${eligible.length} eligible cleaner(s) have rating data.`)
+
+  // ── Step 4b: Score each eligible cleaner ────────────────────────────────
   // Workload: count of accepted jobs on service_date
   const workloadMap: Record<string, number> = {}
 
@@ -167,20 +184,29 @@ export async function runAIDispatch(bookingId: string): Promise<AIDispatchResult
       distanceNorm = Math.min(distanceKm / 50, 1) // 50 km reference cap
     }
 
-    // Lower score = better candidate
-    const finalScore = hasServiceGeo
-      ? 0.6 * workloadNorm + 0.4 * distanceNorm
-      : workloadNorm
+    // Performance rating: 1–5 scale, higher = better candidate
+    // Invert so lower score = better (consistent with workload/distance)
+    // Cleaners with no ratings get a neutral 0.5
+    const ratingData = ratingMap[c.id]
+    const avgRating = ratingData ? ratingData.sum / ratingData.count : null
+    const ratingNorm = avgRating != null ? (5 - avgRating) / 4 : 0.5
 
-    return { ...c, workload, distanceKm, finalScore }
+    // Lower score = better candidate
+    // Weights: 50% workload + 30% proximity + 20% performance rating
+    // Without geo: 70% workload + 30% performance rating
+    const finalScore = hasServiceGeo
+      ? 0.5 * workloadNorm + 0.3 * distanceNorm + 0.2 * ratingNorm
+      : 0.7 * workloadNorm + 0.3 * ratingNorm
+
+    return { ...c, workload, distanceKm, avgRating, finalScore }
   })
 
   const sorted = scored.sort((a, b) => a.finalScore - b.finalScore)
 
   reasoning.push(
     hasServiceGeo
-      ? 'Ranking: 60% workload + 40% proximity (haversine).'
-      : 'No geo coordinates on booking — ranking by workload only.'
+      ? 'Ranking: 50% workload + 30% proximity (haversine) + 20% performance rating.'
+      : 'No geo coordinates — ranking: 70% workload + 30% performance rating.'
   )
 
   // ── Step 5: Select top N candidates ─────────────────────────────────────
@@ -206,6 +232,7 @@ export async function runAIDispatch(bookingId: string): Promise<AIDispatchResult
     fullName: c.full_name,
     workloadScore: c.workload,
     distanceKm: c.distanceKm,
+    avgRating: c.avgRating != null ? Math.round(c.avgRating * 10) / 10 : null,
     finalScore: Math.round(c.finalScore * 100) / 100,
     rank: i + 1,
     dispatched: i < dispatchCount,

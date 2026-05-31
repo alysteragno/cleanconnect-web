@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import SectionHeader from '@/components/marketing/section-header'
-import { SERVICES, BRANCHES } from '@/lib/marketing-data'
+import { SERVICES, BRANCH } from '@/lib/marketing-data'
 
 export const metadata = { title: 'About — CleanConnect' }
 
@@ -13,11 +13,14 @@ export default function AboutPage() {
           Est. 2016
         </div>
         <h1 className="text-4xl sm:text-5xl font-bold text-gray-900 mb-6">
-          About Cleaning Lady PH
+          About Maid For You Cleaning Services
         </h1>
-        <p className="text-lg text-gray-500 max-w-2xl mx-auto">
-          We started with one mission: bring reliable, professional cleaning to Filipino homes and
-          businesses. Today, we operate across 5 locations with a growing team of certified cleaners.
+        <p className="text-lg text-gray-500 max-w-2xl mx-auto mb-4">
+          Maid For You Cleaning Services in Metro Manila offers different kinds of services.
+        </p>
+        <p className="text-base text-gray-400 max-w-2xl mx-auto">
+          We understand the needs of every unit owner, and our team has the quality and integrity
+          to provide you with the best service we offer at an affordable price.
         </p>
       </section>
 
@@ -27,9 +30,9 @@ export default function AboutPage() {
           <SectionHeader title="Our Story" />
           <div className="space-y-4 text-gray-600 leading-relaxed text-sm sm:text-base">
             <p>
-              Cleaning Lady PH was founded in 2016 with a single branch in Manila. What began as a
-              small team of dedicated cleaners has grown into a trusted cleaning service brand serving
-              thousands of households and businesses across the Philippines.
+              Maid For You Cleaning Services was founded in 2016 in Metro Manila. What began as a small team of
+              dedicated cleaners has grown into a trusted cleaning service brand serving thousands of
+              households and businesses across the NCR.
             </p>
             <p>
               We built CleanConnect to bring our operations into the modern era — giving customers the
@@ -37,8 +40,8 @@ export default function AboutPage() {
               and managers the tools they need to coordinate efficiently.
             </p>
             <p>
-              Every cleaner on our platform is background-checked, trained, and assigned to a local
-              branch so you always get someone who knows your area.
+              Every cleaner on our platform is background-checked, trained, and committed to delivering
+              consistent, high-quality results across Metro Manila.
             </p>
           </div>
         </div>
@@ -66,21 +69,17 @@ export default function AboutPage() {
         </div>
       </section>
 
-      {/* Branches */}
+      {/* Coverage */}
       <section className="bg-blue-600 py-16 sm:py-20">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 text-center">
-          <h2 className="text-3xl font-bold text-white mb-3">Our Branches</h2>
-          <p className="text-blue-200 mb-10">5 locations across the Philippines.</p>
-          <div className="flex flex-wrap justify-center gap-3">
-            {BRANCHES.map((b) => (
-              <div
-                key={b.city}
-                className="bg-white/10 border border-white/20 rounded-xl px-6 py-3 text-white"
-              >
-                <p className="font-semibold">{b.city}</p>
-                <p className="text-xs text-blue-200 mt-0.5">{b.type}</p>
-              </div>
-            ))}
+          <h2 className="text-3xl font-bold text-white mb-3">Where We Operate</h2>
+          <p className="text-blue-200 mb-10">Serving Metro Manila (NCR).</p>
+          <div className="flex justify-center">
+            <div className="bg-white/10 border border-white/20 rounded-xl px-8 py-4 text-white">
+              <p className="font-semibold text-lg">{BRANCH.name}</p>
+              <p className="text-sm text-blue-200 mt-1">{BRANCH.area}</p>
+              <p className="text-sm text-blue-200 mt-0.5">{BRANCH.phone}</p>
+            </div>
           </div>
         </div>
       </section>

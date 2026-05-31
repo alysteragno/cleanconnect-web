@@ -30,6 +30,8 @@ export async function createBooking(
   const space_type = (formData.get('space_type') as string) || 'residential'
   const special_notes = (formData.get('special_notes') as string) || null
   const payment_method = (formData.get('payment_method') as string) || 'cash'
+  const couch_quantity = parseInt((formData.get('couch_quantity') as string) || '0', 10)
+  const mattress_quantity = parseInt((formData.get('mattress_quantity') as string) || '0', 10)
 
   const property_sqm = parseFloat(sqmRaw)
 
@@ -58,6 +60,8 @@ export async function createBooking(
     space_type,
     special_notes,
     payment_method,
+    couch_quantity,
+    mattress_quantity,
   }).select('id').single()
 
   if (error) return { error: error.message }

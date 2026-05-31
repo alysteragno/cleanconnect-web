@@ -104,7 +104,7 @@ export async function forceAssignCleaner(
   redirect(`/manager/bookings/${bookingId}`)
 }
 
-// Cancel a booking
+// Cancel a booking — records the transportation cost as the cancellation fee
 export async function cancelBooking(
   state: ManagerActionState,
   formData: FormData
@@ -114,9 +114,12 @@ export async function cancelBooking(
   if (!user) return { error: 'Not authenticated.' }
 
   const bookingId = formData.get('booking_id') as string
+  const feeRaw = formData.get('cancellation_fee') as string
+  const cancellation_fee = feeRaw && parseFloat(feeRaw) > 0 ? parseFloat(feeRaw) : null
+
   const { error } = await supabase
     .from('bookings')
-    .update({ status: 'cancelled' })
+    .update({ status: 'cancelled', cancellation_fee })
     .eq('id', bookingId)
 
   if (error) return { error: error.message }

@@ -82,6 +82,12 @@ export default async function ManagerCleanersPage() {
                     <p className="text-sm font-bold text-green-600">{c.completed}</p>
                     <p className="text-xs text-gray-400">Done</p>
                   </div>
+                  <Link
+                    href={`/manager/cleaners/${c.id}`}
+                    className="text-xs text-blue-600 hover:underline"
+                  >
+                    Availability →
+                  </Link>
                 </div>
               </div>
             ))}

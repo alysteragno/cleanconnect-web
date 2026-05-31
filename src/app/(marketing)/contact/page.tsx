@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import SectionHeader from '@/components/marketing/section-header'
-import { BRANCHES } from '@/lib/marketing-data'
+import { BRANCH } from '@/lib/marketing-data'
 
 export const metadata = { title: 'Contact — CleanConnect' }
 
@@ -11,32 +11,28 @@ export default function ContactPage() {
       <section className="max-w-6xl mx-auto px-4 sm:px-6 py-16 sm:py-24 text-center">
         <h1 className="text-4xl sm:text-5xl font-bold text-gray-900 mb-6">Get in Touch</h1>
         <p className="text-lg text-gray-500 max-w-xl mx-auto">
-          Reach us at any of our branch offices or book your service directly online.
+          Reach us at our office or book your service directly online.
         </p>
       </section>
 
-      {/* Branch contacts */}
+      {/* Contact info */}
       <section className="bg-gray-50 py-16 sm:py-20">
         <div className="max-w-4xl mx-auto px-4 sm:px-6">
           <SectionHeader
-            title="Our Branches"
-            subtitle="Walk in or call your nearest branch."
+            title="Our Office"
+            subtitle="Walk in or give us a call."
           />
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-            {BRANCHES.map((b) => (
-              <div
-                key={b.city}
-                className="bg-white rounded-xl border border-gray-100 p-6 hover:border-blue-100 hover:shadow-sm transition-all"
-              >
-                <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-base font-semibold text-gray-900">{b.city}</h3>
-                  <span className="text-xs bg-blue-50 text-blue-600 font-medium px-2 py-0.5 rounded-full">
-                    {b.type}
-                  </span>
-                </div>
-                <p className="text-sm text-gray-500">{b.phone}</p>
+          <div className="flex justify-center">
+            <div className="bg-white rounded-xl border border-gray-100 p-6 hover:border-blue-100 hover:shadow-sm transition-all w-full max-w-sm">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-base font-semibold text-gray-900">{BRANCH.name}</h3>
+                <span className="text-xs bg-blue-50 text-blue-600 font-medium px-2 py-0.5 rounded-full">
+                  NCR
+                </span>
               </div>
-            ))}
+              <p className="text-sm text-gray-500">{BRANCH.area}</p>
+              <p className="text-sm text-gray-500 mt-1">{BRANCH.phone}</p>
+            </div>
           </div>
         </div>
       </section>

@@ -1,6 +1,6 @@
 -- ─────────────────────────────────────────────────────────────────────────────
 -- CleanConnect — Complete Database Schema
--- Cleaning Lady PH | BS-IT Capstone | FEU Institute of Technology
+-- Maid For You Cleaning Services | BS-IT Capstone | FEU Institute of Technology
 --
 -- Run this entire file in the Supabase SQL Editor on a fresh project.
 -- After running this, run seed.sql to create the first super admin account.
@@ -50,9 +50,12 @@ CREATE TABLE bookings (
     service_date        DATE            NOT NULL,
     service_time        TIME            NOT NULL,
     property_sqm        NUMERIC         NOT NULL,
-    required_cleaners   INTEGER,                    -- set by trigger
-    duration_hours      NUMERIC,                    -- set by trigger
-    base_price          NUMERIC,                    -- set by trigger
+    required_cleaners   INTEGER         NOT NULL DEFAULT 2,  -- set by admin; default 2–3 per policy
+    duration_hours      NUMERIC,                             -- set by trigger
+    base_price          NUMERIC,                             -- set by trigger
+    couch_quantity      INTEGER         NOT NULL DEFAULT 0,
+    mattress_quantity   INTEGER         NOT NULL DEFAULT 0,
+    cancellation_fee    NUMERIC,                             -- transport cost only, set on cancellation
     status              booking_status  NOT NULL DEFAULT 'pending',
     payment_status      payment_status  NOT NULL DEFAULT 'unpaid',
     payment_method      TEXT            NOT NULL DEFAULT 'cash',
@@ -134,27 +137,24 @@ CREATE TABLE settings (
 -- 3. BUSINESS LOGIC TRIGGERS
 -- ─────────────────────────────────────────────────────────────────────────────
 
--- Automatically calculates required_cleaners, duration_hours, and base_price
--- based on property_sqm whenever a booking is inserted or sqm is updated.
+-- Automatically calculates duration_hours and base_price based on property_sqm.
+-- required_cleaners is NOT auto-calculated — it defaults to 2 and is set by
+-- admin discretion per the one-branch NCR policy.
 CREATE OR REPLACE FUNCTION apply_cleanconnect_operational_rules()
 RETURNS TRIGGER AS $$
 BEGIN
     IF NEW.property_sqm <= 30 THEN
-        NEW.required_cleaners := 1;
-        NEW.duration_hours    := 2.0;
-        NEW.base_price        := 1000.00;
+        NEW.duration_hours := 2.0;
+        NEW.base_price     := 1000.00;
     ELSIF NEW.property_sqm <= 60 THEN
-        NEW.required_cleaners := 2;
-        NEW.duration_hours    := 3.0;
-        NEW.base_price        := 1800.00;
+        NEW.duration_hours := 3.0;
+        NEW.base_price     := 1800.00;
     ELSIF NEW.property_sqm <= 100 THEN
-        NEW.required_cleaners := 3;
-        NEW.duration_hours    := 4.0;
-        NEW.base_price        := 2500.00;
+        NEW.duration_hours := 4.0;
+        NEW.base_price     := 2500.00;
     ELSE
-        NEW.required_cleaners := 3 + CEIL((NEW.property_sqm - 100) / 50.0);
-        NEW.duration_hours    := 4.0 + CEIL((NEW.property_sqm - 100) / 50.0);
-        NEW.base_price        := 2500.00 + (CEIL((NEW.property_sqm - 100) / 50.0) * 800.00);
+        NEW.duration_hours := 4.0 + CEIL((NEW.property_sqm - 100) / 50.0);
+        NEW.base_price     := 2500.00 + (CEIL((NEW.property_sqm - 100) / 50.0) * 800.00);
     END IF;
     RETURN NEW;
 END;

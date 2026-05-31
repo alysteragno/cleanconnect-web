@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import { NAV_LINKS } from '@/lib/marketing-data'
 
@@ -10,8 +11,15 @@ export default function MarketingHeader() {
   return (
     <header className="sticky top-0 z-50 bg-white/95 backdrop-blur border-b border-gray-100">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
-        <Link href="/" className="text-xl font-bold text-blue-600">
-          CleanConnect
+        <Link href="/" className="flex items-center gap-2">
+          <Image
+            src="/Logo.jpg"
+            alt="Maid For You Cleaning Services"
+            width={140}
+            height={40}
+            className="h-10 w-auto object-contain"
+            priority
+          />
         </Link>
 
         <nav className="hidden sm:flex items-center gap-6 text-sm">

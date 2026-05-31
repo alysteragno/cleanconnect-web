@@ -72,6 +72,15 @@ export async function proxy(request: NextRequest) {
     }
   }
 
+  // Customer and cleaner sub-pages are mobile-only — redirect all deep paths to the root
+  // placeholder so only /customer and /cleaner (the placeholder pages) are ever rendered.
+  if (session && path.startsWith('/customer/')) {
+    return NextResponse.redirect(new URL('/customer', request.url))
+  }
+  if (session && path.startsWith('/cleaner/')) {
+    return NextResponse.redirect(new URL('/cleaner', request.url))
+  }
+
   return response
 }
 

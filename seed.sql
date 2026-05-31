@@ -8,12 +8,9 @@
 -- 1. BRANCHES
 -- ─────────────────────────────────────────────────────────────────────────────
 
+-- Single branch only — service area is strictly NCR (Metro Manila).
 INSERT INTO branches (name, region, contact_number) VALUES
-    ('Manila',      'NCR',          '+63 2 8XXX XXXX'),
-    ('Cebu',        'Region VII',   '+63 32 8XXX XXXX'),
-    ('Baguio',      'Region I',     '+63 74 8XXX XXXX'),
-    ('Quezon City', 'NCR',          '+63 2 8XXX XXXX'),
-    ('Muntinlupa',  'NCR',          '+63 2 8XXX XXXX');
+    ('Maid For You Cleaning Services', 'NCR', '+63 2 8XXX XXXX');
 
 
 -- ─────────────────────────────────────────────────────────────────────────────

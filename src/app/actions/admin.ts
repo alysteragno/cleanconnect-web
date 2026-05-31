@@ -137,28 +137,66 @@ export async function updatePaymentStatus(
   return { success: `Payment status updated to "${payment_status}".` }
 }
 
-// ── Branch management ──────────────────────────────────────────────────────
+// ── Cleaner availability override ─────────────────────────────────────────
+// Admin and branch managers can set or remove day-offs on behalf of cleaners.
+// Uses admin client to bypass the cleaner-only RLS on cleaner_availability.
 
-export async function createBranch(
+async function assertStaff(supabase: Awaited<ReturnType<typeof createClient>>, userId: string) {
+  const { data } = await supabase.from('profiles').select('role').eq('id', userId).single()
+  return data?.role === 'super_admin' || data?.role === 'branch_manager'
+}
+
+export async function addCleanerDayOff(
   state: AdminActionState,
   formData: FormData
 ): Promise<AdminActionState> {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user || !(await assertSuperAdmin(supabase, user.id))) return { error: 'Unauthorized.' }
+  if (!user || !(await assertStaff(supabase, user.id))) return { error: 'Unauthorized.' }
 
-  const name = (formData.get('name') as string).trim()
-  const region = (formData.get('region') as string).trim()
-  const contact_number = (formData.get('contact_number') as string).trim() || null
+  const cleaner_id = formData.get('cleaner_id') as string
+  const unavailable_date = formData.get('unavailable_date') as string
+  if (!cleaner_id || !unavailable_date) return { error: 'Date is required.' }
 
-  if (!name || !region) return { error: 'Branch name and region are required.' }
+  const admin = createAdminClient()
+  const { error } = await admin
+    .from('cleaner_availability')
+    .insert({ cleaner_id, unavailable_date })
 
-  const { error } = await supabase.from('branches').insert({ name, region, contact_number })
+  if (error) return { error: error.code === '23505' ? 'That date is already marked.' : error.message }
+
+  revalidatePath(`/admin/cleaners/${cleaner_id}`)
+  revalidatePath(`/manager/cleaners/${cleaner_id}`)
+  return { success: 'Day-off added.' }
+}
+
+export async function removeCleanerDayOff(
+  state: AdminActionState,
+  formData: FormData
+): Promise<AdminActionState> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user || !(await assertStaff(supabase, user.id))) return { error: 'Unauthorized.' }
+
+  const availability_id = formData.get('availability_id') as string
+  const cleaner_id = formData.get('cleaner_id') as string
+  if (!availability_id) return { error: 'Missing ID.' }
+
+  const admin = createAdminClient()
+  const { error } = await admin
+    .from('cleaner_availability')
+    .delete()
+    .eq('id', availability_id)
+
   if (error) return { error: error.message }
 
-  revalidatePath('/admin/branches')
-  redirect('/admin/branches')
+  revalidatePath(`/admin/cleaners/${cleaner_id}`)
+  revalidatePath(`/manager/cleaners/${cleaner_id}`)
+  return { success: 'Day-off removed.' }
 }
+
+// ── Branch management ──────────────────────────────────────────────────────
+// Single-branch only — createBranch is intentionally removed per client policy.
 
 export async function updateBranch(
   state: AdminActionState,

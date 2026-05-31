@@ -1,23 +1,28 @@
 export const SERVICES = [
   {
-    title: 'General Home Cleaning',
+    title: 'General Cleaning',
     description: 'Complete top-to-bottom cleaning of your home — floors, surfaces, bathrooms, and kitchen included.',
     icon: '🏠',
   },
   {
-    title: 'Premium Mattress & Upholstery',
-    description: 'Deep cleaning and sanitizing of mattresses, sofas, and upholstered furniture.',
+    title: 'Air Conditioning Cleaning',
+    description: 'Professional cleaning and maintenance of aircon units to improve efficiency and air quality.',
+    icon: '❄️',
+  },
+  {
+    title: 'Curtain Dry Cleaning',
+    description: 'Specialized dry cleaning for curtains and drapes to remove dust, stains, and allergens.',
+    icon: '🪟',
+  },
+  {
+    title: 'Carpet Cleaning',
+    description: 'Deep extraction cleaning for carpets to lift embedded dirt, stains, and odors.',
+    icon: '🧹',
+  },
+  {
+    title: 'Sofa Cleaning',
+    description: 'Thorough cleaning and sanitizing of sofas and upholstered furniture.',
     icon: '🛋️',
-  },
-  {
-    title: 'Complete Home Package',
-    description: 'Comprehensive cleaning with steam sterilization for a hygienic, hotel-quality result.',
-    icon: '✨',
-  },
-  {
-    title: 'Disinfection Services',
-    description: 'Professional-grade disinfection to eliminate bacteria, viruses, and allergens from your space.',
-    icon: '🧴',
   },
   {
     title: 'Post-Construction Cleaning',
@@ -25,19 +30,32 @@ export const SERVICES = [
     icon: '🔨',
   },
   {
-    title: 'Deep Cleaning Add-ons',
-    description: 'Customize your service with extra hours, additional cleaners, or specialized cleaning tasks.',
-    icon: '➕',
+    title: 'Mattress Cleaning',
+    description: 'Deep cleaning and sanitizing of mattresses to eliminate dust mites, stains, and allergens.',
+    icon: '🛏️',
+  },
+  {
+    title: 'Carpet Shampooing',
+    description: 'Hot water extraction shampooing to revive and deep-clean heavily soiled carpets.',
+    icon: '🫧',
+  },
+  {
+    title: 'Office Cleaning',
+    description: 'Professional cleaning of office spaces, workstations, common areas, and restrooms.',
+    icon: '🏢',
+  },
+  {
+    title: 'Condo Cleaning',
+    description: 'Specialized cleaning packages tailored for condo units — flexible scheduling available.',
+    icon: '🏙️',
   },
 ]
 
-export const BRANCHES = [
-  { city: 'Manila', type: 'Main Branch', phone: '+63 2 8XXX XXXX' },
-  { city: 'Cebu', type: 'Branch', phone: '+63 32 8XXX XXXX' },
-  { city: 'Baguio', type: 'Branch', phone: '+63 74 8XXX XXXX' },
-  { city: 'Quezon City', type: 'Franchise', phone: '+63 2 8XXX XXXX' },
-  { city: 'Muntinlupa', type: 'Franchise', phone: '+63 2 8XXX XXXX' },
-]
+export const BRANCH = {
+  name: 'Maid For You Cleaning Services',
+  area: 'Metro Manila (NCR)',
+  phone: '+63 2 8XXX XXXX',
+}
 
 export const STEPS = [
   {
@@ -48,7 +66,7 @@ export const STEPS = [
   {
     step: '02',
     title: 'We Assign a Cleaner',
-    description: 'Our system matches you with the nearest available, qualified cleaner from your branch.',
+    description: 'Our team matches you with available, qualified cleaners and confirms your booking.',
   },
   {
     step: '03',
