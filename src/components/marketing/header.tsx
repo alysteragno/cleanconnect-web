@@ -110,10 +110,13 @@ export default function MarketingHeader() {
           </div>
         </div>
 
-        {/* Mobile menu panel */}
-        {open && (
-          <div className="sm:hidden bg-white border-b border-gray-100 shadow-lg">
-            <div className="px-4 pt-2 pb-5 space-y-0.5">
+        {/* Mobile menu panel — always mounted, animated with max-height + opacity */}
+        <div
+          className={`sm:hidden overflow-hidden bg-white border-b border-gray-100 shadow-lg transition-all duration-300 ease-out ${
+            open ? 'max-h-[600px] opacity-100' : 'max-h-0 opacity-0'
+          }`}
+        >
+          <div className="px-4 pt-2 pb-5 space-y-0.5">
               {NAV_LINKS.map((link) => (
                 <Link
                   key={link.href}
@@ -179,19 +182,18 @@ export default function MarketingHeader() {
                   </a>
                 </div>
               </div>
-            </div>
           </div>
-        )}
+        </div>
       </header>
 
-      {/* Backdrop — closes menu when tapping outside */}
-      {open && (
-        <div
-          className="fixed inset-0 bg-black/20 z-40 sm:hidden"
-          onClick={() => setOpen(false)}
-          aria-hidden="true"
-        />
-      )}
+      {/* Backdrop — always mounted, fades in/out */}
+      <div
+        className={`fixed inset-0 bg-black/20 z-40 sm:hidden transition-opacity duration-300 ${
+          open ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
+        }`}
+        onClick={() => setOpen(false)}
+        aria-hidden="true"
+      />
     </>
   )
 }
