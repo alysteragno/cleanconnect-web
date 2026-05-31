@@ -72,12 +72,40 @@ export default function HomePage() {
       <section id="services" className="bg-gray-50 py-16 sm:py-20">
         <div className="max-w-6xl mx-auto px-4 sm:px-6">
           <ScrollReveal>
-            <div className="mb-10">
+            <div className="mb-8">
               <h2 className="text-2xl font-bold text-gray-900 tracking-tight">Our Services</h2>
               <p className="text-sm text-gray-500 mt-1">Professional cleaning for every need.</p>
             </div>
           </ScrollReveal>
-          <ScrollReveal delay={100}>
+
+          {/* Photo strip — horizontal scroll on mobile, 3-up on desktop */}
+          <ScrollReveal delay={80}>
+            <div className="flex gap-4 overflow-x-auto pb-1 mb-10 snap-x snap-mandatory scrollbar-hide">
+              {[
+                { src: '/services/s1.jpg', label: 'Home & Condo Cleaning' },
+                { src: '/services/s2.jpg', label: 'Sofa & Upholstery Cleaning' },
+                { src: '/services/s3.jpg', label: 'Carpet & Mattress Cleaning' },
+              ].map((photo) => (
+                <div
+                  key={photo.src}
+                  className="relative flex-none w-72 sm:flex-1 h-56 rounded-2xl overflow-hidden snap-center group"
+                >
+                  <Image
+                    src={photo.src}
+                    alt={photo.label}
+                    fill
+                    className="object-cover transition-transform duration-500 group-hover:scale-105"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/65 via-black/10 to-transparent" />
+                  <div className="absolute bottom-0 left-0 right-0 p-4">
+                    <p className="text-white text-sm font-semibold leading-tight">{photo.label}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </ScrollReveal>
+
+          <ScrollReveal delay={160}>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-px bg-gray-200 rounded-xl overflow-hidden border border-gray-200">
               {SERVICES.map((service) => (
                 <div
