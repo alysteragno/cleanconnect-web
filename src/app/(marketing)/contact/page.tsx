@@ -81,7 +81,7 @@ export default function ContactPage() {
                 <Image src="/messenger-fill.svg" alt="" width={16} height={16} className="text-pink-600" style={{ filter: 'invert(40%) sepia(100%) saturate(500%) hue-rotate(280deg)' }} />
               }
             >
-              Message us on Messenger
+              Maid For You Cleaning Services
             </ContactRow>
 
             <ContactRow
@@ -101,20 +101,36 @@ export default function ContactPage() {
           {/* Branch info */}
           <div>
             <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-4">Our Branch</p>
-            <div className="bg-white rounded-xl border border-gray-200 p-6">
-              <div className="flex items-center justify-between mb-4">
+            <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
+              <div className="flex items-start justify-between gap-3">
                 <p className="text-sm font-semibold text-gray-900">{BRANCH.name}</p>
-                <span className="text-xs bg-pink-50 text-pink-600 border border-pink-200 font-medium px-2 py-0.5 rounded-full">
+                <span className="text-xs bg-pink-50 text-pink-600 border border-pink-200 font-medium px-2 py-0.5 rounded-full shrink-0">
                   NCR Only
                 </span>
               </div>
-              <p className="text-sm text-gray-500">{BRANCH.area}</p>
-              <div className="mt-4 pt-4 border-t border-gray-100">
-                <p className="text-xs text-gray-400">Service coverage</p>
-                <p className="text-sm text-gray-700 mt-1">
-                  We serve all cities within Metro Manila (National Capital Region).
-                  Bookings outside NCR are not accepted.
-                </p>
+
+              {/* Address */}
+              <div className="flex items-start gap-2.5">
+                <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-pink-500 shrink-0 mt-0.5">
+                  <path d="M8 1.5a4.5 4.5 0 014.5 4.5c0 3-4.5 8.5-4.5 8.5S3.5 9 3.5 6A4.5 4.5 0 018 1.5z"/>
+                  <circle cx="8" cy="6" r="1.5"/>
+                </svg>
+                <p className="text-sm text-gray-600">{BRANCH.address}</p>
+              </div>
+
+              {/* Service areas */}
+              <div className="border-t border-gray-100 pt-4">
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2.5">Service Areas</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {BRANCH.serviceAreas.map((city) => (
+                    <span
+                      key={city}
+                      className="text-xs bg-gray-50 border border-gray-200 text-gray-600 px-2.5 py-1 rounded-full"
+                    >
+                      {city}
+                    </span>
+                  ))}
+                </div>
               </div>
             </div>
           </div>
