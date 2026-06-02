@@ -78,12 +78,37 @@ export default function ContactPage() {
               label="Facebook Messenger"
               href={CONTACT.messengerUrl}
               icon={
-                <Image src="/messenger-fill.svg" alt="" width={16} height={16} className="text-pink-600" style={{ filter: 'invert(40%) sepia(100%) saturate(500%) hue-rotate(280deg)' }} />
+                <Image src="/messenger.svg" alt="" width={16} height={16} className="text-pink-600" />
               }
             >
               Maid For You Cleaning Services
             </ContactRow>
 
+           
+            <ContactRow
+              label="Facebook"
+              href={CONTACT.facebookUrl}
+              icon={<Image src="/Facebook.svg" alt="" width={16} height={16} />}
+            >
+              Maid For You Cleaning Services
+            </ContactRow>
+
+            <ContactRow
+              label="Instagram"
+              href={CONTACT.instagramUrl}
+              icon={<Image src="/Instagram.svg" alt="" width={16} height={16} />}
+            >
+              @maidforyouu
+            </ContactRow>
+
+            <ContactRow
+              label="X (Twitter)"
+              href={CONTACT.twitterUrl}
+              icon={<Image src="/Twitter.svg" alt="" width={16} height={16} />}
+            >
+              @MMaidforyou
+            </ContactRow> 
+            
             <ContactRow
               label="WhatsApp"
               href={CONTACT.whatsappUrl}
@@ -97,6 +122,7 @@ export default function ContactPage() {
               +63 945 889 0338
             </ContactRow>
           </div>
+
 
           {/* Branch info */}
           <div>

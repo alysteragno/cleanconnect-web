@@ -45,7 +45,7 @@ export const BRANCH = {
   name: 'Maid For You Cleaning Services',
   area: 'Metro Manila (NCR)',
   phone: '+63458890338',
-  address: 'San Agustin St, Makati, Philippines 1210',
+  address: 'Recuerdo Towers, Conchu street, Sta. Ana Manila',
   serviceAreas: [
     'Quezon City', 'Pateros', 'Makati', 'Pasig',
     'Mandaluyong', 'Pasay City', 'Manila',

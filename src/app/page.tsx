@@ -12,18 +12,9 @@ export default function HomePage() {
 
       {/* Hero — cream background from brand palette */}
       <section className="bg-[#FFF5EC] py-20 sm:py-28">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 mt-6">
           <div className="max-w-3xl">
-            <div className="mb-6">
-              <Image
-                src="/Logo.webp"
-                alt="Maid For You Cleaning Services"
-                width={180}
-                height={54}
-                className="h-14 w-auto object-contain"
-                priority
-              />
-            </div>
+           
             <h1 className="text-4xl sm:text-5xl font-bold text-gray-900 leading-tight tracking-tight mb-5">
               Professional cleaning
               <br />
