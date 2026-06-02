@@ -23,15 +23,25 @@ export async function createCleanerAccount(
 ): Promise<AdminActionState> {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user || !(await assertSuperAdmin(supabase, user.id))) return { error: 'Unauthorized.' }
+  if (!user) return { error: 'Session expired. Please log in again.' }
+
+  const { data: adminProfile } = await supabase
+    .from('profiles')
+    .select('role, branch_id')
+    .eq('id', user.id)
+    .single()
+
+  if (adminProfile?.role !== 'super_admin') return { error: 'Unauthorized.' }
+
+  const branch_id = adminProfile.branch_id
+  if (!branch_id) return { error: 'Your admin profile has no branch assigned.' }
 
   const full_name = (formData.get('full_name') as string).trim()
   const email = (formData.get('email') as string).trim()
   const password = formData.get('password') as string
   const phone = (formData.get('phone') as string).trim() || null
-  const branch_id = formData.get('branch_id') as string
 
-  if (!full_name || !email || !password || !branch_id) return { error: 'All fields are required.' }
+  if (!full_name || !email || !password) return { error: 'All fields are required.' }
   if (password.length < 8) return { error: 'Password must be at least 8 characters.' }
 
   const adminClient = createAdminClient()

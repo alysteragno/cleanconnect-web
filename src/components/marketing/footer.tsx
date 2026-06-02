@@ -12,7 +12,7 @@ export default function MarketingFooter() {
           <div>
             <Link href="/">
               <Image
-                src="/Logo.jpg"
+                src="/Logo.webp"
                 alt="Maid For You Cleaning Services"
                 width={110}
                 height={34}

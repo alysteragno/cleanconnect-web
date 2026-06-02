@@ -16,7 +16,7 @@ export default function HomePage() {
           <div className="max-w-3xl">
             <div className="mb-6">
               <Image
-                src="/Logo.jpg"
+                src="/Logo.webp"
                 alt="Maid For You Cleaning Services"
                 width={180}
                 height={54}

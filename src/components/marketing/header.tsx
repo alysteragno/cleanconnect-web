@@ -56,7 +56,7 @@ export default function MarketingHeader() {
           <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
             <Link href="/" className="flex items-center">
               <Image
-                src="/Logo.jpg"
+                src="/Logo.webp"
                 alt="Maid For You Cleaning Services"
                 width={140}
                 height={40}
@@ -80,7 +80,20 @@ export default function MarketingHeader() {
               ))}
             </nav>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-3">
+              {/* Desktop social icons */}
+              <div className="hidden sm:flex items-center gap-2">
+                <a href={CONTACT.facebookUrl} target="_blank" rel="noopener noreferrer" aria-label="Facebook" className="hover:opacity-75 transition-opacity">
+                  <Image src="/Facebook.svg" alt="Facebook" width={20} height={20} />
+                </a>
+                <a href={CONTACT.instagramUrl} target="_blank" rel="noopener noreferrer" aria-label="Instagram" className="hover:opacity-75 transition-opacity">
+                  <Image src="/Instagram.svg" alt="Instagram" width={20} height={20} />
+                </a>
+                <a href={CONTACT.twitterUrl} target="_blank" rel="noopener noreferrer" aria-label="X (Twitter)" className="hover:opacity-75 transition-opacity">
+                  <Image src="/Twitter.svg" alt="X" width={18} height={18} />
+                </a>
+              </div>
+
               {/* Desktop sign in */}
               <Link
                 href="/login"
@@ -179,6 +192,17 @@ export default function MarketingHeader() {
                       <path d="M12 0C5.373 0 0 5.373 0 12c0 2.123.555 4.116 1.528 5.845L.057 23.272a.75.75 0 00.914.913l5.487-1.449A11.95 11.95 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-1.898 0-3.676-.52-5.198-1.424l-.37-.216-3.84 1.016 1.03-3.752-.234-.384A9.96 9.96 0 012 12C2 6.477 6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z"/>
                     </svg>
                     WhatsApp
+                  </a>
+                </div>
+                <div className="flex items-center gap-3 px-3 pt-2">
+                  <a href={CONTACT.facebookUrl} target="_blank" rel="noopener noreferrer" aria-label="Facebook" className="hover:opacity-75 transition-opacity">
+                    <Image src="/Facebook.svg" alt="Facebook" width={22} height={22} />
+                  </a>
+                  <a href={CONTACT.instagramUrl} target="_blank" rel="noopener noreferrer" aria-label="Instagram" className="hover:opacity-75 transition-opacity">
+                    <Image src="/Instagram.svg" alt="Instagram" width={22} height={22} />
+                  </a>
+                  <a href={CONTACT.twitterUrl} target="_blank" rel="noopener noreferrer" aria-label="X (Twitter)" className="hover:opacity-75 transition-opacity">
+                    <Image src="/Twitter.svg" alt="X" width={20} height={20} />
                   </a>
                 </div>
               </div>

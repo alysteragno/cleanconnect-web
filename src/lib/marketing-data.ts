@@ -58,6 +58,9 @@ export const CONTACT = {
   email: 'maid4you20.ph@gmail.com',
   messengerUrl: 'https://www.facebook.com/messages/t/maid4you20/',
   whatsappUrl: 'https://wa.me/639458890338',
+  facebookUrl: 'https://www.facebook.com/104977731462508',
+  instagramUrl: 'https://www.instagram.com/maidforyouu/',
+  twitterUrl: 'https://www.x.com/MMaidforyou',
 }
 
 export const STEPS = [
