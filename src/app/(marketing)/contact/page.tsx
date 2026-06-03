@@ -163,6 +163,41 @@ export default function ContactPage() {
         </div>
       </section>
 
+      {/* Map */}
+      <section className="py-12 sm:py-16">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6">
+          <div className="mb-5 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
+            <div>
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Find Us</p>
+              <p className="text-sm text-gray-700 font-medium">{BRANCH.address}</p>
+            </div>
+            <a
+              href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(BRANCH.address + ', Philippines')}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 px-4 py-2 bg-pink-600 text-white text-sm font-semibold rounded-lg hover:bg-pink-700 transition-colors shrink-0"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polygon points="3 11 22 2 13 21 11 13 3 11"/>
+              </svg>
+              Get Directions
+            </a>
+          </div>
+          <div className="rounded-2xl overflow-hidden border border-gray-200 shadow-sm h-80 sm:h-96">
+            <iframe
+              src={`https://maps.google.com/maps?q=${encodeURIComponent(BRANCH.address + ', Philippines')}&output=embed&z=16`}
+              width="100%"
+              height="100%"
+              style={{ border: 0 }}
+              allowFullScreen
+              loading="lazy"
+              referrerPolicy="no-referrer-when-downgrade"
+              title="Maid For You Cleaning Services location"
+            />
+          </div>
+        </div>
+      </section>
+
       {/* CTA */}
       <section className="py-14">
         <div className="max-w-xl mx-auto px-4 sm:px-6 text-center">

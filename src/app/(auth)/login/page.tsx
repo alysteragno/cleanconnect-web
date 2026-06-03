@@ -1,5 +1,6 @@
 ﻿import Image from 'next/image'
 import LoginForm from './login-form'
+import Link from 'next/link'
 
 export default async function LoginPage({
   searchParams,
@@ -11,18 +12,10 @@ export default async function LoginPage({
   return (
     <div className="min-h-screen bg-gray-50 flex">
       {/* Left panel — branding */}
-      <div className="hidden lg:flex lg:w-1/2 bg-pink-600 flex-col justify-between p-12">
-        <Image
-          src="/Logo.jpg"
-          alt="Maid For You Cleaning Services"
-          width={140}
-          height={44}
-          className="h-11 w-auto object-contain brightness-0 invert"
-          priority
-        />
+      <div className="hidden lg:flex lg:w-1/2 bg-pink-600 flex-col justify-center p-12">
         <div>
           <p className="text-pink-100 text-sm font-medium uppercase tracking-widest mb-4">
-            Admin Portal
+            Maid For You
           </p>
           <h2 className="text-white text-3xl font-bold leading-snug">
             Professional cleaning operations,
@@ -43,19 +36,22 @@ export default async function LoginPage({
         <div className="w-full max-w-sm">
           {/* Mobile logo */}
           <div className="flex justify-center mb-8 lg:hidden">
-            <Image
-              src="/Logo.jpg"
-              alt="Maid For You Cleaning Services"
-              width={130}
-              height={40}
-              className="h-10 w-auto object-contain"
-              priority
-            />
           </div>
-
+  <div className='flex justify-center'>
+            <Link href="/">  
+              <Image
+                src="/Logo.webp"
+                alt="Maid For You Cleaning Services"
+                width={150}
+                height={60}
+                className="w-auto object-contain "
+                priority
+              />
+              </Link>
+            </div>
           <div className="mb-8">
             <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Sign in</h1>
-            <p className="text-sm text-gray-500 mt-1">Admin and staff access only.</p>
+            <p className="text-sm text-gray-500 mt-1">Welcome back. Sign in to your account.</p>
           </div>
 
           {registered && (
@@ -65,6 +61,13 @@ export default async function LoginPage({
           )}
 
           <LoginForm />
+
+          <p className="text-center text-sm text-gray-500 mt-6">
+            Don&apos;t have an account?{' '}
+            <a href="/register" className="text-pink-600 font-medium hover:text-pink-700 transition-colors">
+              Register
+            </a>
+          </p>
         </div>
       </div>
     </div>

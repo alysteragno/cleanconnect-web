@@ -11,7 +11,7 @@ export default function MobileAppPlaceholder({ role }: { role: 'customer' | 'cle
 
         <div className="flex justify-center">
           <Image
-            src="/Logo.jpg"
+            src="/Logo.webp"
             alt="Maid For You Cleaning Services"
             width={150}
             height={46}

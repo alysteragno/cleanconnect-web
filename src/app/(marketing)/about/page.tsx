@@ -24,24 +24,30 @@ export default function AboutPage() {
         </p>
       </section>
 
-      {/* Story */}
-      <section className="bg-gray-50 py-16 sm:py-20">
-        <div className="max-w-3xl mx-auto px-4 sm:px-6">
-          <SectionHeader title="Our Story" />
-          <div className="space-y-4 text-gray-600 leading-relaxed text-sm sm:text-base">
-            <p>
-              Maid For You Cleaning Services was founded in 2016 in Metro Manila. What began as a small team of
-              dedicated cleaners has grown into a trusted cleaning service brand serving thousands of
-              households and businesses across the NCR.
+      {/* Goals / Understanding / Pledge */}
+      <section className="py-16 sm:py-20">
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 space-y-12">
+          <div>
+            <h2 className="text-xl font-bold text-gray-900 mb-3">Our Goals</h2>
+            <p className="text-gray-600 leading-relaxed text-sm sm:text-base">
+              Since our founding, Maid For You Cleaning Services has been committed to exceptional efficiency
+              and the highest level of professionalism. We guarantee not only to meet but to exceed your
+              expectations and ensure your complete satisfaction.
             </p>
-            <p>
-              We built CleanConnect to bring our operations into the modern era — giving customers the
-              ability to book, track, and rate their cleaning service online, while giving our cleaners
-              and managers the tools they need to coordinate efficiently.
+          </div>
+          <div>
+            <h2 className="text-xl font-bold text-gray-900 mb-3">Understanding Your Needs</h2>
+            <p className="text-gray-600 leading-relaxed text-sm sm:text-base">
+              Maid For You Cleaning Services provides a wide range of professional cleaning services. We
+              understand the unique needs of unit owners and brokers, and our team is committed to delivering
+              high-quality service with integrity at competitive and affordable prices.
             </p>
-            <p>
-              Every cleaner on our platform is background-checked, trained, and committed to delivering
-              consistent, high-quality results across Metro Manila.
+          </div>
+          <div>
+            <h2 className="text-xl font-bold text-gray-900 mb-3">Pledge</h2>
+            <p className="text-gray-600 leading-relaxed text-sm sm:text-base">
+              Maid For You Cleaning Services is committed to excellence. You can trust our team to deliver
+              professional, efficient service while ensuring your complete satisfaction from start to finish.
             </p>
           </div>
         </div>

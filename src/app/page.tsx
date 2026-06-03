@@ -45,10 +45,10 @@ export default function HomePage() {
                 Download the App
               </Link>
               <a
-                href="#services"
+                href="/register"
                 className="px-6 py-3 bg-white text-gray-700 border border-gray-200 rounded-lg font-semibold text-sm hover:bg-gray-50 transition-colors"
               >
-                View services
+                Create Account
               </a>
             </div>
             <p className="mt-6 text-xs text-gray-400 border border-orange-200 bg-white rounded-full inline-flex items-center gap-2 px-4 py-2">

@@ -45,7 +45,7 @@ export async function login(state: AuthState, formData: FormData): Promise<AuthS
 
   const cookieStore = await cookies()
   cookieStore.set('cleanconnect-role', role, {
-    httpOnly: false,
+    httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',
     path: '/',
