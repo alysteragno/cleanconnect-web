@@ -60,9 +60,7 @@ export default async function AdminAnnouncementsPage() {
                   {a.body && <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">{a.body}</p>}
                   <p className="text-xs text-gray-400 mt-1">
                     {new Date(a.created_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })}
-                    {a.poster?.full_name && (
-                      <span className="ml-1.5 text-gray-400">· Posted by <span className="font-medium text-gray-500">{a.poster.full_name}</span></span>
-                    )}
+                    <span className="ml-1.5">· Posted by <span className="font-medium text-gray-500">{a.poster?.full_name ?? 'Admin'}</span></span>
                   </p>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
