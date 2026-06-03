@@ -16,7 +16,7 @@ export default async function AdminAnnouncementsPage() {
   const supabase = await createClient()
   const { data } = await supabase
     .from('announcements')
-    .select('id, title, body, is_active, created_at, poster:created_by(full_name)')
+    .select('id, title, body, is_active, created_at, poster:profiles!created_by(full_name)')
     .order('created_at', { ascending: false })
 
   const list = (data ?? []) as unknown as Announcement[]

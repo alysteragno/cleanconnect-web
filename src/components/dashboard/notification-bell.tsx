@@ -16,6 +16,14 @@ type Notification = {
   created_at: string
 }
 
+type Announcement = {
+  id: string
+  title: string
+  body: string | null
+  created_at: string
+  poster: { full_name: string } | null
+}
+
 function getHref(n: Notification, role: string): string {
   if (n.booking_id) {
     if (role === 'super_admin' || role === 'branch_manager') return `/admin/bookings/${n.booking_id}`
@@ -33,12 +41,15 @@ export default function NotificationBell({
   userId,
   role,
   initialNotifications,
+  initialAnnouncements = [],
 }: {
   userId: string
   role: string
   initialNotifications: Notification[]
+  initialAnnouncements?: Announcement[]
 }) {
   const [notifications, setNotifications] = useState(initialNotifications)
+  const [announcements] = useState(initialAnnouncements)
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
 
@@ -100,36 +111,60 @@ export default function NotificationBell({
             )}
           </div>
 
-          <div className="max-h-80 overflow-y-auto divide-y divide-gray-50">
-            {notifications.length === 0 ? (
-              <p className="text-sm text-gray-400 text-center py-8">No notifications yet.</p>
-            ) : (
-              notifications.slice(0, 10).map((n) => (
-                <Link
-                  key={n.id}
-                  href={getHref(n, role)}
-                  onClick={() => {
-                    if (!n.is_read) {
-                      void markNotificationRead(n.id)
-                      setNotifications((prev) =>
-                        prev.map((x) => (x.id === n.id ? { ...x, is_read: true } : x))
-                      )
-                    }
-                    setOpen(false)
-                  }}
-                  className={`block px-4 py-3 hover:bg-gray-50 transition-colors ${!n.is_read ? 'bg-pink-50/40' : ''}`}
-                >
-                  <p className={`text-sm font-medium ${!n.is_read ? 'text-gray-900' : 'text-gray-500'}`}>
-                    {n.title}
-                  </p>
-                  <p className="text-xs text-gray-400 mt-0.5">{n.body}</p>
-                  <p className="text-xs text-gray-300 mt-1">
-                    {new Date(n.created_at).toLocaleDateString('en-PH', {
-                      month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
-                    })}
-                  </p>
-                </Link>
-              ))
+          <div className="max-h-96 overflow-y-auto">
+            {/* Notifications */}
+            <div className="divide-y divide-gray-50">
+              {notifications.length === 0 ? (
+                <p className="text-sm text-gray-400 text-center py-6">No notifications yet.</p>
+              ) : (
+                notifications.slice(0, 10).map((n) => (
+                  <Link
+                    key={n.id}
+                    href={getHref(n, role)}
+                    onClick={() => {
+                      if (!n.is_read) {
+                        void markNotificationRead(n.id)
+                        setNotifications((prev) =>
+                          prev.map((x) => (x.id === n.id ? { ...x, is_read: true } : x))
+                        )
+                      }
+                      setOpen(false)
+                    }}
+                    className={`block px-4 py-3 hover:bg-gray-50 transition-colors ${!n.is_read ? 'bg-pink-50/40' : ''}`}
+                  >
+                    <p className={`text-sm font-medium ${!n.is_read ? 'text-gray-900' : 'text-gray-500'}`}>
+                      {n.title}
+                    </p>
+                    <p className="text-xs text-gray-400 mt-0.5">{n.body}</p>
+                    <p className="text-xs text-gray-300 mt-1">
+                      {new Date(n.created_at).toLocaleDateString('en-PH', {
+                        month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
+                      })}
+                    </p>
+                  </Link>
+                ))
+              )}
+            </div>
+
+            {/* Announcements */}
+            {announcements.length > 0 && (
+              <>
+                <div className="px-4 py-2 bg-gray-50 border-t border-gray-100">
+                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Announcements</p>
+                </div>
+                <div className="divide-y divide-gray-50">
+                  {announcements.map((a) => (
+                    <div key={a.id} className="px-4 py-3">
+                      <p className="text-sm font-medium text-gray-900">{a.title}</p>
+                      {a.body && <p className="text-xs text-gray-400 mt-0.5 line-clamp-2">{a.body}</p>}
+                      <p className="text-xs text-gray-300 mt-1">
+                        {new Date(a.created_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })}
+                        <span className="ml-1.5">· <span className="font-medium text-gray-400">{a.poster?.full_name ?? 'Admin'}</span></span>
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </>
             )}
           </div>
         </div>

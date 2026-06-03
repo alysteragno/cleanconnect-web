@@ -43,12 +43,19 @@ export default async function DashboardLayout({ children }: { children: React.Re
     return <>{children}</>
   }
 
-  const { data: notifData } = await supabase
-    .from('notifications')
-    .select('id, title, body, type, booking_id, complaint_id, is_read, created_at')
-    .eq('user_id', user.id)
-    .order('created_at', { ascending: false })
-    .limit(10)
+  const [{ data: notifData }, { data: announcementData }] = await Promise.all([
+    supabase
+      .from('notifications')
+      .select('id, title, body, type, booking_id, complaint_id, is_read, created_at')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false })
+      .limit(10),
+    supabase
+      .from('announcements')
+      .select('id, title, body, created_at, poster:profiles!created_by(full_name)')
+      .order('created_at', { ascending: false })
+      .limit(5),
+  ])
 
   const sidebarContent = (
     <>
@@ -112,6 +119,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
         userId={user.id}
         role={role}
         initialNotifications={notifData ?? []}
+        initialAnnouncements={(announcementData ?? []) as any[]}
       />
       <span className="w-px h-4 bg-gray-200" />
       <span className="text-sm text-gray-700 font-medium">{displayName}</span>
