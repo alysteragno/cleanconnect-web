@@ -1,0 +1,41 @@
+'use server'
+
+import { revalidatePath } from 'next/cache'
+import { createClient } from '@/utils/supabase/server'
+
+export async function createAnnouncement(formData: FormData) {
+  const title = (formData.get('title') as string)?.trim()
+  const body  = (formData.get('body')  as string)?.trim() || null
+
+  if (!title) return { error: 'Title is required.' }
+
+  const supabase = await createClient()
+  const { error } = await supabase.from('announcements').insert({ title, body })
+  if (error) return { error: error.message }
+
+  revalidatePath('/admin/announcements')
+  revalidatePath('/')
+  return { success: true }
+}
+
+export async function toggleAnnouncement(id: string, isActive: boolean) {
+  const supabase = await createClient()
+  const { error } = await supabase
+    .from('announcements')
+    .update({ is_active: isActive })
+    .eq('id', id)
+
+  if (error) return { error: error.message }
+
+  revalidatePath('/admin/announcements')
+  revalidatePath('/')
+}
+
+export async function deleteAnnouncement(id: string) {
+  const supabase = await createClient()
+  const { error } = await supabase.from('announcements').delete().eq('id', id)
+  if (error) return { error: error.message }
+
+  revalidatePath('/admin/announcements')
+  revalidatePath('/')
+}

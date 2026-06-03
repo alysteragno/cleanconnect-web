@@ -31,10 +31,7 @@ export default function RegisterPage() {
       </div>
 
       <p className="text-xs text-gray-400 mt-6 text-center">
-        By creating an account you agree to our{' '}
-        <span className="underline cursor-pointer hover:text-gray-600 transition-colors">Terms of Service</span>
-        {' '}and{' '}
-        <span className="underline cursor-pointer hover:text-gray-600 transition-colors">Privacy Policy</span>.
+        Your information is only used to manage your bookings. We will never share it with third parties.
       </p>
     </div>
   )

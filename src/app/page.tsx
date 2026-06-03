@@ -2,10 +2,18 @@ import Link from 'next/link'
 import Image from 'next/image'
 import MarketingHeader from '@/components/marketing/header'
 import MarketingFooter from '@/components/marketing/footer'
-import { ScrollReveal } from '@/components/scroll-reveal'
 import { SERVICES, BRANCH, STEPS } from '@/lib/marketing-data'
+import { createClient } from '@/utils/supabase/server'
 
-export default function HomePage() {
+export default async function HomePage() {
+  const supabase = await createClient()
+  const { data } = await supabase
+    .from('announcements')
+    .select('id, title, body')
+    .eq('is_active', true)
+    .order('created_at', { ascending: false })
+
+  const announcements = (data ?? []) as { id: string; title: string; body: string | null }[]
   return (
     <div className="min-h-screen bg-white">
       <MarketingHeader />
@@ -53,84 +61,97 @@ export default function HomePage() {
             </div>
             <p className="mt-6 text-xs text-gray-400 border border-orange-200 bg-white rounded-full inline-flex items-center gap-2 px-4 py-2">
               <span className="w-2 h-2 rounded-full bg-pink-500 inline-block" />
-              Book via our mobile app &mdash; coming soon on iOS &amp; Android
+              Book via our mobile app
             </p>
           </div>
         </div>
       </section>
 
+      {/* Announcements */}
+      {announcements.length > 0 && (
+        <section className="bg-white py-8 sm:py-10">
+          <div className="max-w-6xl mx-auto px-4 sm:px-6 space-y-3">
+            {announcements.map((a) => (
+              <div
+                key={a.id}
+                className="flex items-start gap-3 bg-pink-50 border border-pink-200 rounded-xl px-5 py-4"
+              >
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-pink-600 shrink-0 mt-0.5">
+                  <path d="M2 6v4h2.5L10 13V3L4.5 6H2z" />
+                  <path d="M12 5.5a3 3 0 010 5" />
+                </svg>
+                <div>
+                  <p className="text-sm font-semibold text-pink-900">{a.title}</p>
+                  {a.body && <p className="text-xs text-pink-700 mt-0.5 leading-relaxed">{a.body}</p>}
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
       {/* Services */}
       <section id="services" className="bg-gray-50 py-16 sm:py-20">
         <div className="max-w-6xl mx-auto px-4 sm:px-6">
-          <ScrollReveal>
-            <div className="mb-8">
-              <h2 className="text-2xl font-bold text-gray-900 tracking-tight">Our Services</h2>
-              <p className="text-sm text-gray-500 mt-1">Professional cleaning for every need.</p>
-            </div>
-          </ScrollReveal>
+          <div className="mb-8">
+            <h2 className="text-2xl font-bold text-gray-900 tracking-tight">Our Services</h2>
+            <p className="text-sm text-gray-500 mt-1">Professional cleaning for every need.</p>
+          </div>
 
-          {/* Photo strip — vertical on mobile, 3-up on desktop */}
-          <ScrollReveal delay={80}>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-10">
-              {[
-                '/services/s1.jpg',
-                '/services/s2.jpg',
-                '/services/s3.jpg',
-              ].map((src) => (
-                <div
-                  key={src}
-                  className="relative aspect-[3/4] sm:aspect-auto sm:h-56 rounded-2xl overflow-hidden group"
-                >
-                  <Image
-                    src={src}
-                    alt="Maid For You Cleaning Services"
-                    fill
-                    className="object-cover transition-transform duration-500 group-hover:scale-105"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-black/10 to-transparent" />
-                </div>
-              ))}
-            </div>
-          </ScrollReveal>
+          {/* Photo strip — 3-up on all screen sizes */}
+          <div className="grid grid-cols-3 gap-2 sm:gap-4 mb-10">
+            {[
+              '/services/s1.jpg',
+              '/services/s2.jpg',
+              '/services/s3.jpg',
+            ].map((src) => (
+              <div
+                key={src}
+                className="relative h-28 sm:h-56 rounded-lg sm:rounded-2xl overflow-hidden group"
+              >
+                <Image
+                  src={src}
+                  alt="Maid For You Cleaning Services"
+                  fill
+                  className="object-cover transition-transform duration-500 group-hover:scale-105"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-black/10 to-transparent" />
+              </div>
+            ))}
+          </div>
 
-          <ScrollReveal delay={160}>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-px bg-gray-200 rounded-xl overflow-hidden border border-gray-200">
-              {SERVICES.map((service) => (
-                <div
-                  key={service.title}
-                  className="bg-white px-6 py-5 hover:bg-[#FFF5EC] transition-colors"
-                >
-                  <p className="text-sm font-semibold text-gray-900 mb-1.5">{service.title}</p>
-                  <p className="text-xs text-gray-500 leading-relaxed">{service.description}</p>
-                </div>
-              ))}
-            </div>
-          </ScrollReveal>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-px bg-gray-200 rounded-xl overflow-hidden border border-gray-200">
+            {SERVICES.map((service) => (
+              <div
+                key={service.title}
+                className="bg-white px-6 py-5 hover:bg-[#FFF5EC] transition-colors"
+              >
+                <p className="text-sm font-semibold text-gray-900 mb-1.5">{service.title}</p>
+                <p className="text-xs text-gray-500 leading-relaxed">{service.description}</p>
+              </div>
+            ))}
+          </div>
         </div>
       </section>
 
       {/* How it works — cream background */}
       <section id="how-it-works" className="bg-[#FFF5EC] py-16 sm:py-20">
         <div className="max-w-6xl mx-auto px-4 sm:px-6">
-          <ScrollReveal>
-            <div className="mb-10">
-              <h2 className="text-2xl font-bold text-gray-900 tracking-tight">How It Works</h2>
-              <p className="text-sm text-gray-500 mt-1">Three steps to a cleaner space.</p>
-            </div>
-          </ScrollReveal>
+          <div className="mb-10">
+            <h2 className="text-2xl font-bold text-gray-900 tracking-tight">How It Works</h2>
+            <p className="text-sm text-gray-500 mt-1">Three steps to a cleaner space.</p>
+          </div>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-8">
             {STEPS.map((item, i) => (
-              <ScrollReveal key={item.step} delay={i * 120}>
-                <div className="flex gap-4">
-                  <div className="w-8 h-8 rounded-full bg-pink-600 text-white flex items-center justify-center text-xs font-bold shrink-0 mt-0.5">
-                    {i + 1}
-                  </div>
-                  <div>
-                    <p className="text-sm font-semibold text-gray-900 mb-1">{item.title}</p>
-                    <p className="text-sm text-gray-500 leading-relaxed">{item.description}</p>
-                  </div>
+              <div key={item.step} className="flex gap-4">
+                <div className="w-8 h-8 rounded-full bg-pink-600 text-white flex items-center justify-center text-xs font-bold shrink-0 mt-0.5">
+                  {i + 1}
                 </div>
-              </ScrollReveal>
+                <div>
+                  <p className="text-sm font-semibold text-gray-900 mb-1">{item.title}</p>
+                  <p className="text-sm text-gray-500 leading-relaxed">{item.description}</p>
+                </div>
+              </div>
             ))}
           </div>
         </div>

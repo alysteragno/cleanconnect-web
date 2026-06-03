@@ -66,10 +66,11 @@ export default async function AdminPage() {
         <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Quick access</h2>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
           {[
-            { href: '/admin/bookings',   label: 'Bookings',   sub: 'View all' },
-            { href: '/admin/cleaners',   label: 'Cleaners',   sub: 'Manage staff' },
-            { href: '/admin/complaints', label: 'Complaints', sub: 'Review tickets' },
-            { href: '/admin/reports',    label: 'Reports',    sub: 'Export data' },
+            { href: '/admin/bookings',       label: 'Bookings',       sub: 'View all' },
+            { href: '/admin/cleaners',       label: 'Cleaners',       sub: 'Manage staff' },
+            { href: '/admin/complaints',     label: 'Complaints',     sub: 'Review tickets' },
+            { href: '/admin/announcements',  label: 'Announcements',  sub: 'Post updates' },
+            { href: '/admin/reports',        label: 'Reports',        sub: 'Export data' },
           ].map((item) => (
             <Link
               key={item.href}

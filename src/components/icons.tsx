@@ -99,6 +99,15 @@ export function IconCreditCard({ className }: IconProps) {
   )
 }
 
+export function IconMegaphone({ className }: IconProps) {
+  return (
+    <svg {...props} className={`${base} ${className ?? ''}`}>
+      <path d="M2 6v4h2.5L10 13V3L4.5 6H2z" />
+      <path d="M12 5.5a3 3 0 010 5" />
+    </svg>
+  )
+}
+
 export function IconChevronRight({ className }: IconProps) {
   return (
     <svg {...props} className={`${base} ${className ?? ''}`}>
