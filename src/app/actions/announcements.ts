@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/utils/supabase/server'
 
-export async function createAnnouncement(formData: FormData) {
+export async function createAnnouncement(_prevState: unknown, formData: FormData) {
   const title = (formData.get('title') as string)?.trim()
   const body  = (formData.get('body')  as string)?.trim() || null
 

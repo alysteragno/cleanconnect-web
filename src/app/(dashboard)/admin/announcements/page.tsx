@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { createClient } from '@/utils/supabase/server'
-import { createAnnouncement, toggleAnnouncement, deleteAnnouncement } from '@/app/actions/announcements'
+import { toggleAnnouncement, deleteAnnouncement } from '@/app/actions/announcements'
+import AnnouncementCreateForm from './create-form'
 
 type Announcement = {
   id: string
@@ -31,39 +32,7 @@ export default async function AdminAnnouncementsPage() {
         <p className="text-sm text-gray-500 mt-0.5">Active announcements appear on the public homepage.</p>
       </div>
 
-      {/* Create form */}
-      <div className="bg-white rounded-xl border border-gray-200 p-5">
-        <p className="text-sm font-semibold text-gray-700 mb-4">New Announcement</p>
-        <form action={createAnnouncement} className="space-y-3">
-          <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">Title *</label>
-            <input
-              name="title"
-              type="text"
-              required
-              placeholder="e.g. Holiday schedule update"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-pink-500"
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">
-              Body <span className="text-gray-400 font-normal">(optional)</span>
-            </label>
-            <textarea
-              name="body"
-              rows={3}
-              placeholder="Additional details shown below the title..."
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-pink-500 resize-none"
-            />
-          </div>
-          <button
-            type="submit"
-            className="px-5 py-2 bg-pink-600 text-white rounded-lg text-sm font-semibold hover:bg-pink-700 transition-colors"
-          >
-            Post Announcement
-          </button>
-        </form>
-      </div>
+      <AnnouncementCreateForm />
 
       {/* List */}
       <div className="bg-white rounded-xl border border-gray-200">
