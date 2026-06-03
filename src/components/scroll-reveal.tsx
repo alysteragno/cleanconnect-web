@@ -9,7 +9,7 @@ interface Props {
   threshold?: number
 }
 
-export function ScrollReveal({ children, className = '', delay = 0, threshold = 0.12 }: Props) {
+export function ScrollReveal({ children, className = '', delay = 0, threshold = 0 }: Props) {
   const ref = useRef<HTMLDivElement>(null)
   const [visible, setVisible] = useState(false)
 

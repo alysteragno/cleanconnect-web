@@ -29,6 +29,17 @@ export async function createNotification({
   })
 }
 
+export async function markNotificationRead(id: string) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return
+  await supabase
+    .from('notifications')
+    .update({ is_read: true })
+    .eq('id', id)
+    .eq('user_id', user.id)
+}
+
 export async function markAllNotificationsRead() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()

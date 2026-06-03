@@ -10,7 +10,8 @@ export async function createAnnouncement(_prevState: unknown, formData: FormData
   if (!title) return { error: 'Title is required.' }
 
   const supabase = await createClient()
-  const { error } = await supabase.from('announcements').insert({ title, body })
+  const { data: { user } } = await supabase.auth.getUser()
+  const { error } = await supabase.from('announcements').insert({ title, body, created_by: user?.id ?? null })
   if (error) return { error: error.message }
 
   revalidatePath('/admin/announcements')

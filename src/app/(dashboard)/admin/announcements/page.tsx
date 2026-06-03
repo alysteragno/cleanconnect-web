@@ -9,16 +9,17 @@ type Announcement = {
   body: string | null
   is_active: boolean
   created_at: string
+  poster: { full_name: string } | null
 }
 
 export default async function AdminAnnouncementsPage() {
   const supabase = await createClient()
   const { data } = await supabase
     .from('announcements')
-    .select('id, title, body, is_active, created_at')
+    .select('id, title, body, is_active, created_at, poster:created_by(full_name)')
     .order('created_at', { ascending: false })
 
-  const list = (data ?? []) as Announcement[]
+  const list = (data ?? []) as unknown as Announcement[]
   const activeCount = list.filter((a) => a.is_active).length
 
   return (
@@ -59,6 +60,9 @@ export default async function AdminAnnouncementsPage() {
                   {a.body && <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">{a.body}</p>}
                   <p className="text-xs text-gray-400 mt-1">
                     {new Date(a.created_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })}
+                    {a.poster?.full_name && (
+                      <span className="ml-1.5 text-gray-400">· Posted by <span className="font-medium text-gray-500">{a.poster.full_name}</span></span>
+                    )}
                   </p>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">

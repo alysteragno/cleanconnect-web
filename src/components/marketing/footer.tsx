@@ -90,7 +90,7 @@ export default function MarketingFooter() {
                 </Link>
               ))}
               <Link href="/login" className="block text-sm text-gray-500 hover:text-gray-900 transition-colors">
-                Admin Sign in
+                Sign in
               </Link>
             </div>
           </div>

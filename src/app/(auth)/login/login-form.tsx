@@ -20,7 +20,7 @@ export default function LoginForm() {
           type="email"
           required
           autoComplete="email"
-          placeholder="admin@example.com"
+          placeholder="name@example.com"
           className={inputClass}
         />
       </div>

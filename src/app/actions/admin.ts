@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { createClient, createAdminClient } from '@/utils/supabase/server'
+import { createNotification } from './notifications'
 
 export type AdminActionState = { error?: string; success?: string } | undefined
 
@@ -141,6 +142,25 @@ export async function updatePaymentStatus(
 
   if (error) return { error: error.message }
 
+  if (payment_status === 'paid') {
+    const { data: bookingMeta } = await supabase
+      .from('bookings')
+      .select('customer_id, service_date')
+      .eq('id', booking_id)
+      .single()
+
+    if (bookingMeta) {
+      const dateStr = new Date(bookingMeta.service_date).toLocaleDateString('en-PH', { month: 'short', day: 'numeric' })
+      await createNotification({
+        userId: bookingMeta.customer_id,
+        title: 'Payment Confirmed',
+        body: `Your payment for the appointment on ${dateStr} has been received. Thank you!`,
+        type: 'payment_confirmed',
+        bookingId: booking_id,
+      })
+    }
+  }
+
   revalidatePath(`/admin/bookings/${booking_id}`)
   revalidatePath('/admin/bookings')
   return { success: `Payment status updated to "${payment_status}".` }
@@ -174,6 +194,28 @@ export async function dispatchCleaners(
 
   if (error) return { error: error.message }
 
+  const { data: booking } = await supabase
+    .from('bookings')
+    .select('service_date')
+    .eq('id', bookingId)
+    .single()
+
+  const dateStr = booking?.service_date
+    ? new Date(booking.service_date).toLocaleDateString('en-PH', { month: 'short', day: 'numeric' })
+    : 'an upcoming date'
+
+  await Promise.all(
+    cleanerIds.map((cleanerId) =>
+      createNotification({
+        userId: cleanerId,
+        title: 'New Job Offer',
+        body: `You have a cleaning offer for ${dateStr}. Accept or decline in your assignments.`,
+        type: 'job_offer',
+        bookingId,
+      })
+    )
+  )
+
   revalidatePath(`/admin/bookings/${bookingId}`)
   return { success: `Offer sent to ${cleanerIds.length} cleaner(s).` }
 }
@@ -204,6 +246,32 @@ export async function forceAssignCleaner(
     .eq('id', bookingId)
   if (e2) return { error: e2.message }
 
+  const { data: booking } = await supabase
+    .from('bookings')
+    .select('service_date, customer_id')
+    .eq('id', bookingId)
+    .single()
+
+  if (booking) {
+    const dateStr = new Date(booking.service_date).toLocaleDateString('en-PH', { month: 'short', day: 'numeric' })
+    await Promise.all([
+      createNotification({
+        userId: cleanerId,
+        title: 'Job Confirmed',
+        body: `You have been assigned a cleaning job on ${dateStr}.`,
+        type: 'job_assigned',
+        bookingId,
+      }),
+      createNotification({
+        userId: booking.customer_id,
+        title: 'Booking Confirmed',
+        body: `Your cleaning appointment on ${dateStr} has been confirmed!`,
+        type: 'booking_confirmed',
+        bookingId,
+      }),
+    ])
+  }
+
   revalidatePath(`/admin/bookings/${bookingId}`)
   revalidatePath('/admin')
   redirect(`/admin/bookings/${bookingId}`)
@@ -221,12 +289,29 @@ export async function cancelBooking(
   const feeRaw = formData.get('cancellation_fee') as string
   const cancellation_fee = feeRaw && parseFloat(feeRaw) > 0 ? parseFloat(feeRaw) : null
 
+  const { data: bookingMeta } = await supabase
+    .from('bookings')
+    .select('customer_id, service_date')
+    .eq('id', bookingId)
+    .single()
+
   const { error } = await supabase
     .from('bookings')
     .update({ status: 'cancelled', cancellation_fee })
     .eq('id', bookingId)
 
   if (error) return { error: error.message }
+
+  if (bookingMeta) {
+    const dateStr = new Date(bookingMeta.service_date).toLocaleDateString('en-PH', { month: 'short', day: 'numeric' })
+    await createNotification({
+      userId: bookingMeta.customer_id,
+      title: 'Booking Cancelled',
+      body: `Your cleaning appointment on ${dateStr} has been cancelled. Contact us if you have questions.`,
+      type: 'booking_cancelled',
+      bookingId,
+    })
+  }
 
   revalidatePath('/admin/bookings')
   revalidatePath(`/admin/bookings/${bookingId}`)

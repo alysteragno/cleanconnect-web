@@ -104,11 +104,6 @@ export default async function AdminBookingsPage({
             </Link>
           ))}
         </div>
-        <BranchFilter
-          branches={branchList}
-          selected={branch ?? ''}
-          baseHref="/admin/bookings"
-        />
       </div>
 
       <div className="bg-white rounded-xl border border-gray-200">

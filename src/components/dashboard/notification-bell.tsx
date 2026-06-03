@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/utils/supabase/client'
-import { markAllNotificationsRead } from '@/app/actions/notifications'
+import { markAllNotificationsRead, markNotificationRead } from '@/app/actions/notifications'
 
 type Notification = {
   id: string
@@ -108,7 +108,15 @@ export default function NotificationBell({
                 <Link
                   key={n.id}
                   href={getHref(n, role)}
-                  onClick={() => setOpen(false)}
+                  onClick={() => {
+                    if (!n.is_read) {
+                      void markNotificationRead(n.id)
+                      setNotifications((prev) =>
+                        prev.map((x) => (x.id === n.id ? { ...x, is_read: true } : x))
+                      )
+                    }
+                    setOpen(false)
+                  }}
                   className={`block px-4 py-3 hover:bg-gray-50 transition-colors ${!n.is_read ? 'bg-pink-50/40' : ''}`}
                 >
                   <p className={`text-sm font-medium ${!n.is_read ? 'text-gray-900' : 'text-gray-500'}`}>
