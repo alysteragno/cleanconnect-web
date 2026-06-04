@@ -53,7 +53,7 @@ export default function NotificationBell({
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
 
-  const unread = notifications.filter((n) => !n.is_read).length
+  const unread = notifications.filter((n) => !n.is_read).length + announcements.length
 
   useEffect(() => {
     const supabase = createClient()
