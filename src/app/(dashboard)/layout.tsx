@@ -16,6 +16,7 @@ const ADMIN_NAV = [
   { href: '/admin',                  label: 'Dashboard',     icon: <IconDashboard /> },
   { href: '/admin/bookings',         label: 'Bookings',      icon: <IconCalendar /> },
   { href: '/admin/cleaners',         label: 'Cleaners',      icon: <IconUsers /> },
+  { href: '/admin/customers',        label: 'Customers',     icon: <IconUsers /> },
   { href: '/admin/complaints',       label: 'Complaints',    icon: <IconChat /> },
   { href: '/admin/feedback',         label: 'Feedback',      icon: <IconStar /> },
   { href: '/admin/announcements',    label: 'Announcements', icon: <IconMegaphone /> },

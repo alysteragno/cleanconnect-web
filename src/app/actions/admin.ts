@@ -119,6 +119,29 @@ export async function toggleCleanerStatus(
   return { success: current ? 'Cleaner deactivated.' : 'Cleaner reactivated.' }
 }
 
+export async function toggleCustomerStatus(
+  state: AdminActionState,
+  formData: FormData
+): Promise<AdminActionState> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user || !(await assertSuperAdmin(supabase, user.id))) return { error: 'Unauthorized.' }
+
+  const customer_id = formData.get('customer_id') as string
+  const current = formData.get('is_active') === 'true'
+
+  const { error } = await supabase
+    .from('profiles')
+    .update({ is_active: !current })
+    .eq('id', customer_id)
+
+  if (error) return { error: error.message }
+
+  revalidatePath(`/admin/customers/${customer_id}`)
+  revalidatePath('/admin/customers')
+  return { success: current ? 'Customer deactivated.' : 'Customer reactivated.' }
+}
+
 // ── Payment management ─────────────────────────────────────────────────────
 
 export async function updatePaymentStatus(
