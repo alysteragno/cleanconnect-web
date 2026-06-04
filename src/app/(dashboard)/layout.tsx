@@ -2,7 +2,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { cookies } from 'next/headers'
-import { createClient } from '@/utils/supabase/server'
+import { createClient, createAdminClient } from '@/utils/supabase/server'
 import { logout } from '@/app/actions/auth'
 import NotificationBell from '@/components/dashboard/notification-bell'
 import { SidebarNav } from '@/components/dashboard/sidebar-nav'
@@ -43,19 +43,32 @@ export default async function DashboardLayout({ children }: { children: React.Re
     return <>{children}</>
   }
 
-  const [{ data: notifData }, { data: announcementData }] = await Promise.all([
+  const adminDb = createAdminClient()
+
+  const [{ data: notifData }, { data: announcementRows }] = await Promise.all([
     supabase
       .from('notifications')
       .select('id, title, body, type, booking_id, complaint_id, is_read, created_at')
       .eq('user_id', user.id)
       .order('created_at', { ascending: false })
       .limit(10),
-    supabase
+    adminDb
       .from('announcements')
-      .select('id, title, body, created_at, poster:profiles!created_by(full_name)')
+      .select('id, title, body, created_at, created_by')
       .order('created_at', { ascending: false })
       .limit(5),
   ])
+
+  const posterIds = [...new Set((announcementRows ?? []).filter((r: any) => r.created_by).map((r: any) => r.created_by as string))]
+  let posterMap: Record<string, string> = {}
+  if (posterIds.length > 0) {
+    const { data: profiles } = await adminDb.from('profiles').select('id, full_name').in('id', posterIds)
+    posterMap = Object.fromEntries((profiles ?? []).map((p: any) => [p.id, p.full_name]))
+  }
+  const announcementData = (announcementRows ?? []).map((r: any) => ({
+    ...r,
+    poster_name: r.created_by ? (posterMap[r.created_by] ?? 'Admin') : 'Admin',
+  }))
 
   const sidebarContent = (
     <>

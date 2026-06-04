@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { createClient } from '@/utils/supabase/server'
+import { createAdminClient } from '@/utils/supabase/server'
 import { toggleAnnouncement, deleteAnnouncement } from '@/app/actions/announcements'
 import AnnouncementCreateForm from './create-form'
 
@@ -9,17 +9,33 @@ type Announcement = {
   body: string | null
   is_active: boolean
   created_at: string
-  poster: { full_name: string } | null
+  created_by: string | null
+  poster_name: string
 }
 
 export default async function AdminAnnouncementsPage() {
-  const supabase = await createClient()
-  const { data } = await supabase
+  const admin = createAdminClient()
+
+  const { data: rows } = await admin
     .from('announcements')
-    .select('id, title, body, is_active, created_at, poster:profiles!created_by(full_name)')
+    .select('id, title, body, is_active, created_at, created_by')
     .order('created_at', { ascending: false })
 
-  const list = (data ?? []) as unknown as Announcement[]
+  const posterIds = [...new Set((rows ?? []).filter((r) => r.created_by).map((r) => r.created_by as string))]
+  let posterMap: Record<string, string> = {}
+  if (posterIds.length > 0) {
+    const { data: profiles } = await admin
+      .from('profiles')
+      .select('id, full_name')
+      .in('id', posterIds)
+    posterMap = Object.fromEntries((profiles ?? []).map((p) => [p.id, p.full_name]))
+  }
+
+  const list: Announcement[] = (rows ?? []).map((r) => ({
+    ...r,
+    poster_name: r.created_by ? (posterMap[r.created_by] ?? 'Admin') : 'Admin',
+  }))
+
   const activeCount = list.filter((a) => a.is_active).length
 
   return (
@@ -60,7 +76,7 @@ export default async function AdminAnnouncementsPage() {
                   {a.body && <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">{a.body}</p>}
                   <p className="text-xs text-gray-400 mt-1">
                     {new Date(a.created_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })}
-                    <span className="ml-1.5">· Posted by <span className="font-medium text-gray-500">{a.poster?.full_name ?? 'Admin'}</span></span>
+                    <span className="ml-1.5">· Posted by <span className="font-medium text-gray-500">{a.poster_name}</span></span>
                   </p>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">

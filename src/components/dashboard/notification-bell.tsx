@@ -21,7 +21,7 @@ type Announcement = {
   title: string
   body: string | null
   created_at: string
-  poster: { full_name: string } | null
+  poster_name: string
 }
 
 function getHref(n: Notification, role: string): string {
@@ -159,7 +159,7 @@ export default function NotificationBell({
                       {a.body && <p className="text-xs text-gray-400 mt-0.5 line-clamp-2">{a.body}</p>}
                       <p className="text-xs text-gray-300 mt-1">
                         {new Date(a.created_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })}
-                        <span className="ml-1.5">· <span className="font-medium text-gray-400">{a.poster?.full_name ?? 'Admin'}</span></span>
+                        <span className="ml-1.5">· <span className="font-medium text-gray-400">{a.poster_name}</span></span>
                       </p>
                     </div>
                   ))}
