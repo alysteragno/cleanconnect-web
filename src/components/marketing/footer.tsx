@@ -76,7 +76,7 @@ export default function MarketingFooter() {
               />
             </Link>
             <p className="text-xs text-gray-400 leading-relaxed">
-              Professional cleaning services in Metro Manila. Serving homes, condos, and offices since 2016.
+              Professional cleaning services in Metro Manila. Serving homes, condos, and offices since 2021.
             </p>
           </div>
 

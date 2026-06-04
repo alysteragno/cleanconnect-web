@@ -23,7 +23,7 @@ export default async function LoginPage({
             managed in one place.
           </h2>
           <p className="text-pink-200 text-sm mt-4 leading-relaxed">
-            Maid For You Cleaning Services — serving Metro Manila since 2016.
+            Maid For You Cleaning Services — serving Metro Manila since 2021.
           </p>
         </div>
         <p className="text-pink-300 text-xs">
