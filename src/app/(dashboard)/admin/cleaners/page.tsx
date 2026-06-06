@@ -69,7 +69,6 @@ function CleanerSection({ title, cleaners, dimmed = false }: { title: string; cl
                   <p className="text-xs text-gray-400">{c.phone ?? 'No phone'}</p>
                 </div>
               </div>
-              <p className="text-xs text-pink-600 group-hover:underline">Edit →</p>
             </Link>
           ))}
         </div>

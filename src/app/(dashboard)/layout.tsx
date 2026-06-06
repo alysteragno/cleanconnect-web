@@ -21,7 +21,7 @@ const ADMIN_NAV = [
   { href: '/admin/feedback',         label: 'Feedback',      icon: <IconStar /> },
   { href: '/admin/announcements',    label: 'Announcements', icon: <IconMegaphone /> },
   { href: '/admin/reports',          label: 'Reports',       icon: <IconChart /> },
-  { href: '/admin/settings',         label: 'Settings',      icon: <IconSettings /> },
+  { href: '/admin/settings',         label: 'Payment Settings', icon: <IconSettings /> },
 ]
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -117,16 +117,6 @@ export default async function DashboardLayout({ children }: { children: React.Re
             <p className="text-xs text-pink-200 capitalize">{role.replace('_', ' ')}</p>
           </div>
         </div>
-        <Link
-          href="/admin/settings"
-          className="w-full flex items-center justify-between px-3 py-2 rounded-lg text-pink-200 hover:bg-pink-600 hover:text-white transition-colors text-sm"
-        >
-          <span className="flex items-center gap-2.5">
-            <IconSettings />
-            Settings
-          </span>
-          <IconChevronRight />
-        </Link>
         <form action={logout}>
           <button
             type="submit"
