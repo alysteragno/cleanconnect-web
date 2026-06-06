@@ -43,7 +43,7 @@ export default async function AdminComplaintsPage() {
               <div>
                 <p className="text-sm font-medium text-gray-900">{c.subject}</p>
                 <p className="text-xs text-gray-400 mt-0.5">
-                  {(c.profiles as { full_name: string } | null)?.full_name ?? 'Customer'} ·{' '}
+                  {((Array.isArray(c.profiles) ? c.profiles[0] : c.profiles) as { full_name: string } | null)?.full_name ?? 'Customer'} ·{' '}
                   {new Date(c.created_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })}
                 </p>
               </div>

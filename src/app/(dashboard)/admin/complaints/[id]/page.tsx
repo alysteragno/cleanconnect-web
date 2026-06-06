@@ -42,7 +42,8 @@ export default async function AdminComplaintDetailPage({
 
   if (!complaint) notFound()
 
-  const customer = complaint.profiles as { full_name: string; phone: string | null } | null
+  const profileData = Array.isArray(complaint.profiles) ? complaint.profiles[0] : complaint.profiles
+  const customer = profileData as { full_name: string; phone: string | null } | null
 
   return (
     <div className="max-w-2xl space-y-4">
