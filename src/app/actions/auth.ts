@@ -78,6 +78,10 @@ export async function register(state: AuthState, formData: FormData): Promise<Au
 
   if (profileError) return { error: 'Account created but profile setup failed. Please contact support.' }
 
+  // Clear any stale role cookie so a previous admin session can't redirect this new user to /admin
+  const cookieStore = await cookies()
+  cookieStore.delete('cleanconnect-role')
+
   redirect('/login?registered=true')
 }
 

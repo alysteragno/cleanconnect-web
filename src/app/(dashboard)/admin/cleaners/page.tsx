@@ -1,5 +1,5 @@
 ﻿import Link from 'next/link'
-import { createClient } from '@/utils/supabase/server'
+import { createAdminClient } from '@/utils/supabase/server'
 
 type Cleaner = {
   id: string
@@ -10,7 +10,7 @@ type Cleaner = {
 }
 
 export default async function AdminCleanersPage() {
-  const supabase = await createClient()
+  const supabase = createAdminClient()
 
   const { data: cleaners } = await supabase
     .from('profiles')

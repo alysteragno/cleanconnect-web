@@ -26,16 +26,14 @@ export async function createCleanerAccount(
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Session expired. Please log in again.' }
 
-  const { data: adminProfile } = await supabase
+  const adminClient = createAdminClient()
+  const { data: adminProfile } = await adminClient
     .from('profiles')
-    .select('role, branch_id')
+    .select('role')
     .eq('id', user.id)
     .single()
 
-  if (adminProfile?.role !== 'super_admin') return { error: 'Unauthorized.' }
-
-  const branch_id = adminProfile.branch_id
-  if (!branch_id) return { error: 'Your admin profile has no branch assigned.' }
+  if (!adminProfile || adminProfile.role !== 'super_admin') return { error: 'Unauthorized.' }
 
   const full_name = (formData.get('full_name') as string).trim()
   const email = (formData.get('email') as string).trim()
@@ -45,7 +43,6 @@ export async function createCleanerAccount(
   if (!full_name || !email || !password) return { error: 'All fields are required.' }
   if (password.length < 8) return { error: 'Password must be at least 8 characters.' }
 
-  const adminClient = createAdminClient()
   const { data: signUpData, error: signUpError } = await adminClient.auth.admin.createUser({
     email,
     password,
@@ -59,7 +56,6 @@ export async function createCleanerAccount(
     id: signUpData.user.id,
     full_name,
     phone,
-    branch_id,
     role: 'cleaner',
     is_active: true,
   })

@@ -15,7 +15,11 @@ const PATH_ROLES: Record<string, string> = {
 }
 
 export async function proxy(request: NextRequest) {
-  let response = NextResponse.next({ request })
+  // Forward pathname as a request header so server component layouts can read it
+  const requestHeaders = new Headers(request.headers)
+  requestHeaders.set('x-pathname', request.nextUrl.pathname)
+
+  let response = NextResponse.next({ request: { headers: requestHeaders } })
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -27,7 +31,7 @@ export async function proxy(request: NextRequest) {
         },
         setAll(cookiesToSet) {
           cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
-          response = NextResponse.next({ request })
+          response = NextResponse.next({ request: { headers: requestHeaders } })
           cookiesToSet.forEach(({ name, value, options }) =>
             response.cookies.set(name, value, options)
           )
@@ -58,12 +62,13 @@ export async function proxy(request: NextRequest) {
   }
 
   // Authenticated users accessing the wrong role's dashboard get redirected
+  // Also blocks access when no role cookie exists (missing cookie = no permission)
   if (isProtected && session) {
     const role = request.cookies.get('cleanconnect-role')?.value
     const matchedBase = PROTECTED_PATHS.find((p) => path.startsWith(p))
 
-    if (matchedBase && role && PATH_ROLES[matchedBase] !== role) {
-      const correctDest = ROLE_ROUTES[role] ?? '/customer'
+    if (matchedBase && (!role || PATH_ROLES[matchedBase] !== role)) {
+      const correctDest = role ? (ROLE_ROUTES[role] ?? '/customer') : '/customer'
       return NextResponse.redirect(new URL(correctDest, request.url))
     }
   }

@@ -1,7 +1,7 @@
 import Image from 'next/image'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
-import { cookies } from 'next/headers'
+import { cookies, headers } from 'next/headers'
 import { createClient, createAdminClient } from '@/utils/supabase/server'
 import { logout } from '@/app/actions/auth'
 import NotificationBell from '@/components/dashboard/notification-bell'
@@ -37,11 +37,24 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
   const cookieStore = await cookies()
   const roleCookie  = cookieStore.get('cleanconnect-role')?.value
+  // Always trust the DB role — never the cookie alone
   const role        = profile?.role ?? roleCookie ?? 'customer'
   const displayName = profile?.full_name ?? user.email ?? 'User'
 
+  const headersList = await headers()
+  const pathname    = headersList.get('x-pathname') ?? ''
+
   if (role === 'customer' || role === 'cleaner') {
+    // Guard: these roles must not see admin or manager routes
+    if (pathname.startsWith('/admin') || pathname.startsWith('/manager')) {
+      redirect('/customer')
+    }
     return <>{children}</>
+  }
+
+  // Guard: only super_admin may access /admin
+  if (pathname.startsWith('/admin') && role !== 'super_admin') {
+    redirect('/customer')
   }
 
   const adminDb = createAdminClient()
