@@ -41,6 +41,20 @@ export default function RegisterForm() {
       </div>
 
       <div>
+        <label htmlFor="phone" className="block text-sm font-medium text-gray-700 mb-1.5">
+          Phone number <span className="text-gray-400 font-normal">(optional)</span>
+        </label>
+        <input
+          id="phone"
+          name="phone"
+          type="tel"
+          autoComplete="tel"
+          placeholder="+63 912 345 6789"
+          className={inputClass}
+        />
+      </div>
+
+      <div>
         <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1.5">
           Password
         </label>

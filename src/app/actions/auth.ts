@@ -59,6 +59,7 @@ export async function register(state: AuthState, formData: FormData): Promise<Au
   const name = formData.get('name') as string
   const email = formData.get('email') as string
   const password = formData.get('password') as string
+  const phone = (formData.get('phone') as string | null)?.trim() || null
 
   if (!name || !email || !password) return { error: 'All fields are required.' }
   if (password.length < 8) return { error: 'Password must be at least 8 characters.' }
@@ -74,6 +75,7 @@ export async function register(state: AuthState, formData: FormData): Promise<Au
     id: data.user.id,
     full_name: name,
     role: 'customer',
+    ...(phone && { phone }),
   })
 
   if (profileError) return { error: 'Account created but profile setup failed. Please contact support.' }
