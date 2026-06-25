@@ -10,6 +10,7 @@ export async function createNotification({
   type,
   bookingId,
   complaintId,
+  customerId,
 }: {
   userId: string
   title: string
@@ -17,6 +18,7 @@ export async function createNotification({
   type: string
   bookingId?: string
   complaintId?: string
+  customerId?: string
 }) {
   const admin = createAdminClient()
   await admin.from('notifications').insert({
@@ -26,6 +28,7 @@ export async function createNotification({
     type,
     booking_id: bookingId ?? null,
     complaint_id: complaintId ?? null,
+    customer_id: customerId ?? null,
   })
 }
 

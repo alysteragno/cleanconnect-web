@@ -337,6 +337,36 @@ export async function cancelBooking(
   redirect('/admin/bookings')
 }
 
+// ── Billing adjustment ────────────────────────────────────────────────────
+
+export async function adjustBookingAmount(
+  state: AdminActionState,
+  formData: FormData
+): Promise<AdminActionState> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user || !(await assertSuperAdmin(supabase, user.id))) return { error: 'Unauthorized.' }
+
+  const booking_id = formData.get('booking_id') as string
+  const raw = formData.get('base_price') as string
+  const amount = parseFloat(raw)
+
+  if (!booking_id) return { error: 'Missing booking.' }
+  if (isNaN(amount) || amount < 0) return { error: 'Enter a valid amount.' }
+
+  const { error } = await supabase
+    .from('bookings')
+    .update({ base_price: amount })
+    .eq('id', booking_id)
+
+  if (error) return { error: error.message }
+
+  revalidatePath(`/admin/bookings/${booking_id}`)
+  revalidatePath('/admin/bookings')
+  revalidatePath('/admin')
+  return { success: `Billing updated to ₱${amount.toLocaleString('en-PH', { minimumFractionDigits: 2 })}.` }
+}
+
 // ── Cleaner availability override ─────────────────────────────────────────
 // Uses admin client to bypass the cleaner-only RLS on cleaner_availability.
 
