@@ -9,19 +9,35 @@ import { SidebarNav } from '@/components/dashboard/sidebar-nav'
 import { DashboardShell } from '@/components/dashboard/dashboard-shell'
 import {
   IconDashboard, IconCalendar, IconUsers, IconChat, IconStar,
-  IconChart, IconSettings, IconSignOut, IconChevronRight, IconMegaphone,
+  IconChart, IconSettings, IconSignOut, IconChevronRight, IconMegaphone, IconHeadset,
 } from '@/components/icons'
 
 const ADMIN_NAV = [
-  { href: '/admin',                  label: 'Dashboard',     icon: <IconDashboard /> },
-  { href: '/admin/bookings',         label: 'Bookings',      icon: <IconCalendar /> },
-  { href: '/admin/cleaners',         label: 'Cleaners',      icon: <IconUsers /> },
-  { href: '/admin/customers',        label: 'Customers',     icon: <IconUsers /> },
-  { href: '/admin/complaints',       label: 'Complaints',    icon: <IconChat /> },
-  { href: '/admin/feedback',         label: 'Feedback',      icon: <IconStar /> },
-  { href: '/admin/announcements',    label: 'Announcements', icon: <IconMegaphone /> },
-  { href: '/admin/reports',          label: 'Reports',       icon: <IconChart /> },
-  { href: '/admin/settings',         label: 'Payment Settings', icon: <IconSettings /> },
+  {
+    label: 'Overview',
+    links: [
+      { href: '/admin', label: 'Dashboard', icon: <IconDashboard /> },
+    ],
+  },
+  {
+    label: 'Operations',
+    links: [
+      { href: '/admin/bookings',      label: 'Bookings',      icon: <IconCalendar /> },
+      { href: '/admin/cleaners',      label: 'Cleaners',      icon: <IconUsers /> },
+      { href: '/admin/customers',     label: 'Customers',     icon: <IconUsers /> },
+      { href: '/admin/complaints',    label: 'Complaints',    icon: <IconChat /> },
+      { href: '/admin/support',       label: 'Support Chat',  icon: <IconHeadset /> },
+      { href: '/admin/feedback',      label: 'Feedback',      icon: <IconStar /> },
+      { href: '/admin/announcements', label: 'Announcements', icon: <IconMegaphone /> },
+    ],
+  },
+  {
+    label: 'Admin',
+    links: [
+      { href: '/admin/reports',   label: 'Reports',          icon: <IconChart /> },
+      { href: '/admin/settings',  label: 'Payment Settings', icon: <IconSettings /> },
+    ],
+  },
 ]
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -62,7 +78,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
   const [{ data: notifData }, { data: announcementRows }] = await Promise.all([
     supabase
       .from('notifications')
-      .select('id, title, body, type, booking_id, complaint_id, is_read, created_at')
+      .select('id, title, body, type, booking_id, complaint_id, customer_id, is_read, created_at')
       .eq('user_id', user.id)
       .order('created_at', { ascending: false })
       .limit(10),
@@ -103,7 +119,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
       {/* Nav */}
       <nav className="flex-1 px-3 py-3 overflow-y-auto">
-        <SidebarNav links={ADMIN_NAV} />
+        <SidebarNav sections={ADMIN_NAV} />
       </nav>
 
       {/* User footer */}

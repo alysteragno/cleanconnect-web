@@ -116,6 +116,31 @@ export function IconChevronRight({ className }: IconProps) {
   )
 }
 
+export function IconClock({ className }: IconProps) {
+  return (
+    <svg {...props} className={`${base} ${className ?? ''}`}>
+      <circle cx="8" cy="8" r="6.5" />
+      <path d="M8 4.5V8l2.5 2.5" />
+    </svg>
+  )
+}
+
+export function IconArrowUpRight({ className }: IconProps) {
+  return (
+    <svg {...props} className={`${base} ${className ?? ''}`}>
+      <path d="M4 12L12 4M12 4H6M12 4v6" />
+    </svg>
+  )
+}
+
+export function IconZap({ className }: IconProps) {
+  return (
+    <svg {...props} className={`${base} ${className ?? ''}`}>
+      <path d="M9.5 1.5L4 9h5l-2.5 5.5L13.5 7H8.5L9.5 1.5z" />
+    </svg>
+  )
+}
+
 export function IconCheck({ className }: IconProps) {
   return (
     <svg {...props} className={`${base} ${className ?? ''}`}>
@@ -128,6 +153,16 @@ export function IconX({ className }: IconProps) {
   return (
     <svg {...props} className={`${base} ${className ?? ''}`}>
       <path d="M3 3l10 10M13 3L3 13" />
+    </svg>
+  )
+}
+
+export function IconHeadset({ className }: IconProps) {
+  return (
+    <svg {...props} className={`${base} ${className ?? ''}`}>
+      <path d="M1.5 10 Q8 1.5 14.5 10" />
+      <rect x="1" y="10" width="2" height="4" rx="1" />
+      <rect x="13" y="10" width="2" height="4" rx="1" />
     </svg>
   )
 }

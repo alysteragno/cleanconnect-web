@@ -12,6 +12,7 @@ type Notification = {
   type: string
   booking_id: string | null
   complaint_id: string | null
+  customer_id: string | null
   is_read: boolean
   created_at: string
 }
@@ -25,6 +26,9 @@ type Announcement = {
 }
 
 function getHref(n: Notification, role: string): string {
+  if (n.customer_id && n.type === 'direct_message') {
+    if (role === 'super_admin' || role === 'branch_manager') return `/admin/support/${n.customer_id}`
+  }
   if (n.booking_id) {
     if (role === 'super_admin' || role === 'branch_manager') return `/admin/bookings/${n.booking_id}`
     if (role === 'cleaner') return `/cleaner/jobs`

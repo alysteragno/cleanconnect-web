@@ -9,6 +9,50 @@ interface Props {
   children: React.ReactNode
 }
 
+const PATH_LABELS: Record<string, string> = {
+  admin:         'Dashboard',
+  bookings:      'Bookings',
+  cleaners:      'Cleaners',
+  customers:     'Customers',
+  complaints:    'Complaints',
+  feedback:      'Feedback',
+  announcements: 'Announcements',
+  reports:       'Reports',
+  settings:      'Payment Settings',
+  customer:      'Dashboard',
+  cleaner:       'Dashboard',
+  manager:       'Dashboard',
+}
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+function Breadcrumb() {
+  const pathname = usePathname()
+  const segments = pathname.split('/').filter(Boolean)
+
+  const crumbs = segments.map((seg) => {
+    if (UUID_RE.test(seg)) return 'Detail'
+    return PATH_LABELS[seg] ?? seg.charAt(0).toUpperCase() + seg.slice(1)
+  })
+
+  // Collapse: for /admin/bookings/detail → ['Dashboard', 'Bookings', 'Detail']
+  // But only show last two to keep it compact
+  const visible = crumbs.length > 2 ? crumbs.slice(-2) : crumbs
+
+  return (
+    <nav className="hidden md:flex items-center gap-1.5 text-sm text-gray-400">
+      {visible.map((crumb, i) => (
+        <span key={i} className="flex items-center gap-1.5">
+          {i > 0 && <span className="text-gray-300">/</span>}
+          <span className={i === visible.length - 1 ? 'text-gray-700 font-medium' : 'text-gray-400'}>
+            {crumb}
+          </span>
+        </span>
+      ))}
+    </nav>
+  )
+}
+
 export function DashboardShell({ sidebarContent, topBarContent, children }: Props) {
   const [open, setOpen] = useState(false)
   const pathname = usePathname()
@@ -48,27 +92,27 @@ export function DashboardShell({ sidebarContent, topBarContent, children }: Prop
       <div className="flex-1 flex flex-col min-w-0 md:ml-56">
 
         {/* Top bar */}
-        <header className="h-14 bg-white border-b border-gray-100 px-4 md:px-6 flex items-center sticky top-0 z-10">
+        <header className="h-14 bg-white border-b border-gray-100 px-4 md:px-6 flex items-center gap-3 sticky top-0 z-10 shadow-sm">
           {/* Hamburger — mobile only */}
           <button
             onClick={() => setOpen((v) => !v)}
-            className="flex items-center justify-center w-11 h-11 -ml-2 mr-1 rounded-lg text-gray-600 hover:bg-gray-100 active:bg-gray-200 transition-colors md:hidden shrink-0"
+            className="flex items-center justify-center w-9 h-9 -ml-1 rounded-lg text-gray-500 hover:bg-gray-100 active:bg-gray-200 transition-colors md:hidden shrink-0"
             aria-label={open ? 'Close menu' : 'Open menu'}
             aria-expanded={open}
           >
             {open ? (
-              <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" className="pointer-events-none">
+              <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" className="pointer-events-none">
                 <path d="M4 4l12 12M16 4L4 16"/>
               </svg>
             ) : (
-              <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" className="pointer-events-none">
+              <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" className="pointer-events-none">
                 <path d="M3 5h14M3 10h14M3 15h14"/>
               </svg>
             )}
           </button>
-          <div className="text-sm text-gray-400 hidden md:block">
-            Maid For You Cleaning Services &mdash; Admin Portal
-          </div>
+
+          <Breadcrumb />
+
           <div className="flex items-center gap-3 ml-auto">
             {topBarContent}
           </div>

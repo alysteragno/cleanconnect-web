@@ -1,9 +1,7 @@
 ﻿import Image from 'next/image'
-import Link from 'next/link'
 import { logout } from '@/app/actions/auth'
 
 export default function MobileAppPlaceholder({ role }: { role: 'customer' | 'cleaner' }) {
-  const isCustomer = role === 'customer'
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center px-4">
@@ -29,10 +27,10 @@ export default function MobileAppPlaceholder({ role }: { role: 'customer' | 'cle
 
         <div>
           <h1 className="text-lg font-semibold text-gray-900 mb-2">
-            {isCustomer ? 'Book on the Mobile App' : 'Manage Jobs on the Mobile App'}
+            {role === 'customer' ? 'Book on the Mobile App' : 'Manage Jobs on the Mobile App'}
           </h1>
           <p className="text-sm text-gray-500 leading-relaxed">
-            {isCustomer
+            {role === 'customer'
               ? 'Booking, scheduling, and tracking your cleaning services are available on the Maid For You mobile app.'
               : 'View assigned jobs, update your availability, and manage your schedule on the mobile app.'}
           </p>
@@ -72,12 +70,6 @@ export default function MobileAppPlaceholder({ role }: { role: 'customer' | 'cle
         </div>
       </div>
 
-      <p className="mt-5 text-xs text-gray-400">
-        Need help?{' '}
-        <Link href="/contact" className="underline hover:text-gray-600 transition-colors">
-          Contact us
-        </Link>
-      </p>
     </div>
   )
 }
