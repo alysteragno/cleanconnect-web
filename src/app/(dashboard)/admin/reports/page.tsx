@@ -11,13 +11,11 @@ type CompletedBooking = {
   payment_status: string
   payment_method: string
   profiles: { full_name: string } | null
-  branches: { name: string } | null
 }
 
 type CleanerRow = {
   id: string
   full_name: string
-  branches: { name: string } | null
 }
 
 const SERVICE_LABELS: Record<string, string> = {
@@ -38,36 +36,84 @@ const PAYMENT_STYLES: Record<string, string> = {
 function formatDate(d: string) {
   return new Date(d + 'T00:00:00').toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })
 }
+function formatTime(t: string) {
+  const [h, m] = t.split(':')
+  const hr = parseInt(h)
+  return `${hr % 12 || 12}:${m} ${hr >= 12 ? 'PM' : 'AM'}`
+}
 
 export default async function ReportsPage() {
   const supabase = await createClient()
+
+  // Week bounds (Mon–Sun)
+  const now = new Date()
+  const dayOfWeek = now.getDay() // 0 = Sun
+  const diffToMon = (dayOfWeek === 0 ? -6 : 1 - dayOfWeek)
+  const monday = new Date(now)
+  monday.setDate(now.getDate() + diffToMon)
+  monday.setHours(0, 0, 0, 0)
+  const sunday = new Date(monday)
+  sunday.setDate(monday.getDate() + 6)
+  const weekStart = monday.toISOString().split('T')[0]
+  const weekEnd   = sunday.toISOString().split('T')[0]
 
   const [
     { data: completedBookings },
     { data: allBookings },
     { data: cleaners },
     { data: feedbackRows },
+    { data: weekBookings },
   ] = await Promise.all([
     supabase
       .from('bookings')
-      .select('id, service_date, service_type, property_sqm, base_price, payment_status, payment_method, profiles!customer_id(full_name), branches(name)')
+      .select('id, service_date, service_type, property_sqm, base_price, payment_status, payment_method, profiles!customer_id(full_name)')
       .eq('status', 'completed')
       .order('service_date', { ascending: false })
       .limit(50),
     supabase.from('bookings').select('status, base_price, payment_status, service_type'),
     supabase
       .from('profiles')
-      .select('id, full_name, branches(name)')
+      .select('id, full_name')
       .eq('role', 'cleaner')
       .eq('is_active', true)
       .order('full_name'),
     supabase.from('feedback').select('cleaner_id, rating'),
+    supabase
+      .from('bookings')
+      .select('id, service_date, service_time, service_type, status, base_price, profiles!customer_id(full_name)')
+      .gte('service_date', weekStart)
+      .lte('service_date', weekEnd)
+      .not('status', 'eq', 'cancelled')
+      .order('service_date')
+      .order('service_time'),
   ])
 
-  const completed  = (completedBookings ?? []) as unknown as CompletedBooking[]
-  const all        = (allBookings ?? []) as { status: string; base_price: number; payment_status: string; service_type: string }[]
-  const cleanerList= (cleaners ?? []) as unknown as CleanerRow[]
-  const feedback   = (feedbackRows ?? []) as { cleaner_id: string; rating: number }[]
+  type WeekBooking = {
+    id: string
+    service_date: string
+    service_time: string
+    service_type: string
+    status: string
+    base_price: number
+    profiles: { full_name: string } | null
+  }
+
+  const completed   = (completedBookings ?? []) as unknown as CompletedBooking[]
+  const all         = (allBookings ?? []) as { status: string; base_price: number; payment_status: string; service_type: string }[]
+  const cleanerList = (cleaners ?? []) as unknown as CleanerRow[]
+  const feedback    = (feedbackRows ?? []) as { cleaner_id: string; rating: number }[]
+  const weekList    = (weekBookings ?? []) as unknown as WeekBooking[]
+
+  // Group weekly bookings by date
+  const weekByDay = weekList.reduce<Record<string, WeekBooking[]>>((acc, b) => {
+    ;(acc[b.service_date] ??= []).push(b)
+    return acc
+  }, {})
+  const weekDays = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(monday)
+    d.setDate(monday.getDate() + i)
+    return d.toISOString().split('T')[0]
+  })
 
   // Financial
   const totalRevenue    = all.filter((b) => b.payment_status === 'paid').reduce((s, b) => s + Number(b.base_price), 0)
@@ -98,6 +144,10 @@ export default async function ReportsPage() {
       return { ...c, jobs: count ?? 0, avgRating, reviews: myFeedback.length }
     })
   )
+
+  const topCleaners = cleanerStats
+    .filter((c) => c.avgRating != null && c.avgRating >= 4.5)
+    .sort((a, b) => (b.avgRating ?? 0) - (a.avgRating ?? 0))
 
   return (
     <div className="space-y-8">
@@ -266,7 +316,7 @@ export default async function ReportsPage() {
                       {c.full_name}
                     </p>
                   </div>
-                  <p className="hidden sm:block text-xs text-gray-500">{c.branches?.name ?? '—'}</p>
+                  <p className="hidden sm:block text-xs text-gray-500">Maid For You</p>
                   <p className="hidden sm:block text-sm font-semibold text-gray-800 text-center">{c.jobs}</p>
                   <div className="hidden sm:flex items-center justify-center gap-1">
                     {c.avgRating != null ? (
@@ -290,6 +340,108 @@ export default async function ReportsPage() {
               ))}
             </div>
           )}
+        </div>
+      </section>
+
+      {/* Top Cleaners Leaderboard */}
+      <section>
+        <h2 className="text-sm font-semibold text-gray-900 mb-4 uppercase tracking-wide">
+          Top Cleaners
+          <span className="text-gray-400 font-normal ml-2 normal-case">(4.5★ and above)</span>
+        </h2>
+        {topCleaners.length === 0 ? (
+          <div className="bg-white rounded-xl border border-gray-200 px-5 py-10 text-center">
+            <p className="text-sm text-gray-400">No cleaners with 4.5★ or higher yet.</p>
+          </div>
+        ) : (
+          <div className="bg-white rounded-xl border border-gray-200 divide-y divide-gray-50">
+            {topCleaners.map((c, i) => (
+              <Link
+                key={c.id}
+                href={`/admin/cleaners/${c.id}`}
+                className="flex items-center gap-4 px-5 py-3.5 hover:bg-amber-50/40 transition-colors group"
+              >
+                <span className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${
+                  i === 0 ? 'bg-amber-400 text-white' :
+                  i === 1 ? 'bg-gray-300 text-gray-700' :
+                  i === 2 ? 'bg-amber-700/70 text-white' :
+                  'bg-gray-100 text-gray-500'
+                }`}>
+                  {i + 1}
+                </span>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-gray-900 group-hover:text-amber-700 transition-colors truncate">{c.full_name}</p>
+                  <p className="text-xs text-gray-400">{c.jobs} jobs · {c.reviews} review{c.reviews !== 1 ? 's' : ''}</p>
+                </div>
+                <div className="flex items-center gap-1 shrink-0">
+                  <span className="text-amber-400">★</span>
+                  <span className="text-sm font-bold text-gray-900">{c.avgRating!.toFixed(1)}</span>
+                </div>
+              </Link>
+            ))}
+          </div>
+        )}
+      </section>
+
+      {/* Weekly Schedule */}
+      <section>
+        <h2 className="text-sm font-semibold text-gray-900 mb-4 uppercase tracking-wide">
+          This Week&apos;s Schedule
+          <span className="text-gray-400 font-normal ml-2 normal-case">
+            {new Date(weekStart + 'T00:00:00').toLocaleDateString('en-PH', { month: 'short', day: 'numeric' })}
+            {' – '}
+            {new Date(weekEnd + 'T00:00:00').toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })}
+          </span>
+        </h2>
+        <div className="space-y-3">
+          {weekDays.map((date) => {
+            const dayBookings = weekByDay[date] ?? []
+            const label = new Date(date + 'T00:00:00').toLocaleDateString('en-PH', { weekday: 'long', month: 'short', day: 'numeric' })
+            const isToday = date === now.toISOString().split('T')[0]
+            return (
+              <div key={date} className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+                <div className={`px-5 py-2.5 border-b border-gray-100 flex items-center justify-between ${isToday ? 'bg-pink-50' : 'bg-gray-50/60'}`}>
+                  <p className={`text-xs font-semibold uppercase tracking-wide ${isToday ? 'text-pink-700' : 'text-gray-500'}`}>
+                    {label}{isToday && <span className="ml-2 text-pink-500">Today</span>}
+                  </p>
+                  <span className="text-xs text-gray-400">{dayBookings.length} booking{dayBookings.length !== 1 ? 's' : ''}</span>
+                </div>
+                {dayBookings.length === 0 ? (
+                  <p className="text-xs text-gray-300 px-5 py-3">No bookings</p>
+                ) : (
+                  <div className="divide-y divide-gray-50">
+                    {dayBookings.map((b) => (
+                      <Link
+                        key={b.id}
+                        href={`/admin/bookings/${b.id}`}
+                        className="flex items-center justify-between px-5 py-3 hover:bg-gray-50 transition-colors group"
+                      >
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-gray-900 group-hover:text-pink-700 transition-colors">
+                            {SERVICE_LABELS[b.service_type] ?? 'Cleaning'}
+                          </p>
+                          <p className="text-xs text-gray-400 mt-0.5">
+                            {formatTime(b.service_time)} · {b.profiles?.full_name ?? 'Customer'}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-3 shrink-0 ml-4">
+                          <p className="text-sm font-semibold text-gray-900">₱{Number(b.base_price).toLocaleString()}</p>
+                          <span className={`text-xs px-2 py-0.5 rounded-full border font-medium capitalize ${
+                            b.status === 'confirmed'   ? 'bg-pink-50 text-pink-700 border-pink-200' :
+                            b.status === 'in_progress' ? 'bg-purple-50 text-purple-700 border-purple-200' :
+                            b.status === 'pending'     ? 'bg-yellow-50 text-yellow-700 border-yellow-200' :
+                            'bg-gray-50 text-gray-500 border-gray-200'
+                          }`}>
+                            {b.status.replace('_', ' ')}
+                          </span>
+                        </div>
+                      </Link>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )
+          })}
         </div>
       </section>
 
@@ -319,7 +471,7 @@ export default async function ReportsPage() {
                 >
                   <p className="text-xs text-gray-600">{formatDate(b.service_date)}</p>
                   <p className="text-sm text-gray-800 truncate">{SERVICE_LABELS[b.service_type] ?? b.service_type}</p>
-                  <p className="text-xs text-gray-500 truncate">{b.branches?.name ?? '—'}</p>
+                  <p className="text-xs text-gray-500 truncate">Maid For You</p>
                   <p className="text-sm text-gray-700 truncate">{b.profiles?.full_name ?? '—'}</p>
                   <p className="text-sm font-semibold text-gray-900 text-right">₱{Number(b.base_price).toLocaleString()}</p>
                   <div className="flex justify-end">
