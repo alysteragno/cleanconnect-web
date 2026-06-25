@@ -1,7 +1,8 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { createClient } from '@/utils/supabase/server'
+import { createAdminClient } from '@/utils/supabase/server'
 import CustomerToggleForm from './customer-toggle-form'
+import { IconHeadset } from '@/components/icons'
 
 type Customer = {
   id: string
@@ -55,7 +56,7 @@ export default async function CustomerDetailPage({
   params: Promise<{ id: string }>
 }) {
   const { id } = await params
-  const supabase = await createClient()
+  const supabase = createAdminClient()
 
   const [{ data: customer }, { data: bookings }] = await Promise.all([
     supabase
@@ -92,13 +93,20 @@ export default async function CustomerDetailPage({
       {/* Profile card */}
       <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-5">
         <div className="flex items-center gap-4 pb-5 border-b border-gray-100">
-          <div className="w-12 h-12 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-lg font-bold shrink-0">
+          <div className="w-12 h-12 bg-pink-100 text-pink-600 rounded-full flex items-center justify-center text-lg font-bold shrink-0">
             {c.full_name.charAt(0).toUpperCase()}
           </div>
-          <div>
+          <div className="flex-1 min-w-0">
             <p className="text-base font-semibold text-gray-900">{c.full_name}</p>
             <p className="text-xs text-gray-500">{c.phone ?? 'No phone on file'}</p>
           </div>
+          <Link
+            href={`/admin/support/${c.id}`}
+            className="flex items-center gap-1.5 px-3 py-2 bg-pink-600 text-white rounded-lg text-sm font-medium hover:bg-pink-700 transition-colors shrink-0"
+          >
+            <IconHeadset />
+            Message
+          </Link>
         </div>
 
         <div className="divide-y divide-gray-100">

@@ -32,8 +32,11 @@ export default function DispatchPanel({
   const [selected, setSelected] = useState<string[]>([])
   const [showManual, setShowManual] = useState(false)
 
-  const alreadyAssigned = new Set(assignments.map((a) => a.cleaner_id))
-  const availableForDispatch = cleaners.filter((c) => !alreadyAssigned.has(c.id))
+  // Exclude cleaners with a pending offer or accepted assignment; declined cleaners can be re-offered.
+  const activelyAssigned = new Set(
+    assignments.filter((a) => a.status === 'offered' || a.status === 'accepted').map((a) => a.cleaner_id)
+  )
+  const availableForDispatch = cleaners.filter((c) => !activelyAssigned.has(c.id))
   const isClosed = bookingStatus === 'completed' || bookingStatus === 'cancelled'
 
   const toggle = (id: string) =>

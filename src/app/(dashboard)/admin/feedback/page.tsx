@@ -9,7 +9,6 @@ type Feedback = {
   bookings: {
     service_date: string
     service_type: string
-    branches: { name: string } | null
   } | null
   profiles: { full_name: string } | null
 }
@@ -35,7 +34,7 @@ export default async function AdminFeedbackPage() {
   const [{ data: feedbackRows }, { data: avgData }] = await Promise.all([
     supabase
       .from('feedback')
-      .select('id, rating, comment, created_at, bookings (service_date, service_type, branches (name)), profiles!customer_id (full_name)')
+      .select('id, rating, comment, created_at, bookings (service_date, service_type), profiles!customer_id (full_name)')
       .order('created_at', { ascending: false }),
     supabase.from('feedback').select('rating'),
   ])
@@ -96,8 +95,7 @@ export default async function AdminFeedbackPage() {
                     <Stars rating={f.rating} />
                     <p className="text-xs text-gray-400 mt-1">
                       {f.profiles?.full_name ?? 'Customer'} ·{' '}
-                      {SERVICE_LABELS[f.bookings?.service_type ?? ''] ?? 'Service'} ·{' '}
-                      {f.bookings?.branches?.name ?? '—'}
+                      {SERVICE_LABELS[f.bookings?.service_type ?? ''] ?? 'Service'}
                     </p>
                   </div>
                   <p className="text-xs text-gray-400 shrink-0">

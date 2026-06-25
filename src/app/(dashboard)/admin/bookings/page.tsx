@@ -12,7 +12,6 @@ type Booking = {
   status: string
   payment_status: string
   profiles: { full_name: string } | null
-  branches: { name: string } | null
 }
 
 type Branch = { id: string; name: string }
@@ -55,10 +54,10 @@ export default async function AdminBookingsPage({
     (() => {
       let q = supabase
         .from('bookings')
-        .select('id, service_date, service_time, service_type, property_sqm, base_price, status, payment_status, profiles!customer_id (full_name), branches (name)')
+        .select('id, service_date, service_time, service_type, property_sqm, base_price, status, payment_status, profiles!customer_id (full_name)')
         .order('service_date', { ascending: false })
       if (status) q = q.eq('status', status)
-      if (branch) q = q.eq('branch_id', branch)
+      // branch_id column not in current DB schema — filter skipped
       return q
     })(),
   ])
@@ -127,7 +126,7 @@ export default async function AdminBookingsPage({
                     </span>
                   </div>
                   <p className="text-xs text-gray-500">
-                    {b.branches?.name ?? '—'} · {b.profiles?.full_name ?? 'Customer'} · {formatDate(b.service_date)} at {formatTime(b.service_time)}
+                    {branchList[0]?.name ?? '—'} · {b.profiles?.full_name ?? 'Customer'} · {formatDate(b.service_date)} at {formatTime(b.service_time)}
                   </p>
                 </div>
                 <div className="text-right shrink-0 ml-4">

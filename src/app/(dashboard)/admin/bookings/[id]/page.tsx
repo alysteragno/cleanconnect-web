@@ -2,6 +2,7 @@
 import { notFound } from 'next/navigation'
 import { createClient } from '@/utils/supabase/server'
 import PaymentForm from './payment-form'
+import AdjustForm from './adjust-form'
 import DispatchPanel from './dispatch-panel'
 
 type Booking = {
@@ -26,7 +27,6 @@ type Booking = {
   address_province: string | null
   special_notes: string | null
   profiles: { full_name: string; phone: string | null } | null
-  branches: { name: string } | null
 }
 
 type Assignment = {
@@ -82,8 +82,7 @@ export default async function AdminBookingDetailPage({
         status, payment_status, payment_method,
         address_unit, address_street, address_city, address_province,
         special_notes,
-        profiles!customer_id (full_name, phone),
-        branches (name)
+        profiles!customer_id (full_name, phone)
       `)
       .eq('id', id)
       .single(),
@@ -161,6 +160,11 @@ export default async function AdminBookingDetailPage({
               )}
             </div>
             <PaymentForm bookingId={b.id} currentStatus={b.payment_status} />
+          </div>
+
+          <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-3">
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Billing Adjustment</p>
+            <AdjustForm bookingId={b.id} currentAmount={Number(b.base_price)} />
           </div>
         </div>
 
