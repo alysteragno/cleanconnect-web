@@ -5,7 +5,8 @@ import { PrintButton } from '@/components/ui/print-button'
 type CompletedBooking = {
   id: string
   service_date: string
-  service_type: string
+  service_name: string | null
+  space_type: string
   property_sqm: number
   base_price: number
   payment_status: string
@@ -13,24 +14,107 @@ type CompletedBooking = {
   profiles: { full_name: string } | null
 }
 
-type CleanerRow = {
-  id: string
-  full_name: string
+type SpaceTypeStat = {
+  label: string
+  count: number
+  revenue: number
+  avgSqm: number | null
+  paidRevenue: number
 }
 
-const SERVICE_LABELS: Record<string, string> = {
-  general:           'General Cleaning',
-  premium_mattress:  'Mattress & Upholstery',
-  complete:          'Complete Package',
-  disinfection:      'Disinfection',
-  post_construction: 'Post-Construction',
+type CleanerRow = { id: string; full_name: string }
+
+type RecentFeedback = {
+  id: string
+  rating: number
+  comment: string | null
+  created_at: string
+  bookings: { service_name: string | null } | null
+  profiles: { full_name: string } | null
 }
+
+type WeekBooking = {
+  id: string
+  service_date: string
+  service_time: string
+  service_name: string | null
+  status: string
+  base_price: number
+  profiles: { full_name: string } | null
+}
+
+const SPACE_LABELS: Record<string, string> = {
+  residential: 'Residential (House)',
+  condo:       'Condo Unit',
+  office:      'Office',
+  commercial:  'Commercial Space',
+}
+
+const SPACE_COLORS: Record<string, string> = {
+  residential: 'bg-blue-400',
+  condo:       'bg-violet-400',
+  office:      'bg-amber-400',
+  commercial:  'bg-emerald-400',
+}
+
+const SPACE_BADGE: Record<string, string> = {
+  residential: 'bg-blue-50 text-blue-700 border-blue-200',
+  condo:       'bg-violet-50 text-violet-700 border-violet-200',
+  office:      'bg-amber-50 text-amber-700 border-amber-200',
+  commercial:  'bg-emerald-50 text-emerald-700 border-emerald-200',
+}
+
+const COMMERCIAL_TYPES = new Set(['condo', 'office', 'commercial'])
 
 const PAYMENT_STYLES: Record<string, string> = {
   unpaid:   'bg-red-50 text-red-600 border-red-200',
-  partial:  'bg-amber-50 text-amber-600 border-amber-200',
   paid:     'bg-emerald-50 text-emerald-600 border-emerald-200',
   refunded: 'bg-gray-50 text-gray-500 border-gray-200',
+}
+
+const PERIODS = [
+  { value: 'day',   label: 'Today'      },
+  { value: 'week',  label: 'This Week'  },
+  { value: 'month', label: 'This Month' },
+  { value: 'all',   label: 'All Time'   },
+] as const
+type Period = (typeof PERIODS)[number]['value']
+
+type DateRange = { start: string; end: string }
+
+function getDateRange(period: string): DateRange | null {
+  const now = new Date()
+  if (period === 'day') {
+    const d = now.toISOString().split('T')[0]
+    return { start: d, end: d }
+  }
+  if (period === 'week') {
+    const dow = now.getDay()
+    const mon = new Date(now)
+    mon.setDate(now.getDate() + (dow === 0 ? -6 : 1 - dow))
+    mon.setHours(0, 0, 0, 0)
+    const sun = new Date(mon)
+    sun.setDate(mon.getDate() + 6)
+    return { start: mon.toISOString().split('T')[0], end: sun.toISOString().split('T')[0] }
+  }
+  if (period === 'month') {
+    const first = new Date(now.getFullYear(), now.getMonth(), 1)
+    const last  = new Date(now.getFullYear(), now.getMonth() + 1, 0)
+    return { start: first.toISOString().split('T')[0], end: last.toISOString().split('T')[0] }
+  }
+  return null
+}
+
+function periodSubtitle(period: string, range: DateRange | null): string {
+  const fmt = (d: string, opts: Intl.DateTimeFormatOptions) =>
+    new Date(d + 'T00:00:00').toLocaleDateString('en-PH', opts)
+  if (period === 'day' && range)
+    return fmt(range.start, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })
+  if (period === 'week' && range)
+    return `${fmt(range.start, { month: 'short', day: 'numeric' })} – ${fmt(range.end, { month: 'short', day: 'numeric', year: 'numeric' })}`
+  if (period === 'month')
+    return new Date().toLocaleDateString('en-PH', { month: 'long', year: 'numeric' })
+  return 'All time'
 }
 
 function formatDate(d: string) {
@@ -42,69 +126,101 @@ function formatTime(t: string) {
   return `${hr % 12 || 12}:${m} ${hr >= 12 ? 'PM' : 'AM'}`
 }
 
-export default async function ReportsPage() {
-  const supabase = await createClient()
+export default async function ReportsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ period?: string }>
+}) {
+  const { period: rawPeriod = 'month' } = await searchParams
+  const period: Period = PERIODS.some((p) => p.value === rawPeriod)
+    ? (rawPeriod as Period)
+    : 'month'
 
-  // Week bounds (Mon–Sun)
+  const range    = getDateRange(period)
+  const subtitle = periodSubtitle(period, range)
+
+  const supabase = await createClient()
   const now = new Date()
-  const dayOfWeek = now.getDay() // 0 = Sun
-  const diffToMon = (dayOfWeek === 0 ? -6 : 1 - dayOfWeek)
+
+  // Weekly schedule always shows current week regardless of period tab
+  const dow = now.getDay()
   const monday = new Date(now)
-  monday.setDate(now.getDate() + diffToMon)
+  monday.setDate(now.getDate() + (dow === 0 ? -6 : 1 - dow))
   monday.setHours(0, 0, 0, 0)
   const sunday = new Date(monday)
   sunday.setDate(monday.getDate() + 6)
   const weekStart = monday.toISOString().split('T')[0]
   const weekEnd   = sunday.toISOString().split('T')[0]
 
+  // Period-filtered queries
+  const allBookingsQ = range
+    ? supabase.from('bookings').select('status, base_price, payment_status, service_name, space_type, property_sqm')
+        .gte('service_date', range.start).lte('service_date', range.end)
+    : supabase.from('bookings').select('status, base_price, payment_status, service_name, space_type, property_sqm')
+
+  const completedQ = range
+    ? supabase.from('bookings')
+        .select('id, service_date, service_name, property_sqm, base_price, payment_status, payment_method, profiles!customer_id(full_name)')
+        .eq('status', 'completed')
+        .gte('service_date', range.start).lte('service_date', range.end)
+        .order('service_date', { ascending: false })
+    : supabase.from('bookings')
+        .select('id, service_date, service_name, property_sqm, base_price, payment_status, payment_method, profiles!customer_id(full_name)')
+        .eq('status', 'completed')
+        .order('service_date', { ascending: false })
+        .limit(100)
+
+  // Period-filtered recent feedback (by created_at)
+  const recentFeedbackQ = range
+    ? supabase.from('feedback')
+        .select('id, rating, comment, created_at, bookings(service_name), profiles!customer_id(full_name)')
+        .gte('created_at', `${range.start}T00:00:00`)
+        .lte('created_at', `${range.end}T23:59:59`)
+        .order('created_at', { ascending: false })
+        .limit(5)
+    : supabase.from('feedback')
+        .select('id, rating, comment, created_at, bookings(service_name), profiles!customer_id(full_name)')
+        .order('created_at', { ascending: false })
+        .limit(5)
+
   const [
-    { data: completedBookings },
     { data: allBookings },
+    { data: completedBookings },
     { data: cleaners },
     { data: feedbackRows },
     { data: weekBookings },
+    { data: recentFeedbackRows },
   ] = await Promise.all([
-    supabase
-      .from('bookings')
-      .select('id, service_date, service_type, property_sqm, base_price, payment_status, payment_method, profiles!customer_id(full_name)')
-      .eq('status', 'completed')
-      .order('service_date', { ascending: false })
-      .limit(50),
-    supabase.from('bookings').select('status, base_price, payment_status, service_type'),
-    supabase
-      .from('profiles')
-      .select('id, full_name')
-      .eq('role', 'cleaner')
-      .eq('is_active', true)
-      .order('full_name'),
+    allBookingsQ,
+    completedQ,
+    supabase.from('profiles').select('id, full_name').eq('role', 'cleaner').eq('is_active', true).order('full_name'),
     supabase.from('feedback').select('cleaner_id, rating'),
-    supabase
-      .from('bookings')
-      .select('id, service_date, service_time, service_type, status, base_price, profiles!customer_id(full_name)')
-      .gte('service_date', weekStart)
-      .lte('service_date', weekEnd)
+    supabase.from('bookings')
+      .select('id, service_date, service_time, service_name, status, base_price, profiles!customer_id(full_name)')
+      .gte('service_date', weekStart).lte('service_date', weekEnd)
       .not('status', 'eq', 'cancelled')
-      .order('service_date')
-      .order('service_time'),
+      .order('service_date').order('service_time'),
+    recentFeedbackQ,
   ])
 
-  type WeekBooking = {
-    id: string
-    service_date: string
-    service_time: string
-    service_type: string
-    status: string
-    base_price: number
-    profiles: { full_name: string } | null
-  }
+  const all           = (allBookings ?? []) as { status: string; base_price: number; payment_status: string; service_name: string | null; space_type: string; property_sqm: number }[]
+  const completed     = (completedBookings ?? []) as unknown as CompletedBooking[]
+  const cleanerList   = (cleaners ?? []) as unknown as CleanerRow[]
+  const feedback      = (feedbackRows ?? []) as { cleaner_id: string; rating: number }[]
+  const weekList      = (weekBookings ?? []) as unknown as WeekBooking[]
+  const recentFeedback = (recentFeedbackRows ?? []) as unknown as RecentFeedback[]
 
-  const completed   = (completedBookings ?? []) as unknown as CompletedBooking[]
-  const all         = (allBookings ?? []) as { status: string; base_price: number; payment_status: string; service_type: string }[]
-  const cleanerList = (cleaners ?? []) as unknown as CleanerRow[]
-  const feedback    = (feedbackRows ?? []) as { cleaner_id: string; rating: number }[]
-  const weekList    = (weekBookings ?? []) as unknown as WeekBooking[]
+  // Feedback stats (all-time — used for avg + distribution)
+  const allRatings   = feedback.map((f) => f.rating)
+  const feedbackAvg  = allRatings.length > 0
+    ? (allRatings.reduce((s, r) => s + r, 0) / allRatings.length).toFixed(1)
+    : null
+  const ratingDist   = [5, 4, 3, 2, 1].map((star) => ({
+    star,
+    count: allRatings.filter((r) => r === star).length,
+  }))
 
-  // Group weekly bookings by date
+  // Weekly schedule: group by date
   const weekByDay = weekList.reduce<Record<string, WeekBooking[]>>((acc, b) => {
     ;(acc[b.service_date] ??= []).push(b)
     return acc
@@ -115,28 +231,62 @@ export default async function ReportsPage() {
     return d.toISOString().split('T')[0]
   })
 
-  // Financial
-  const totalRevenue    = all.filter((b) => b.payment_status === 'paid').reduce((s, b) => s + Number(b.base_price), 0)
-  const partialRevenue  = all.filter((b) => b.payment_status === 'partial').reduce((s, b) => s + Number(b.base_price), 0)
-  const unpaidRevenue   = all.filter((b) => b.payment_status === 'unpaid').reduce((s, b) => s + Number(b.base_price), 0)
-  const totalPotential  = all.reduce((s, b) => s + Number(b.base_price), 0)
-  const collectionRate  = totalPotential > 0 ? Math.round((totalRevenue / totalPotential) * 100) : 0
+  // Financial KPIs
+  const totalRevenue   = all.filter((b) => b.payment_status === 'paid').reduce((s, b) => s + Number(b.base_price), 0)
+  const unpaidRevenue  = all.filter((b) => b.payment_status === 'unpaid').reduce((s, b) => s + Number(b.base_price), 0)
+  const totalPotential = all.reduce((s, b) => s + Number(b.base_price), 0)
+  const collectionRate = totalPotential > 0 ? Math.round((totalRevenue / totalPotential) * 100) : 0
 
-  // Status breakdown
-  const statusCounts = all.reduce((acc, b) => { acc[b.status] = (acc[b.status] ?? 0) + 1; return acc }, {} as Record<string, number>)
-  const statusOrder  = ['pending', 'confirmed', 'in_progress', 'completed', 'cancelled']
+  // Status + service breakdown
+  const statusCounts  = all.reduce((acc, b) => { acc[b.status] = (acc[b.status] ?? 0) + 1; return acc }, {} as Record<string, number>)
+  const serviceCounts = all.reduce((acc, b) => { const k = b.service_name ?? 'Unknown'; acc[k] = (acc[k] ?? 0) + 1; return acc }, {} as Record<string, number>)
+  const statusOrder   = ['pending', 'confirmed', 'in_progress', 'completed', 'cancelled']
 
-  // Service breakdown
-  const serviceCounts = all.reduce((acc, b) => { acc[b.service_type] = (acc[b.service_type] ?? 0) + 1; return acc }, {} as Record<string, number>)
+  // Property type analysis
+  const spaceTypeMap = all.reduce<Record<string, { count: number; totalRevenue: number; paidRevenue: number; sqmSum: number; sqmCount: number }>>(
+    (acc, b) => {
+      const key = b.space_type || 'residential'
+      if (!acc[key]) acc[key] = { count: 0, totalRevenue: 0, paidRevenue: 0, sqmSum: 0, sqmCount: 0 }
+      acc[key].count++
+      acc[key].totalRevenue += Number(b.base_price)
+      if (b.payment_status === 'paid') acc[key].paidRevenue += Number(b.base_price)
+      if (b.property_sqm > 0) { acc[key].sqmSum += Number(b.property_sqm); acc[key].sqmCount++ }
+      return acc
+    },
+    {}
+  )
+  const spaceTypeOrder = ['residential', 'condo', 'office', 'commercial']
+  const spaceTypeStats: SpaceTypeStat[] = spaceTypeOrder
+    .filter((k) => spaceTypeMap[k])
+    .map((k) => ({
+      label:       SPACE_LABELS[k] ?? k,
+      count:       spaceTypeMap[k].count,
+      revenue:     spaceTypeMap[k].totalRevenue,
+      paidRevenue: spaceTypeMap[k].paidRevenue,
+      avgSqm:      spaceTypeMap[k].sqmCount > 0 ? Math.round(spaceTypeMap[k].sqmSum / spaceTypeMap[k].sqmCount) : null,
+    }))
+  const unknownTypes = Object.keys(spaceTypeMap).filter((k) => !spaceTypeOrder.includes(k))
+  unknownTypes.forEach((k) => {
+    spaceTypeStats.push({
+      label:       k.charAt(0).toUpperCase() + k.slice(1),
+      count:       spaceTypeMap[k].count,
+      revenue:     spaceTypeMap[k].totalRevenue,
+      paidRevenue: spaceTypeMap[k].paidRevenue,
+      avgSqm:      spaceTypeMap[k].sqmCount > 0 ? Math.round(spaceTypeMap[k].sqmSum / spaceTypeMap[k].sqmCount) : null,
+    })
+  })
+  const commercialCount     = all.filter((b) => COMMERCIAL_TYPES.has(b.space_type || '')).length
+  const residentialCount    = all.filter((b) => !COMMERCIAL_TYPES.has(b.space_type || '')).length
+  const commercialRevenue   = all.filter((b) => COMMERCIAL_TYPES.has(b.space_type || '') && b.payment_status === 'paid').reduce((s, b) => s + Number(b.base_price), 0)
+  const residentialRevenue  = all.filter((b) => !COMMERCIAL_TYPES.has(b.space_type || '') && b.payment_status === 'paid').reduce((s, b) => s + Number(b.base_price), 0)
 
-  // Cleaner performance
+  // Cleaner performance (always all-time)
   const cleanerStats = await Promise.all(
     cleanerList.map(async (c) => {
       const { count } = await supabase
         .from('cleaner_assignments')
         .select('*', { count: 'exact', head: true })
-        .eq('cleaner_id', c.id)
-        .eq('status', 'completed')
+        .eq('cleaner_id', c.id).eq('status', 'completed')
       const myFeedback = feedback.filter((f) => f.cleaner_id === c.id)
       const avgRating  = myFeedback.length > 0
         ? myFeedback.reduce((s, f) => s + f.rating, 0) / myFeedback.length
@@ -153,147 +303,301 @@ export default async function ReportsPage() {
     <div className="space-y-8">
 
       {/* Header */}
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
         <div>
           <Link href="/admin" className="text-xs text-gray-400 hover:text-gray-600 transition-colors">
             ← Dashboard
           </Link>
           <h1 className="text-xl font-bold text-gray-900 tracking-tight mt-2">Reports & Analytics</h1>
-          <p className="text-sm text-gray-400 mt-0.5">Bookings, revenue, and cleaner performance data</p>
+          <p className="text-sm text-gray-400 mt-0.5">Bookings, revenue, and cleaner performance</p>
         </div>
         <PrintButton />
       </div>
 
-      {/* Revenue KPIs */}
+      {/* Period tabs */}
+      <div className="flex items-center gap-1 bg-gray-100 rounded-xl p-1 w-fit">
+        {PERIODS.map((p) => (
+          <Link
+            key={p.value}
+            href={`/admin/reports?period=${p.value}`}
+            className={`px-4 py-2 rounded-lg text-xs font-semibold transition-all ${
+              period === p.value
+                ? 'bg-white text-gray-900 shadow-sm'
+                : 'text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            {p.label}
+          </Link>
+        ))}
+      </div>
+
+      {/* Financial Summary */}
       <section>
-        <h2 className="text-sm font-semibold text-gray-900 mb-4 uppercase tracking-wide">Financial Summary</h2>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
-          <div className="bg-white rounded-xl border border-gray-200 border-l-4 border-l-gray-300 px-5 py-4">
-            <p className="text-2xl font-bold text-gray-900">{all.length}</p>
-            <p className="text-xs text-gray-500 mt-1">Total Bookings</p>
-          </div>
-          <div className="bg-white rounded-xl border border-gray-200 border-l-4 border-l-emerald-400 px-5 py-4">
-            <p className="text-2xl font-bold text-emerald-600">₱{totalRevenue.toLocaleString()}</p>
-            <p className="text-xs text-gray-500 mt-1">Revenue Collected</p>
-          </div>
-          <div className="bg-white rounded-xl border border-gray-200 border-l-4 border-l-red-400 px-5 py-4">
-            <p className="text-2xl font-bold text-red-600">₱{unpaidRevenue.toLocaleString()}</p>
-            <p className="text-xs text-gray-500 mt-1">Outstanding (Unpaid)</p>
-          </div>
-          <div className="bg-white rounded-xl border border-gray-200 border-l-4 border-l-pink-500 px-5 py-4">
-            <p className="text-2xl font-bold text-pink-600">{collectionRate}%</p>
-            <p className="text-xs text-gray-500 mt-1">Collection Rate</p>
-          </div>
+        <div className="flex items-baseline gap-2 mb-4">
+          <h2 className="text-sm font-semibold text-gray-900 uppercase tracking-wide">Financial Summary</h2>
+          <span className="text-xs text-gray-400">{subtitle}</span>
         </div>
 
-        {/* Revenue breakdown bar */}
-        {totalPotential > 0 && (
-          <div className="bg-white rounded-xl border border-gray-200 p-5">
-            <div className="flex items-center justify-between mb-3">
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Revenue Breakdown</p>
-              <p className="text-xs text-gray-400">Total potential: ₱{totalPotential.toLocaleString()}</p>
-            </div>
-            <div className="flex h-3 rounded-full overflow-hidden bg-gray-100 gap-px">
-              {totalRevenue > 0 && (
-                <div
-                  className="bg-emerald-400 h-full transition-all"
-                  style={{ width: `${(totalRevenue / totalPotential) * 100}%` }}
-                  title={`Paid: ₱${totalRevenue.toLocaleString()}`}
-                />
-              )}
-              {partialRevenue > 0 && (
-                <div
-                  className="bg-amber-400 h-full transition-all"
-                  style={{ width: `${(partialRevenue / totalPotential) * 100}%` }}
-                  title={`Partial: ₱${partialRevenue.toLocaleString()}`}
-                />
-              )}
-              {unpaidRevenue > 0 && (
-                <div
-                  className="bg-red-300 h-full transition-all"
-                  style={{ width: `${(unpaidRevenue / totalPotential) * 100}%` }}
-                  title={`Unpaid: ₱${unpaidRevenue.toLocaleString()}`}
-                />
-              )}
-            </div>
-            <div className="flex gap-4 mt-3">
-              {[
-                { label: 'Paid',    color: 'bg-emerald-400', value: `₱${totalRevenue.toLocaleString()}` },
-                { label: 'Partial', color: 'bg-amber-400',   value: `₱${partialRevenue.toLocaleString()}` },
-                { label: 'Unpaid',  color: 'bg-red-300',     value: `₱${unpaidRevenue.toLocaleString()}` },
-              ].map((l) => (
-                <div key={l.label} className="flex items-center gap-1.5">
-                  <span className={`w-2.5 h-2.5 rounded-full ${l.color} shrink-0`} />
-                  <span className="text-xs text-gray-500">{l.label}: <strong className="text-gray-700">{l.value}</strong></span>
-                </div>
-              ))}
-            </div>
+        {all.length === 0 ? (
+          <div className="bg-white rounded-xl border border-gray-200 px-5 py-10 text-center">
+            <p className="text-sm text-gray-400">No bookings for this period.</p>
           </div>
+        ) : (
+          <>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+              <div className="bg-white rounded-xl border border-gray-200 border-l-4 border-l-gray-300 px-5 py-4">
+                <p className="text-2xl font-bold text-gray-900">{all.length}</p>
+                <p className="text-xs text-gray-500 mt-1">Total Bookings</p>
+              </div>
+              <div className="bg-white rounded-xl border border-gray-200 border-l-4 border-l-emerald-400 px-5 py-4">
+                <p className="text-2xl font-bold text-emerald-600">₱{totalRevenue.toLocaleString()}</p>
+                <p className="text-xs text-gray-500 mt-1">Revenue Collected</p>
+              </div>
+              <div className="bg-white rounded-xl border border-gray-200 border-l-4 border-l-red-400 px-5 py-4">
+                <p className="text-2xl font-bold text-red-600">₱{unpaidRevenue.toLocaleString()}</p>
+                <p className="text-xs text-gray-500 mt-1">Outstanding (Processing Payment)</p>
+              </div>
+              <div className="bg-white rounded-xl border border-gray-200 border-l-4 border-l-pink-500 px-5 py-4">
+                <p className="text-2xl font-bold text-pink-600">{collectionRate}%</p>
+                <p className="text-xs text-gray-500 mt-1">Collection Rate</p>
+              </div>
+            </div>
+
+            {totalPotential > 0 && (
+              <div className="bg-white rounded-xl border border-gray-200 p-5">
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Revenue Breakdown</p>
+                  <p className="text-xs text-gray-400">Total potential: ₱{totalPotential.toLocaleString()}</p>
+                </div>
+                <div className="flex h-3 rounded-full overflow-hidden bg-gray-100 gap-px">
+                  {totalRevenue > 0 && (
+                    <div
+                      className="bg-emerald-400 h-full transition-all"
+                      style={{ width: `${(totalRevenue / totalPotential) * 100}%` }}
+                      title={`Paid: ₱${totalRevenue.toLocaleString()}`}
+                    />
+                  )}
+                  {unpaidRevenue > 0 && (
+                    <div
+                      className="bg-red-300 h-full transition-all"
+                      style={{ width: `${(unpaidRevenue / totalPotential) * 100}%` }}
+                      title={`Processing Payment: ₱${unpaidRevenue.toLocaleString()}`}
+                    />
+                  )}
+                </div>
+                <div className="flex gap-4 mt-3">
+                  {[
+                    { label: 'Paid',   color: 'bg-emerald-400', value: `₱${totalRevenue.toLocaleString()}`  },
+                    { label: 'Processing Payment', color: 'bg-red-300', value: `₱${unpaidRevenue.toLocaleString()}` },
+                  ].map((l) => (
+                    <div key={l.label} className="flex items-center gap-1.5">
+                      <span className={`w-2.5 h-2.5 rounded-full ${l.color} shrink-0`} />
+                      <span className="text-xs text-gray-500">{l.label}: <strong className="text-gray-700">{l.value}</strong></span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </>
         )}
       </section>
 
-      {/* Booking analytics */}
+      {/* Booking Analytics */}
       <section>
-        <h2 className="text-sm font-semibold text-gray-900 mb-4 uppercase tracking-wide">Booking Analytics</h2>
+        <div className="flex items-baseline gap-2 mb-4">
+          <h2 className="text-sm font-semibold text-gray-900 uppercase tracking-wide">Booking Analytics</h2>
+          <span className="text-xs text-gray-400">{subtitle}</span>
+        </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
 
-          {/* Status distribution */}
+          {/* By status */}
           <div className="bg-white rounded-xl border border-gray-200 p-5">
             <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-4">By Status</p>
-            <div className="space-y-2.5">
-              {statusOrder.filter((s) => statusCounts[s]).map((s) => {
-                const count = statusCounts[s] ?? 0
-                const pct   = all.length > 0 ? (count / all.length) * 100 : 0
-                const barColor: Record<string, string> = {
-                  pending:     'bg-amber-400',
-                  confirmed:   'bg-pink-400',
-                  in_progress: 'bg-violet-400',
-                  completed:   'bg-emerald-400',
-                  cancelled:   'bg-red-300',
-                }
-                return (
-                  <div key={s} className="flex items-center gap-3">
-                    <p className="text-xs text-gray-600 capitalize w-24 shrink-0">{s.replace('_', ' ')}</p>
-                    <div className="flex-1 bg-gray-100 rounded-full h-2">
-                      <div className={`${barColor[s] ?? 'bg-gray-300'} h-2 rounded-full`} style={{ width: `${pct}%` }} />
-                    </div>
-                    <p className="text-xs font-semibold text-gray-700 w-6 text-right">{count}</p>
-                  </div>
-                )
-              })}
-            </div>
-          </div>
-
-          {/* Service type distribution */}
-          <div className="bg-white rounded-xl border border-gray-200 p-5">
-            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-4">By Service Type</p>
-            <div className="space-y-2.5">
-              {Object.entries(serviceCounts)
-                .sort(([, a], [, b]) => b - a)
-                .map(([type, count]) => {
-                  const pct = all.length > 0 ? (count / all.length) * 100 : 0
+            {all.length === 0 ? (
+              <p className="text-xs text-gray-400">No data.</p>
+            ) : (
+              <div className="space-y-2.5">
+                {statusOrder.filter((s) => statusCounts[s]).map((s) => {
+                  const count = statusCounts[s] ?? 0
+                  const pct   = all.length > 0 ? (count / all.length) * 100 : 0
+                  const barColor: Record<string, string> = {
+                    pending:     'bg-amber-400',
+                    confirmed:   'bg-pink-400',
+                    in_progress: 'bg-violet-400',
+                    completed:   'bg-emerald-400',
+                    cancelled:   'bg-red-300',
+                  }
                   return (
-                    <div key={type} className="flex items-center gap-3">
-                      <p className="text-xs text-gray-600 w-36 shrink-0 truncate">{SERVICE_LABELS[type] ?? type}</p>
+                    <div key={s} className="flex items-center gap-3">
+                      <p className="text-xs text-gray-600 capitalize w-24 shrink-0">{s.replace('_', ' ')}</p>
                       <div className="flex-1 bg-gray-100 rounded-full h-2">
-                        <div className="bg-pink-400 h-2 rounded-full" style={{ width: `${pct}%` }} />
+                        <div className={`${barColor[s] ?? 'bg-gray-300'} h-2 rounded-full`} style={{ width: `${pct}%` }} />
                       </div>
                       <p className="text-xs font-semibold text-gray-700 w-6 text-right">{count}</p>
                     </div>
                   )
                 })}
-            </div>
+              </div>
+            )}
+          </div>
+
+          {/* By service type */}
+          <div className="bg-white rounded-xl border border-gray-200 p-5">
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-4">By Service Type</p>
+            {all.length === 0 ? (
+              <p className="text-xs text-gray-400">No data.</p>
+            ) : (
+              <div className="space-y-2.5">
+                {Object.entries(serviceCounts)
+                  .sort(([, a], [, b]) => b - a)
+                  .map(([type, count]) => {
+                    const pct = all.length > 0 ? (count / all.length) * 100 : 0
+                    return (
+                      <div key={type} className="flex items-center gap-3">
+                        <p className="text-xs text-gray-600 w-36 shrink-0 truncate">{type}</p>
+                        <div className="flex-1 bg-gray-100 rounded-full h-2">
+                          <div className="bg-pink-400 h-2 rounded-full" style={{ width: `${pct}%` }} />
+                        </div>
+                        <p className="text-xs font-semibold text-gray-700 w-6 text-right">{count}</p>
+                      </div>
+                    )
+                  })}
+              </div>
+            )}
           </div>
         </div>
       </section>
 
-      {/* Cleaner performance */}
+      {/* Property Type Analysis */}
       <section>
-        <h2 className="text-sm font-semibold text-gray-900 mb-4 uppercase tracking-wide">Cleaner Performance</h2>
+        <div className="flex items-baseline gap-2 mb-4">
+          <h2 className="text-sm font-semibold text-gray-900 uppercase tracking-wide">Property Type Analysis</h2>
+          <span className="text-xs text-gray-400">{subtitle}</span>
+        </div>
+
+        {all.length === 0 ? (
+          <div className="bg-white rounded-xl border border-gray-200 px-5 py-10 text-center">
+            <p className="text-sm text-gray-400">No bookings for this period.</p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+
+            {/* Residential vs Commercial summary cards */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="bg-white rounded-xl border border-gray-200 border-l-4 border-l-blue-400 px-5 py-4">
+                <p className="text-2xl font-bold text-gray-900">{residentialCount}</p>
+                <p className="text-xs text-gray-500 mt-1">Residential Bookings</p>
+                <p className="text-xs text-emerald-600 font-medium mt-2">₱{residentialRevenue.toLocaleString()} collected</p>
+              </div>
+              <div className="bg-white rounded-xl border border-gray-200 border-l-4 border-l-violet-400 px-5 py-4">
+                <p className="text-2xl font-bold text-gray-900">{commercialCount}</p>
+                <p className="text-xs text-gray-500 mt-1">Commercial Bookings</p>
+                <p className="text-xs text-emerald-600 font-medium mt-2">₱{commercialRevenue.toLocaleString()} collected</p>
+              </div>
+            </div>
+
+            {/* Per-type breakdown */}
+            {spaceTypeStats.length > 0 && (
+              <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+                <div className="hidden sm:grid grid-cols-[1fr_80px_120px_120px_100px] gap-4 px-5 py-3 border-b border-gray-100 bg-gray-50/60">
+                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Space Type</p>
+                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide text-center">Bookings</p>
+                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide text-right">Total Value</p>
+                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide text-right">Collected</p>
+                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide text-right">Avg Size</p>
+                </div>
+                <div className="divide-y divide-gray-50">
+                  {spaceTypeStats.map((s) => {
+                    const key = Object.entries(SPACE_LABELS).find(([, v]) => v === s.label)?.[0] ?? 'residential'
+                    const barPct = all.length > 0 ? (s.count / all.length) * 100 : 0
+                    return (
+                      <div key={s.label} className="px-5 py-4">
+                        {/* Desktop */}
+                        <div className="hidden sm:grid grid-cols-[1fr_80px_120px_120px_100px] gap-4 items-center">
+                          <div className="flex items-center gap-3 min-w-0">
+                            <span className={`text-xs px-2 py-0.5 rounded-full border font-medium ${SPACE_BADGE[key] ?? 'bg-gray-50 text-gray-600 border-gray-200'}`}>
+                              {s.label}
+                            </span>
+                          </div>
+                          <div className="text-center">
+                            <p className="text-sm font-semibold text-gray-800">{s.count}</p>
+                            <div className="mt-1 bg-gray-100 rounded-full h-1.5">
+                              <div className={`${SPACE_COLORS[key] ?? 'bg-gray-400'} h-1.5 rounded-full`} style={{ width: `${barPct}%` }} />
+                            </div>
+                          </div>
+                          <p className="text-sm font-semibold text-gray-800 text-right">₱{s.revenue.toLocaleString()}</p>
+                          <p className="text-sm font-semibold text-emerald-600 text-right">₱{s.paidRevenue.toLocaleString()}</p>
+                          <p className="text-sm text-gray-600 text-right">{s.avgSqm != null ? `${s.avgSqm} sqm` : '—'}</p>
+                        </div>
+                        {/* Mobile */}
+                        <div className="sm:hidden">
+                          <div className="flex items-center justify-between gap-2 mb-2">
+                            <span className={`text-xs px-2 py-0.5 rounded-full border font-medium ${SPACE_BADGE[key] ?? 'bg-gray-50 text-gray-600 border-gray-200'}`}>
+                              {s.label}
+                            </span>
+                            <span className="text-xs font-semibold text-gray-700">{s.count} booking{s.count !== 1 ? 's' : ''}</span>
+                          </div>
+                          <div className="bg-gray-100 rounded-full h-1.5 mb-2">
+                            <div className={`${SPACE_COLORS[key] ?? 'bg-gray-400'} h-1.5 rounded-full`} style={{ width: `${barPct}%` }} />
+                          </div>
+                          <div className="flex items-center gap-4 text-xs text-gray-500">
+                            <span>Value: <strong className="text-gray-800">₱{s.revenue.toLocaleString()}</strong></span>
+                            <span>Paid: <strong className="text-emerald-600">₱{s.paidRevenue.toLocaleString()}</strong></span>
+                            {s.avgSqm != null && <span>Avg: <strong className="text-gray-800">{s.avgSqm} sqm</strong></span>}
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+
+                {/* Stacked bar: share of total bookings */}
+                {spaceTypeStats.length > 1 && (
+                  <div className="px-5 py-4 border-t border-gray-100 bg-gray-50/60">
+                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Booking Share</p>
+                    <div className="flex h-3 rounded-full overflow-hidden bg-gray-100 gap-px">
+                      {spaceTypeStats.map((s) => {
+                        const key = Object.entries(SPACE_LABELS).find(([, v]) => v === s.label)?.[0] ?? 'residential'
+                        const pct = all.length > 0 ? (s.count / all.length) * 100 : 0
+                        return pct > 0 ? (
+                          <div
+                            key={s.label}
+                            className={`${SPACE_COLORS[key] ?? 'bg-gray-400'} h-full transition-all`}
+                            style={{ width: `${pct}%` }}
+                            title={`${s.label}: ${s.count} (${Math.round(pct)}%)`}
+                          />
+                        ) : null
+                      })}
+                    </div>
+                    <div className="flex flex-wrap gap-x-4 gap-y-1.5 mt-3">
+                      {spaceTypeStats.map((s) => {
+                        const key = Object.entries(SPACE_LABELS).find(([, v]) => v === s.label)?.[0] ?? 'residential'
+                        const pct = all.length > 0 ? Math.round((s.count / all.length) * 100) : 0
+                        return (
+                          <div key={s.label} className="flex items-center gap-1.5">
+                            <span className={`w-2.5 h-2.5 rounded-full ${SPACE_COLORS[key] ?? 'bg-gray-400'} shrink-0`} />
+                            <span className="text-xs text-gray-500">{s.label}: <strong className="text-gray-700">{pct}%</strong></span>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+      </section>
+
+      {/* Cleaner Performance — always all-time */}
+      <section>
+        <div className="flex items-baseline gap-2 mb-4">
+          <h2 className="text-sm font-semibold text-gray-900 uppercase tracking-wide">Cleaner Performance</h2>
+          <span className="text-xs text-gray-400">All time</span>
+        </div>
         <div className="bg-white rounded-xl border border-gray-200">
-          <div className="hidden sm:grid grid-cols-[1fr_160px_100px_100px_80px] gap-4 px-5 py-3 border-b border-gray-100 bg-gray-50/60 rounded-t-xl">
+          <div className="hidden sm:grid grid-cols-[1fr_100px_100px_80px] gap-4 px-5 py-3 border-b border-gray-100 bg-gray-50/60 rounded-t-xl">
             <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Cleaner</p>
-            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Branch</p>
             <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide text-center">Jobs Done</p>
             <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide text-center">Avg Rating</p>
             <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide text-right">Reviews</p>
@@ -306,7 +610,7 @@ export default async function ReportsPage() {
                 <Link
                   key={c.id}
                   href={`/admin/cleaners/${c.id}`}
-                  className="flex sm:grid sm:grid-cols-[1fr_160px_100px_100px_80px] gap-3 sm:gap-4 items-center px-5 py-3.5 hover:bg-gray-50 transition-colors group"
+                  className="flex sm:grid sm:grid-cols-[1fr_100px_100px_80px] gap-3 sm:gap-4 items-center px-5 py-3.5 hover:bg-gray-50 transition-colors group"
                 >
                   <div className="flex items-center gap-3 min-w-0">
                     <div className="w-8 h-8 bg-pink-100 text-pink-600 rounded-full flex items-center justify-center text-xs font-bold shrink-0">
@@ -316,7 +620,6 @@ export default async function ReportsPage() {
                       {c.full_name}
                     </p>
                   </div>
-                  <p className="hidden sm:block text-xs text-gray-500">Maid For You</p>
                   <p className="hidden sm:block text-sm font-semibold text-gray-800 text-center">{c.jobs}</p>
                   <div className="hidden sm:flex items-center justify-center gap-1">
                     {c.avgRating != null ? (
@@ -329,7 +632,6 @@ export default async function ReportsPage() {
                     )}
                   </div>
                   <p className="hidden sm:block text-xs text-gray-500 text-right">{c.reviews}</p>
-                  {/* Mobile compact */}
                   <div className="sm:hidden flex items-center gap-2 ml-auto shrink-0">
                     <span className="text-xs text-gray-500">{c.jobs} jobs</span>
                     {c.avgRating != null && (
@@ -343,12 +645,12 @@ export default async function ReportsPage() {
         </div>
       </section>
 
-      {/* Top Cleaners Leaderboard */}
+      {/* Top Cleaners Leaderboard — always all-time */}
       <section>
-        <h2 className="text-sm font-semibold text-gray-900 mb-4 uppercase tracking-wide">
-          Top Cleaners
-          <span className="text-gray-400 font-normal ml-2 normal-case">(4.5★ and above)</span>
-        </h2>
+        <div className="flex items-baseline gap-2 mb-4">
+          <h2 className="text-sm font-semibold text-gray-900 uppercase tracking-wide">Top Cleaners</h2>
+          <span className="text-xs text-gray-400">4.5★ and above · All time</span>
+        </div>
         {topCleaners.length === 0 ? (
           <div className="bg-white rounded-xl border border-gray-200 px-5 py-10 text-center">
             <p className="text-sm text-gray-400">No cleaners with 4.5★ or higher yet.</p>
@@ -383,20 +685,94 @@ export default async function ReportsPage() {
         )}
       </section>
 
-      {/* Weekly Schedule */}
+      {/* Customer Feedback Summary */}
       <section>
-        <h2 className="text-sm font-semibold text-gray-900 mb-4 uppercase tracking-wide">
-          This Week&apos;s Schedule
-          <span className="text-gray-400 font-normal ml-2 normal-case">
+        <div className="flex items-baseline justify-between gap-2 mb-4">
+          <div className="flex items-baseline gap-2">
+            <h2 className="text-sm font-semibold text-gray-900 uppercase tracking-wide">Customer Feedback</h2>
+            <span className="text-xs text-gray-400">
+              {period === 'all' ? 'Recent reviews' : `Reviews · ${subtitle}`}
+            </span>
+          </div>
+          <Link href="/admin/feedback" className="text-xs text-pink-600 hover:text-pink-800 transition-colors">
+            See all →
+          </Link>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {/* Overall rating + distribution — always all-time */}
+          <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
+            <div className="flex items-center gap-3">
+              <div>
+                <p className="text-3xl font-bold text-gray-900">{feedbackAvg ?? '—'}</p>
+                <p className="text-xs text-gray-400 mt-0.5">Overall avg · {allRatings.length} reviews</p>
+              </div>
+              <div className="flex gap-0.5 text-2xl ml-2">
+                {[1, 2, 3, 4, 5].map((i) => (
+                  <span key={i} className={Number(feedbackAvg) >= i ? 'text-yellow-400' : 'text-gray-200'}>★</span>
+                ))}
+              </div>
+            </div>
+            <div className="space-y-2">
+              {ratingDist.map(({ star, count }) => {
+                const pct = allRatings.length > 0 ? (count / allRatings.length) * 100 : 0
+                return (
+                  <div key={star} className="flex items-center gap-3">
+                    <span className="text-xs text-gray-500 w-8 shrink-0">{star} ★</span>
+                    <div className="flex-1 bg-gray-100 rounded-full h-2">
+                      <div className="bg-yellow-400 h-2 rounded-full" style={{ width: `${pct}%` }} />
+                    </div>
+                    <span className="text-xs text-gray-400 w-5 text-right">{count}</span>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+
+          {/* Recent reviews */}
+          <div className="bg-white rounded-xl border border-gray-200 divide-y divide-gray-50">
+            {recentFeedback.length === 0 ? (
+              <p className="text-sm text-gray-400 text-center py-10">No reviews for this period.</p>
+            ) : (
+              recentFeedback.map((f) => (
+                <div key={f.id} className="px-4 py-3">
+                  <div className="flex items-center justify-between gap-2 mb-1">
+                    <div className="flex gap-0.5">
+                      {[1, 2, 3, 4, 5].map((i) => (
+                        <span key={i} className={`text-sm ${f.rating >= i ? 'text-yellow-400' : 'text-gray-200'}`}>★</span>
+                      ))}
+                    </div>
+                    <span className="text-xs text-gray-400">
+                      {new Date(f.created_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric' })}
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-500">
+                    {f.profiles?.full_name ?? 'Customer'} · {f.bookings?.service_name ?? 'Service'}
+                  </p>
+                  {f.comment && (
+                    <p className="text-xs text-gray-700 italic mt-1 line-clamp-2">&ldquo;{f.comment}&rdquo;</p>
+                  )}
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      </section>
+
+      {/* Weekly Schedule — always current week */}
+      <section>
+        <div className="flex items-baseline gap-2 mb-4">
+          <h2 className="text-sm font-semibold text-gray-900 uppercase tracking-wide">This Week&apos;s Schedule</h2>
+          <span className="text-xs text-gray-400">
             {new Date(weekStart + 'T00:00:00').toLocaleDateString('en-PH', { month: 'short', day: 'numeric' })}
             {' – '}
             {new Date(weekEnd + 'T00:00:00').toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })}
           </span>
-        </h2>
+        </div>
         <div className="space-y-3">
           {weekDays.map((date) => {
             const dayBookings = weekByDay[date] ?? []
-            const label = new Date(date + 'T00:00:00').toLocaleDateString('en-PH', { weekday: 'long', month: 'short', day: 'numeric' })
+            const label   = new Date(date + 'T00:00:00').toLocaleDateString('en-PH', { weekday: 'long', month: 'short', day: 'numeric' })
             const isToday = date === now.toISOString().split('T')[0]
             return (
               <div key={date} className="bg-white rounded-xl border border-gray-200 overflow-hidden">
@@ -418,7 +794,7 @@ export default async function ReportsPage() {
                       >
                         <div className="min-w-0">
                           <p className="text-sm font-medium text-gray-900 group-hover:text-pink-700 transition-colors">
-                            {SERVICE_LABELS[b.service_type] ?? 'Cleaning'}
+                            {b.service_name ?? 'Cleaning'}
                           </p>
                           <p className="text-xs text-gray-400 mt-0.5">
                             {formatTime(b.service_time)} · {b.profiles?.full_name ?? 'Customer'}
@@ -445,63 +821,65 @@ export default async function ReportsPage() {
         </div>
       </section>
 
-      {/* Service history table */}
+      {/* Service History */}
       <section>
-        <h2 className="text-sm font-semibold text-gray-900 mb-4 uppercase tracking-wide">
-          Service History
-          <span className="text-gray-400 font-normal ml-2 normal-case">(last 50 completed)</span>
-        </h2>
+        <div className="flex items-baseline gap-2 mb-4">
+          <h2 className="text-sm font-semibold text-gray-900 uppercase tracking-wide">Service History</h2>
+          <span className="text-xs text-gray-400">
+            {period === 'all' ? 'Last 100 completed' : `Completed · ${subtitle}`}
+          </span>
+        </div>
         <div className="bg-white rounded-xl border border-gray-200">
-          <div className="hidden sm:grid grid-cols-[100px_1fr_160px_1fr_100px_80px] gap-4 px-5 py-3 border-b border-gray-100 bg-gray-50/60 rounded-t-xl">
+          <div className="hidden sm:grid grid-cols-[100px_1fr_1fr_100px_80px] gap-4 px-5 py-3 border-b border-gray-100 bg-gray-50/60 rounded-t-xl">
             <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Date</p>
             <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Service</p>
-            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Branch</p>
             <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Customer</p>
             <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide text-right">Amount</p>
             <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide text-right">Payment</p>
           </div>
           {completed.length === 0 ? (
-            <p className="text-sm text-gray-400 text-center py-10">No completed bookings yet.</p>
+            <p className="text-sm text-gray-400 text-center py-10">No completed bookings for this period.</p>
           ) : (
-            <div className="divide-y divide-gray-50">
-              {completed.map((b) => (
-                <div
-                  key={b.id}
-                  className="hidden sm:grid grid-cols-[100px_1fr_160px_1fr_100px_80px] gap-4 items-center px-5 py-3.5"
-                >
-                  <p className="text-xs text-gray-600">{formatDate(b.service_date)}</p>
-                  <p className="text-sm text-gray-800 truncate">{SERVICE_LABELS[b.service_type] ?? b.service_type}</p>
-                  <p className="text-xs text-gray-500 truncate">Maid For You</p>
-                  <p className="text-sm text-gray-700 truncate">{b.profiles?.full_name ?? '—'}</p>
-                  <p className="text-sm font-semibold text-gray-900 text-right">₱{Number(b.base_price).toLocaleString()}</p>
-                  <div className="flex justify-end">
-                    <span className={`text-xs px-2 py-0.5 rounded-full border font-medium capitalize ${PAYMENT_STYLES[b.payment_status] ?? ''}`}>
-                      {b.payment_status}
-                    </span>
+            <>
+              <div className="divide-y divide-gray-50">
+                {completed.map((b) => (
+                  <div
+                    key={b.id}
+                    className="hidden sm:grid grid-cols-[100px_1fr_1fr_100px_80px] gap-4 items-center px-5 py-3.5"
+                  >
+                    <p className="text-xs text-gray-600">{formatDate(b.service_date)}</p>
+                    <p className="text-sm text-gray-800 truncate">{b.service_name ?? '—'}</p>
+                    <p className="text-sm text-gray-700 truncate">{b.profiles?.full_name ?? '—'}</p>
+                    <p className="text-sm font-semibold text-gray-900 text-right">₱{Number(b.base_price).toLocaleString()}</p>
+                    <div className="flex justify-end">
+                      <span className={`text-xs px-2 py-0.5 rounded-full border font-medium capitalize ${PAYMENT_STYLES[b.payment_status] ?? ''}`}>
+                        {b.payment_status}
+                      </span>
+                    </div>
                   </div>
-                </div>
-              ))}
-            </div>
-          )}
-          {/* Mobile fallback */}
-          <div className="sm:hidden divide-y divide-gray-50">
-            {completed.map((b) => (
-              <div key={b.id + '-m'} className="px-4 py-3.5">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium text-gray-900 truncate">{b.profiles?.full_name ?? '—'}</p>
-                    <p className="text-xs text-gray-400 mt-0.5">{SERVICE_LABELS[b.service_type] ?? b.service_type} · {formatDate(b.service_date)}</p>
-                  </div>
-                  <div className="flex flex-col items-end gap-1 shrink-0">
-                    <p className="text-sm font-bold text-gray-900">₱{Number(b.base_price).toLocaleString()}</p>
-                    <span className={`text-xs px-2 py-0.5 rounded-full border font-medium capitalize ${PAYMENT_STYLES[b.payment_status] ?? ''}`}>
-                      {b.payment_status}
-                    </span>
-                  </div>
-                </div>
+                ))}
               </div>
-            ))}
-          </div>
+              {/* Mobile */}
+              <div className="sm:hidden divide-y divide-gray-50">
+                {completed.map((b) => (
+                  <div key={b.id + '-m'} className="px-4 py-3.5">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-gray-900 truncate">{b.profiles?.full_name ?? '—'}</p>
+                        <p className="text-xs text-gray-400 mt-0.5">{b.service_name ?? '—'} · {formatDate(b.service_date)}</p>
+                      </div>
+                      <div className="flex flex-col items-end gap-1 shrink-0">
+                        <p className="text-sm font-bold text-gray-900">₱{Number(b.base_price).toLocaleString()}</p>
+                        <span className={`text-xs px-2 py-0.5 rounded-full border font-medium capitalize ${PAYMENT_STYLES[b.payment_status] ?? ''}`}>
+                          {b.payment_status}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
         </div>
       </section>
     </div>

@@ -16,18 +16,10 @@ type Booking = {
   id: string
   service_date: string
   service_time: string
-  service_type: string
+  service_name: string | null
   base_price: number
   status: string
   payment_status: string
-}
-
-const SERVICE_LABELS: Record<string, string> = {
-  general: 'General Cleaning',
-  premium_mattress: 'Mattress & Upholstery',
-  complete: 'Complete Package',
-  disinfection: 'Disinfection',
-  post_construction: 'Post-Construction',
 }
 
 const STATUS_STYLES: Record<string, string> = {
@@ -67,7 +59,7 @@ export default async function CustomerDetailPage({
       .single(),
     supabase
       .from('bookings')
-      .select('id, service_date, service_time, service_type, base_price, status, payment_status')
+      .select('id, service_date, service_time, service_name, base_price, status, payment_status')
       .eq('customer_id', id)
       .order('service_date', { ascending: false })
       .limit(20),
@@ -141,7 +133,7 @@ export default async function CustomerDetailPage({
               >
                 <div>
                   <p className="text-sm font-medium text-gray-900">
-                    {SERVICE_LABELS[b.service_type] ?? 'Cleaning'}
+                    {b.service_name ?? 'Cleaning'}
                   </p>
                   <p className="text-xs text-gray-400 mt-0.5">
                     {formatDate(b.service_date)} at {formatTime(b.service_time)}

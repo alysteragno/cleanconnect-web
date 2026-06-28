@@ -14,7 +14,7 @@
 CREATE TYPE user_role AS ENUM ('super_admin', 'cleaner', 'customer');
 CREATE TYPE booking_status AS ENUM ('pending', 'confirmed', 'in_progress', 'completed', 'cancelled');
 CREATE TYPE payment_status AS ENUM ('unpaid', 'partial', 'paid', 'refunded');
-CREATE TYPE assignment_status AS ENUM ('offered', 'accepted', 'declined', 'completed');
+CREATE TYPE assignment_status AS ENUM ('assigned', 'declined', 'completed');
 
 
 -- ─────────────────────────────────────────────────────────────────────────────

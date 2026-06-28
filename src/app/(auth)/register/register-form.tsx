@@ -20,7 +20,7 @@ export default function RegisterForm() {
           type="text"
           required
           autoComplete="name"
-          placeholder="Juan dela Cruz"
+          placeholder=""
           className={inputClass}
         />
       </div>
@@ -35,21 +35,21 @@ export default function RegisterForm() {
           type="email"
           required
           autoComplete="email"
-          placeholder="you@example.com"
+          placeholder=""
           className={inputClass}
         />
       </div>
 
       <div>
         <label htmlFor="phone" className="block text-sm font-medium text-gray-700 mb-1.5">
-          Phone number <span className="text-gray-400 font-normal">(optional)</span>
+          Phone number
         </label>
         <input
           id="phone"
           name="phone"
           type="tel"
           autoComplete="tel"
-          placeholder="+63 912 345 6789"
+          placeholder=""
           className={inputClass}
         />
       </div>

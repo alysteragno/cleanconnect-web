@@ -39,7 +39,12 @@ export async function createCleanerAccount(
   const email = (formData.get('email') as string).trim()
   const password = formData.get('password') as string
   const phone = (formData.get('phone') as string).trim() || null
-
+  const address_street           = (formData.get('address_street') as string)?.trim() || null
+  const address_city             = (formData.get('address_city') as string)?.trim() || null
+  const address_province         = (formData.get('address_province') as string)?.trim() || null
+  const date_of_birth            = (formData.get('date_of_birth') as string)?.trim() || null
+  const emergency_contact_name   = (formData.get('emergency_contact_name') as string)?.trim() || null
+  const emergency_contact_phone  = (formData.get('emergency_contact_phone') as string)?.trim() || null
   if (!full_name || !email || !password) return { error: 'All fields are required.' }
   if (password.length < 8) return { error: 'Password must be at least 8 characters.' }
 
@@ -58,6 +63,12 @@ export async function createCleanerAccount(
     phone,
     role: 'cleaner',
     is_active: true,
+    address_street,
+    address_city,
+    address_province,
+    date_of_birth,
+    emergency_contact_name,
+    emergency_contact_phone,
   })
 
   if (profileError) return { error: profileError.message }
@@ -77,12 +88,26 @@ export async function updateCleanerProfile(
   const cleaner_id = formData.get('cleaner_id') as string
   const full_name = (formData.get('full_name') as string).trim()
   const phone = (formData.get('phone') as string).trim() || null
-
+  const address_street           = (formData.get('address_street') as string)?.trim() || null
+  const address_city             = (formData.get('address_city') as string)?.trim() || null
+  const address_province         = (formData.get('address_province') as string)?.trim() || null
+  const date_of_birth            = (formData.get('date_of_birth') as string)?.trim() || null
+  const emergency_contact_name   = (formData.get('emergency_contact_name') as string)?.trim() || null
+  const emergency_contact_phone  = (formData.get('emergency_contact_phone') as string)?.trim() || null
   if (!full_name) return { error: 'Name is required.' }
 
   const { error } = await supabase
     .from('profiles')
-    .update({ full_name, phone })
+    .update({
+      full_name,
+      phone,
+      address_street,
+      address_city,
+      address_province,
+      date_of_birth,
+      emergency_contact_name,
+      emergency_contact_phone,
+    })
     .eq('id', cleaner_id)
 
   if (error) return { error: error.message }
@@ -204,16 +229,17 @@ export async function dispatchCleaners(
   const rows = cleanerIds.map((cleaner_id) => ({
     booking_id: bookingId,
     cleaner_id,
-    status: 'offered' as const,
+    status: 'assigned' as const,
   }))
 
-  const { error } = await supabase
+  const admin = createAdminClient()
+  const { error } = await admin
     .from('cleaner_assignments')
     .upsert(rows, { onConflict: 'booking_id,cleaner_id', ignoreDuplicates: true })
 
   if (error) return { error: error.message }
 
-  const { data: booking } = await supabase
+  const { data: booking } = await admin
     .from('bookings')
     .select('service_date')
     .eq('id', bookingId)
@@ -227,16 +253,16 @@ export async function dispatchCleaners(
     cleanerIds.map((cleanerId) =>
       createNotification({
         userId: cleanerId,
-        title: 'New Job Offer',
-        body: `You have a cleaning offer for ${dateStr}. Accept or decline in your assignments.`,
-        type: 'job_offer',
+        title: 'Job Assignment',
+        body: `You have been assigned a cleaning job on ${dateStr}.`,
+        type: 'job_assigned',
         bookingId,
       })
     )
   )
 
   revalidatePath(`/admin/bookings/${bookingId}`)
-  return { success: `Offer sent to ${cleanerIds.length} cleaner(s).` }
+  return { success: `${cleanerIds.length} cleaner(s) assigned.` }
 }
 
 export async function forceAssignCleaner(
@@ -247,47 +273,53 @@ export async function forceAssignCleaner(
   const { data: { user } } = await supabase.auth.getUser()
   if (!user || !(await assertSuperAdmin(supabase, user.id))) return { error: 'Unauthorized.' }
 
-  const bookingId = formData.get('booking_id') as string
-  const cleanerId = formData.get('cleaner_id') as string
-  if (!bookingId || !cleanerId) return { error: 'Missing booking or cleaner.' }
+  const bookingId  = formData.get('booking_id') as string
+  const cleanerIds = formData.getAll('cleaner_id') as string[]
+  if (!bookingId || cleanerIds.length === 0) return { error: 'Missing booking or cleaner.' }
 
-  const { error: e1 } = await supabase
+  const admin = createAdminClient()
+
+  const { error: e1 } = await admin
     .from('cleaner_assignments')
     .upsert(
-      { booking_id: bookingId, cleaner_id: cleanerId, status: 'accepted' },
+      cleanerIds.map((cleanerId) => ({ booking_id: bookingId, cleaner_id: cleanerId, status: 'assigned' as const })),
       { onConflict: 'booking_id,cleaner_id' }
     )
   if (e1) return { error: e1.message }
 
-  const { error: e2 } = await supabase
+  const { data: booking } = await admin
+    .from('bookings')
+    .select('service_date, customer_id, status')
+    .eq('id', bookingId)
+    .single()
+
+  const wasAlreadyConfirmed = booking?.status === 'confirmed'
+
+  const { error: e2 } = await admin
     .from('bookings')
     .update({ status: 'confirmed' })
     .eq('id', bookingId)
   if (e2) return { error: e2.message }
 
-  const { data: booking } = await supabase
-    .from('bookings')
-    .select('service_date, customer_id')
-    .eq('id', bookingId)
-    .single()
-
   if (booking) {
     const dateStr = new Date(booking.service_date).toLocaleDateString('en-PH', { month: 'short', day: 'numeric' })
     await Promise.all([
-      createNotification({
-        userId: cleanerId,
-        title: 'Job Confirmed',
-        body: `You have been assigned a cleaning job on ${dateStr}.`,
-        type: 'job_assigned',
-        bookingId,
-      }),
-      createNotification({
+      ...cleanerIds.map((cleanerId) =>
+        createNotification({
+          userId: cleanerId,
+          title: 'Job Confirmed',
+          body: `You have been assigned a cleaning job on ${dateStr}.`,
+          type: 'job_assigned',
+          bookingId,
+        })
+      ),
+      ...(!wasAlreadyConfirmed ? [createNotification({
         userId: booking.customer_id,
         title: 'Booking Confirmed',
         body: `Your cleaning appointment on ${dateStr} has been confirmed!`,
         type: 'booking_confirmed',
         bookingId,
-      }),
+      })] : []),
     ])
   }
 
@@ -334,6 +366,34 @@ export async function cancelBooking(
 
   revalidatePath('/admin/bookings')
   revalidatePath(`/admin/bookings/${bookingId}`)
+  redirect('/admin/bookings')
+}
+
+// ── Booking deletion ─────────────────────────────────────────────────────
+
+export async function deleteBooking(
+  state: AdminActionState,
+  formData: FormData
+): Promise<AdminActionState> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user || !(await assertSuperAdmin(supabase, user.id))) return { error: 'Unauthorized.' }
+
+  const bookingId = formData.get('booking_id') as string
+  if (!bookingId) return { error: 'Missing booking.' }
+
+  // Use service-role client — the schema has no FOR DELETE RLS policy for admins,
+  // so the regular client silently drops the operation.
+  const admin = createAdminClient()
+  const { error } = await admin
+    .from('bookings')
+    .delete()
+    .eq('id', bookingId)
+
+  if (error) return { error: error.message }
+
+  revalidatePath('/admin/bookings')
+  revalidatePath('/admin')
   redirect('/admin/bookings')
 }
 
@@ -422,6 +482,73 @@ export async function removeCleanerDayOff(
   revalidatePath(`/admin/cleaners/${cleaner_id}`)
   revalidatePath(`/manager/cleaners/${cleaner_id}`)
   return { success: 'Day-off removed.' }
+}
+
+// ── Cleaner weekly schedule (read-only, called from calendar UI) ───────────
+
+export async function getCleanerWeekScheduleData(
+  weekStart: string,   // ISO date string for Monday of the week
+  cleanerIds: string[]
+): Promise<{
+  dayOffs: Array<{ cleaner_id: string; unavailable_date: string }>
+  assignments: Array<{
+    cleaner_id: string
+    booking_id: string
+    service_date: string
+    booking_status: string
+  }>
+}> {
+  if (cleanerIds.length === 0) return { dayOffs: [], assignments: [] }
+
+  const end = new Date(weekStart + 'T00:00:00')
+  end.setDate(end.getDate() + 6)
+  const weekEnd = end.toISOString().slice(0, 10)
+
+  const adminClient = createAdminClient()
+
+  const [{ data: dayOffs }, { data: bookingsInWeek }] = await Promise.all([
+    adminClient
+      .from('cleaner_availability')
+      .select('cleaner_id, unavailable_date')
+      .in('cleaner_id', cleanerIds)
+      .gte('unavailable_date', weekStart)
+      .lte('unavailable_date', weekEnd),
+    adminClient
+      .from('bookings')
+      .select('id, service_date, status')
+      .gte('service_date', weekStart)
+      .lte('service_date', weekEnd),
+  ])
+
+  const bookingMap = new Map((bookingsInWeek ?? []).map(b => [b.id, b]))
+  const bookingIds = [...bookingMap.keys()]
+
+  let assignments: Array<{
+    cleaner_id: string
+    booking_id: string
+    service_date: string
+    booking_status: string
+  }> = []
+
+  if (bookingIds.length > 0) {
+    const { data: assignData } = await adminClient
+      .from('cleaner_assignments')
+      .select('cleaner_id, booking_id')
+      .in('booking_id', bookingIds)
+      .in('cleaner_id', cleanerIds)
+
+    assignments = (assignData ?? []).map(a => {
+      const bk = bookingMap.get(a.booking_id)
+      return {
+        cleaner_id: a.cleaner_id,
+        booking_id: a.booking_id,
+        service_date: bk?.service_date ?? '',
+        booking_status: bk?.status ?? '',
+      }
+    })
+  }
+
+  return { dayOffs: dayOffs ?? [], assignments }
 }
 
 // ── Branch management ──────────────────────────────────────────────────────

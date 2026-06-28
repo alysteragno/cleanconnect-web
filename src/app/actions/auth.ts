@@ -1,10 +1,20 @@
 'use server'
 
 import { redirect } from 'next/navigation'
-import { cookies } from 'next/headers'
+import { cookies, headers } from 'next/headers'
 import { createClient, createAdminClient } from '@/utils/supabase/server'
+import { getRateLimitBlock, recordLoginFailure, clearLoginFailures } from '@/utils/rate-limit'
 
-export type AuthState = { error: string } | undefined
+export type AuthState = { error: string; remainingAttempts?: number } | undefined
+
+async function getClientIp(): Promise<string> {
+  const h = await headers()
+  return (
+    h.get('x-forwarded-for')?.split(',')[0].trim() ??
+    h.get('x-real-ip') ??
+    'unknown'
+  )
+}
 
 const ROLE_ROUTES: Record<string, string> = {
   super_admin: '/admin',
@@ -19,10 +29,30 @@ export async function login(state: AuthState, formData: FormData): Promise<AuthS
 
   if (!email || !password) return { error: 'Email and password are required.' }
 
+  const ip = await getClientIp()
+  const rateLimitKey = `login:${ip}`
+
+  const blocked = getRateLimitBlock(rateLimitKey)
+  if (blocked > 0) {
+    const minutes = Math.ceil(blocked / 60)
+    return { error: `Too many failed attempts. Please try again in ${minutes} minute${minutes !== 1 ? 's' : ''}.` }
+  }
+
   const supabase = await createClient()
   const { data, error } = await supabase.auth.signInWithPassword({ email, password })
 
-  if (error) return { error: error.message }
+  if (error) {
+    const result = recordLoginFailure(rateLimitKey)
+    if (result.lockedFor) {
+      const minutes = Math.ceil(result.lockedFor / 60)
+      return { error: `Too many failed attempts. Please try again in ${minutes} minute${minutes !== 1 ? 's' : ''}.` }
+    }
+    const WARN_THRESHOLD = 3
+    if (result.remaining !== undefined && result.remaining <= WARN_THRESHOLD) {
+      return { error: 'Invalid email or password.', remainingAttempts: result.remaining }
+    }
+    return { error: 'Invalid email or password.' }
+  }
 
   const adminClient = createAdminClient()
   const { data: profile } = await adminClient
@@ -42,6 +72,8 @@ export async function login(state: AuthState, formData: FormData): Promise<AuthS
     await supabase.auth.signOut()
     return { error: 'Please use the mobile app to sign in.' }
   }
+
+  clearLoginFailures(rateLimitKey)
 
   const cookieStore = await cookies()
   cookieStore.set('cleanconnect-role', role, {

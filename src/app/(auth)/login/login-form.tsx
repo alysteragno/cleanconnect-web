@@ -42,7 +42,14 @@ export default function LoginForm() {
 
       {state?.error && (
         <div className="px-4 py-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
-          {state.error}
+          <p>{state.error}</p>
+          {state.remainingAttempts !== undefined && (
+            <p className="mt-1 font-medium">
+              {state.remainingAttempts === 0
+                ? 'This was your last attempt.'
+                : `${state.remainingAttempts} attempt${state.remainingAttempts !== 1 ? 's' : ''} remaining before lockout.`}
+            </p>
+          )}
         </div>
       )}
 

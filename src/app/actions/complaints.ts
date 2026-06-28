@@ -60,7 +60,7 @@ export async function fileComplaint(
 export async function sendComplaintMessage(
   complaintId: string,
   message: string
-): Promise<{ error?: string } | undefined> {
+): Promise<{ error?: string; message?: { id: string; message: string; created_at: string; sender_id: string } } | undefined> {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Unauthorized.' }
@@ -75,6 +75,16 @@ export async function sendComplaintMessage(
     .insert({ complaint_id: complaintId, sender_id: user.id, message })
 
   if (error) return { error: error.message }
+
+  // Fetch the just-inserted row so the client can optimistically update without a reload
+  const { data: newMsg } = await admin
+    .from('complaint_messages')
+    .select('id, message, created_at, sender_id')
+    .eq('complaint_id', complaintId)
+    .eq('sender_id', user.id)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
 
   const { data: complaint } = await admin
     .from('complaints')
@@ -105,6 +115,8 @@ export async function sendComplaintMessage(
       }
     }
   }
+
+  return { message: newMsg ?? undefined }
 }
 
 export async function updateComplaintStatus(

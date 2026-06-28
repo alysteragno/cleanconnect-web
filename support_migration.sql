@@ -46,5 +46,9 @@ CREATE POLICY "dm_staff_access"
   USING  (auth_user_role() IN ('super_admin', 'branch_manager'))
   WITH CHECK (auth_user_role() IN ('super_admin', 'branch_manager'));
 
--- Allow real-time subscriptions on this table.
-ALTER PUBLICATION supabase_realtime ADD TABLE direct_messages;
+-- Allow real-time subscriptions on this table (idempotent).
+DO $$
+BEGIN
+  ALTER PUBLICATION supabase_realtime ADD TABLE direct_messages;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;

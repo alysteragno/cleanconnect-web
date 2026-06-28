@@ -166,3 +166,13 @@ export function IconHeadset({ className }: IconProps) {
     </svg>
   )
 }
+
+export function IconLayers({ className }: IconProps) {
+  return (
+    <svg {...props} className={`${base} ${className ?? ''}`}>
+      <path d="M8 1.5l6 3-6 3-6-3 6-3z" />
+      <path d="M2 7.5l6 3 6-3" />
+      <path d="M2 11l6 3 6-3" />
+    </svg>
+  )
+}

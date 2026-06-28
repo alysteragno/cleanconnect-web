@@ -2,6 +2,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import MarketingHeader from '@/components/marketing/header'
 import MarketingFooter from '@/components/marketing/footer'
+import AnnouncementCarousel from '@/components/marketing/announcement-carousel'
 import { SERVICES, BRANCH, STEPS } from '@/lib/marketing-data'
 import { createClient } from '@/utils/supabase/server'
 
@@ -9,11 +10,11 @@ export default async function HomePage() {
   const supabase = await createClient()
   const { data } = await supabase
     .from('announcements')
-    .select('id, title, body')
+    .select('id, title, body, created_at')
     .eq('is_active', true)
     .order('created_at', { ascending: false })
 
-  const announcements = (data ?? []) as { id: string; title: string; body: string | null }[]
+  const announcements = (data ?? []) as { id: string; title: string; body: string | null; created_at: string }[]
   return (
     <div className="min-h-screen bg-white">
       <MarketingHeader />
@@ -67,28 +68,8 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {/* Announcements */}
-      {announcements.length > 0 && (
-        <section className="bg-white py-8 sm:py-10">
-          <div className="max-w-6xl mx-auto px-4 sm:px-6 space-y-3">
-            {announcements.map((a) => (
-              <div
-                key={a.id}
-                className="flex items-start gap-3 bg-pink-50 border border-pink-200 rounded-xl px-5 py-4"
-              >
-                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-pink-600 shrink-0 mt-0.5">
-                  <path d="M2 6v4h2.5L10 13V3L4.5 6H2z" />
-                  <path d="M12 5.5a3 3 0 010 5" />
-                </svg>
-                <div>
-                  <p className="text-sm font-semibold text-pink-900">{a.title}</p>
-                  {a.body && <p className="text-xs text-pink-700 mt-0.5 leading-relaxed">{a.body}</p>}
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
+      {/* Announcements — horizontal carousel, newest first */}
+      <AnnouncementCarousel items={announcements} />
 
       {/* Services */}
       <section id="services" className="bg-gray-50 py-16 sm:py-20">

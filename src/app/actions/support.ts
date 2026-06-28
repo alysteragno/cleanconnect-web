@@ -7,7 +7,7 @@ import { createNotification } from './notifications'
 export async function sendSupportMessage(
   customerId: string,
   message: string
-): Promise<{ error?: string } | undefined> {
+): Promise<{ error?: string; message?: { id: string; message: string; created_at: string; sender_id: string } } | undefined> {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Not authenticated.' }
@@ -15,13 +15,21 @@ export async function sendSupportMessage(
 
   const adminClient = createAdminClient()
 
-  const { error } = await adminClient.from('direct_messages').insert({
-    customer_id: customerId,
-    sender_id: user.id,
-    message: message.trim(),
-  })
+  const { error } = await adminClient
+    .from('direct_messages')
+    .insert({ customer_id: customerId, sender_id: user.id, message: message.trim() })
 
   if (error) return { error: error.message }
+
+  // Fetch the just-inserted row so the client can optimistically update without a reload
+  const { data: newMsg } = await adminClient
+    .from('direct_messages')
+    .select('id, message, created_at, sender_id')
+    .eq('customer_id', customerId)
+    .eq('sender_id', user.id)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
 
   // Notify admins only when the sender is the customer (not when staff replies)
   if (user.id === customerId) {
@@ -47,4 +55,6 @@ export async function sendSupportMessage(
 
   revalidatePath('/customer/support')
   revalidatePath(`/admin/support/${customerId}`)
+
+  return { message: newMsg ?? undefined }
 }

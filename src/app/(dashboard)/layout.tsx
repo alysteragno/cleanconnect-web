@@ -9,7 +9,7 @@ import { SidebarNav } from '@/components/dashboard/sidebar-nav'
 import { DashboardShell } from '@/components/dashboard/dashboard-shell'
 import {
   IconDashboard, IconCalendar, IconUsers, IconChat, IconStar,
-  IconChart, IconSettings, IconSignOut, IconChevronRight, IconMegaphone, IconHeadset,
+  IconChart, IconSettings, IconSignOut, IconChevronRight, IconMegaphone, IconHeadset, IconLayers,
 } from '@/components/icons'
 
 const ADMIN_NAV = [
@@ -29,6 +29,7 @@ const ADMIN_NAV = [
       { href: '/admin/support',       label: 'Support Chat',  icon: <IconHeadset /> },
       { href: '/admin/feedback',      label: 'Feedback',      icon: <IconStar /> },
       { href: '/admin/announcements', label: 'Announcements', icon: <IconMegaphone /> },
+      { href: '/admin/services',      label: 'Services',      icon: <IconLayers /> },
     ],
   },
   {

@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { createClient } from '@/utils/supabase/server'
+import { createAdminClient } from '@/utils/supabase/server'
 import { StatCard } from '@/components/ui/stat-card'
 import {
   IconCalendar, IconClock, IconCheck, IconUsers, IconChart,
@@ -20,13 +20,12 @@ const PAYMENT_STYLES: Record<string, string> = {
   partial: 'bg-blue-50 text-blue-700',
 }
 
-const SERVICE_LABELS: Record<string, string> = {
-  general:           'General',
-  premium_mattress:  'Mattress',
-  complete:          'Complete',
-  disinfection:      'Disinfection',
-  post_construction: 'Post-Construction',
+const PAYMENT_LABELS: Record<string, string> = {
+  paid:    'Paid',
+  unpaid:  'Processing Payment',
+  partial: 'Partial',
 }
+
 
 function formatDate(d: string) {
   return new Date(d + 'T00:00:00').toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })
@@ -94,7 +93,7 @@ function QuickActionCard({
 // ─── Page ────────────────────────────────────────────────────────────────────
 
 export default async function AdminPage() {
-  const supabase = await createClient()
+  const supabase = createAdminClient()
   const today   = new Date().toISOString().split('T')[0]
   const hour    = new Date().getHours()
   const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening'
@@ -114,7 +113,7 @@ export default async function AdminPage() {
     supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('role', 'cleaner').eq('is_active', true),
     supabase
       .from('bookings')
-      .select('id, service_date, service_time, service_type, property_sqm, base_price, status, payment_status, profiles!customer_id (full_name)')
+      .select('id, service_date, service_time, service_name, property_sqm, base_price, status, payment_status, profiles!customer_id (full_name)')
       .order('created_at', { ascending: false })
       .limit(8),
   ])
@@ -123,7 +122,7 @@ export default async function AdminPage() {
     id: string
     service_date: string
     service_time: string
-    service_type: string
+    service_name: string | null
     property_sqm: number
     base_price: number
     status: string
@@ -223,14 +222,14 @@ export default async function AdminPage() {
                         </span>
                       </div>
                       <p className="text-xs text-gray-400 mt-0.5 truncate">
-                        {SERVICE_LABELS[b.service_type] ?? 'Cleaning'} · {b.property_sqm} sqm · {formatDate(b.service_date)} at {formatTime(b.service_time)}
+                        {b.service_name ?? 'Cleaning'} · {b.property_sqm} sqm · {formatDate(b.service_date)} at {formatTime(b.service_time)}
                       </p>
                     </div>
 
                     <div className="text-right shrink-0 ml-2">
                       <p className="text-sm font-bold text-gray-900">₱{Number(b.base_price).toLocaleString()}</p>
-                      <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold capitalize ${PAYMENT_STYLES[b.payment_status] ?? 'bg-gray-100 text-gray-500'}`}>
-                        {b.payment_status}
+                      <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${PAYMENT_STYLES[b.payment_status] ?? 'bg-gray-100 text-gray-500'}`}>
+                        {PAYMENT_LABELS[b.payment_status] ?? b.payment_status}
                       </span>
                     </div>
 

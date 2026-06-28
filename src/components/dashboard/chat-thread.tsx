@@ -11,7 +11,7 @@ interface Props {
   channelName: string
   subscriptionTable: string
   subscriptionFilter: string
-  onSend: (message: string) => Promise<{ error?: string } | undefined>
+  onSend: (message: string) => Promise<{ error?: string; message?: ChatMessage } | undefined>
   isLocked?: boolean
   lockedMessage?: string
   emptyStateHint?: string
@@ -42,22 +42,53 @@ export function ChatThread({
 
   useEffect(() => {
     const supabase = createClient()
-    const channel = supabase
-      .channel(channelName)
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: subscriptionTable, filter: subscriptionFilter },
-        async (payload) => {
-          const { data } = await supabase
-            .from(subscriptionTable)
-            .select('id, message, created_at, sender_id')
-            .eq('id', payload.new.id)
-            .single()
-          if (data) setMessages((prev) => [...prev, data as unknown as ChatMessage])
-        }
-      )
-      .subscribe()
-    return () => { supabase.removeChannel(channel) }
+    let mounted = true
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let channel: any
+
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!mounted) return
+
+      // Set the JWT on the realtime socket BEFORE subscribing.
+      // Without this, createBrowserClient can connect the WebSocket before the
+      // auth token is applied, causing Supabase to silently reject events on
+      // RLS-protected tables.
+      if (session?.access_token) {
+        supabase.realtime.setAuth(session.access_token)
+      }
+
+      channel = supabase
+        .channel(channelName)
+        .on(
+          'postgres_changes',
+          { event: 'INSERT', schema: 'public', table: subscriptionTable, filter: subscriptionFilter },
+          (payload) => {
+            const incoming = payload.new as unknown as ChatMessage
+            setMessages((prev) => {
+              if (prev.some((m) => m.id === incoming.id)) return prev
+              // Replace the matching optimistic entry with the confirmed DB row
+              const optIdx = prev.findIndex(
+                (m) =>
+                  m.id.startsWith('opt-') &&
+                  m.sender_id === incoming.sender_id &&
+                  m.message === incoming.message
+              )
+              if (optIdx !== -1) {
+                const next = [...prev]
+                next[optIdx] = incoming
+                return next
+              }
+              return [...prev, incoming]
+            })
+          }
+        )
+        .subscribe()
+    })
+
+    return () => {
+      mounted = false
+      if (channel) supabase.removeChannel(channel)
+    }
   }, [channelName, subscriptionTable, subscriptionFilter])
 
   async function handleSend() {
@@ -65,12 +96,33 @@ export function ChatThread({
     if (!trimmed) return
     setPending(true)
     setError('')
+
+    // Optimistic update — appears immediately for the sender
+    const tempId = `opt-${Date.now()}`
+    const optimistic: ChatMessage = {
+      id: tempId,
+      message: trimmed,
+      sender_id: currentUserId,
+      created_at: new Date().toISOString(),
+    }
+    setMessages((prev) => [...prev, optimistic])
+    setText('')
+    if (textareaRef.current) textareaRef.current.style.height = 'auto'
+
     const result = await onSend(trimmed)
     if (result?.error) {
       setError(result.error)
-    } else {
-      setText('')
-      if (textareaRef.current) textareaRef.current.style.height = 'auto'
+      setText(trimmed)
+      setMessages((prev) => prev.filter((m) => m.id !== tempId))
+    } else if (result?.message) {
+      // Server returned the confirmed row — replace optimistic immediately
+      // (postgres_changes may also fire and will deduplicate via the ID check)
+      setMessages((prev) => {
+        const next = [...prev]
+        const idx = next.findIndex((m) => m.id === tempId)
+        if (idx !== -1) next[idx] = result.message!
+        return next
+      })
     }
     setPending(false)
   }
@@ -81,8 +133,8 @@ export function ChatThread({
     el.style.height = `${Math.min(el.scrollHeight, 120)}px`
   }
 
-  const grouped       = groupMessagesByDay(messages)
-  const defaultHint   = isStaff ? 'Reply to start the conversation.' : 'Type a message to get started.'
+  const grouped     = groupMessagesByDay(messages)
+  const defaultHint = isStaff ? 'Reply to start the conversation.' : 'Type a message to get started.'
 
   return (
     <div className="flex flex-col h-full bg-gray-50">
@@ -107,12 +159,12 @@ export function ChatThread({
                 </div>
 
                 {msgs.map((msg, i) => {
-                  const isOwn           = msg.sender_id === currentUserId
-                  const senderLabel     = isStaff
+                  const isOwn          = msg.sender_id === currentUserId
+                  const senderLabel    = isStaff
                     ? (isOwn ? null : msg.profiles?.full_name ?? 'Customer')
                     : (isOwn ? null : 'Support')
-                  const isFirstInGroup  = i === 0 || msgs[i - 1].sender_id !== msg.sender_id
-                  const isLastInGroup   = i === msgs.length - 1 || msgs[i + 1].sender_id !== msg.sender_id
+                  const isFirstInGroup = i === 0 || msgs[i - 1].sender_id !== msg.sender_id
+                  const isLastInGroup  = i === msgs.length - 1 || msgs[i + 1].sender_id !== msg.sender_id
 
                   return (
                     <div
