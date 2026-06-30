@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation'
 import { createClient } from '@/utils/supabase/server'
 import CleanerEditForm, { type Cleaner } from './cleaner-edit-form'
 import AvailabilityPanel from './availability-panel'
+import DayOffReviewPanel from './day-off-review-panel'
 
 type UpcomingAssignment = {
   booking_id: string
@@ -36,8 +37,14 @@ export default async function CleanerDetailPage({ params }: { params: Promise<{ 
   const supabase = await createClient()
   const today = new Date().toISOString().split('T')[0]
 
-  const [{ data: cleaner }, { count: jobsDone }, { data: dayOffRows }, { data: upcomingRows }] = await Promise.all([
-    supabase.from('profiles').select('id, full_name, phone, is_active, created_at, address_street, address_city, address_province, date_of_birth, emergency_contact_name, emergency_contact_phone').eq('id', id).eq('role', 'cleaner').single(),
+  const [
+    { data: cleaner },
+    { count: jobsDone },
+    { data: dayOffRows },
+    { data: upcomingRows },
+    { data: pendingRequestRows },
+  ] = await Promise.all([
+    supabase.from('profiles').select('id, full_name, phone, is_active, created_at, address_street, address_city, address_province, date_of_birth, emergency_contact_name, emergency_contact_phone, home_lat, home_lng').eq('id', id).eq('role', 'cleaner').single(),
     supabase.from('cleaner_assignments').select('*', { count: 'exact', head: true }).eq('cleaner_id', id).eq('status', 'completed'),
     supabase.from('cleaner_availability').select('id, unavailable_date').eq('cleaner_id', id).order('unavailable_date'),
     supabase
@@ -48,6 +55,13 @@ export default async function CleanerDetailPage({ params }: { params: Promise<{ 
       .gte('bookings.service_date', today)
       .order('bookings.service_date', { ascending: true })
       .limit(10),
+    supabase
+      .from('cleaner_day_off_requests')
+      .select('id, requested_date, reason, created_at')
+      .eq('cleaner_id', id)
+      .eq('status', 'pending')
+      .gte('requested_date', today)
+      .order('requested_date', { ascending: true }),
   ])
 
   if (!cleaner) notFound()
@@ -56,6 +70,9 @@ export default async function CleanerDetailPage({ params }: { params: Promise<{ 
   const dayOffs = (dayOffRows ?? []) as { id: string; unavailable_date: string }[]
   const upcoming = (upcomingRows ?? []) as unknown as UpcomingAssignment[]
   const activeSchedule = upcoming.filter((a) => a.bookings != null)
+  const pendingRequests = (pendingRequestRows ?? []) as {
+    id: string; requested_date: string; reason: string | null; created_at: string
+  }[]
 
   return (
     <div className="max-w-2xl space-y-6">
@@ -115,6 +132,24 @@ export default async function CleanerDetailPage({ params }: { params: Promise<{ 
             ))}
           </div>
         )}
+      </div>
+
+      {/* Pending Day-Off Requests */}
+      <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm font-semibold text-gray-900">Day-Off Requests</p>
+            <p className="text-xs text-gray-500 mt-0.5">
+              Pending requests submitted by this cleaner.
+            </p>
+          </div>
+          {pendingRequests.length > 0 && (
+            <span className="text-xs bg-yellow-50 text-yellow-700 border border-yellow-200 px-2 py-0.5 rounded-full font-medium">
+              {pendingRequests.length} pending
+            </span>
+          )}
+        </div>
+        <DayOffReviewPanel requests={pendingRequests} />
       </div>
 
       {/* Availability Management */}

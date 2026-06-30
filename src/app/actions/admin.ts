@@ -94,6 +94,10 @@ export async function updateCleanerProfile(
   const date_of_birth            = (formData.get('date_of_birth') as string)?.trim() || null
   const emergency_contact_name   = (formData.get('emergency_contact_name') as string)?.trim() || null
   const emergency_contact_phone  = (formData.get('emergency_contact_phone') as string)?.trim() || null
+  const home_lat_raw = (formData.get('home_lat') as string)?.trim()
+  const home_lng_raw = (formData.get('home_lng') as string)?.trim()
+  const home_lat = home_lat_raw && !isNaN(parseFloat(home_lat_raw)) ? parseFloat(home_lat_raw) : undefined
+  const home_lng = home_lng_raw && !isNaN(parseFloat(home_lng_raw)) ? parseFloat(home_lng_raw) : undefined
   if (!full_name) return { error: 'Name is required.' }
 
   const { error } = await supabase
@@ -107,6 +111,7 @@ export async function updateCleanerProfile(
       date_of_birth,
       emergency_contact_name,
       emergency_contact_phone,
+      ...(home_lat !== undefined && home_lng !== undefined ? { home_lat, home_lng } : {}),
     })
     .eq('id', cleaner_id)
 
@@ -179,6 +184,19 @@ export async function updatePaymentStatus(
   const valid = ['unpaid', 'partial', 'paid', 'refunded']
   if (!valid.includes(payment_status)) return { error: 'Invalid payment status.' }
 
+  // Cash payments are confirmed by the cleaner via the mobile app swipe — block web override
+  if (payment_status === 'paid') {
+    const { data: booking } = await supabase
+      .from('bookings')
+      .select('payment_method')
+      .eq('id', booking_id)
+      .single()
+
+    if (booking?.payment_method === 'cash') {
+      return { error: 'Cash payments are confirmed by the cleaner via the mobile app.' }
+    }
+  }
+
   const { error } = await supabase
     .from('bookings')
     .update({ payment_status })
@@ -239,29 +257,51 @@ export async function dispatchCleaners(
 
   if (error) return { error: error.message }
 
+  // Confirm the booking and fetch date + customer for notifications
   const { data: booking } = await admin
     .from('bookings')
-    .select('service_date')
+    .select('service_date, customer_id, status')
     .eq('id', bookingId)
     .single()
+
+  const wasAlreadyConfirmed = booking?.status === 'confirmed'
+
+  await admin
+    .from('bookings')
+    .update({ status: 'confirmed' })
+    .eq('id', bookingId)
 
   const dateStr = booking?.service_date
     ? new Date(booking.service_date).toLocaleDateString('en-PH', { month: 'short', day: 'numeric' })
     : 'an upcoming date'
 
-  await Promise.all(
-    cleanerIds.map((cleanerId) =>
+  const notifications: Promise<void>[] = cleanerIds.map((cleanerId) =>
+    createNotification({
+      userId: cleanerId,
+      title: 'Job Assignment',
+      body: `You have been assigned a cleaning job on ${dateStr}.`,
+      type: 'job_assigned',
+      bookingId,
+    })
+  )
+
+  if (!wasAlreadyConfirmed && booking?.customer_id) {
+    notifications.push(
       createNotification({
-        userId: cleanerId,
-        title: 'Job Assignment',
-        body: `You have been assigned a cleaning job on ${dateStr}.`,
-        type: 'job_assigned',
+        userId: booking.customer_id,
+        title: 'Booking Confirmed',
+        body: `Your cleaning appointment on ${dateStr} has been confirmed!`,
+        type: 'booking_confirmed',
         bookingId,
       })
     )
-  )
+  }
 
+  await Promise.all(notifications)
+
+  revalidatePath('/admin/bookings')
   revalidatePath(`/admin/bookings/${bookingId}`)
+  revalidatePath('/admin')
   return { success: `${cleanerIds.length} cleaner(s) assigned.` }
 }
 
@@ -323,6 +363,7 @@ export async function forceAssignCleaner(
     ])
   }
 
+  revalidatePath('/admin/bookings')
   revalidatePath(`/admin/bookings/${bookingId}`)
   revalidatePath('/admin')
   redirect(`/admin/bookings/${bookingId}`)
@@ -425,6 +466,34 @@ export async function adjustBookingAmount(
   revalidatePath('/admin/bookings')
   revalidatePath('/admin')
   return { success: `Billing updated to ₱${amount.toLocaleString('en-PH', { minimumFractionDigits: 2 })}.` }
+}
+
+// ── Cleaners required override ────────────────────────────────────────────
+
+export async function updateRequiredCleaners(
+  state: AdminActionState,
+  formData: FormData
+): Promise<AdminActionState> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user || !(await assertSuperAdmin(supabase, user.id))) return { error: 'Unauthorized.' }
+
+  const booking_id = formData.get('booking_id') as string
+  const raw = formData.get('required_cleaners') as string
+  const count = parseInt(raw, 10)
+
+  if (!booking_id) return { error: 'Missing booking.' }
+  if (isNaN(count) || count < 1) return { error: 'Enter a valid number of cleaners.' }
+
+  const { error } = await supabase
+    .from('bookings')
+    .update({ required_cleaners: count })
+    .eq('id', booking_id)
+
+  if (error) return { error: error.message }
+
+  revalidatePath(`/admin/bookings/${booking_id}`)
+  return { success: `Cleaners required updated to ${count}.` }
 }
 
 // ── Cleaner availability override ─────────────────────────────────────────

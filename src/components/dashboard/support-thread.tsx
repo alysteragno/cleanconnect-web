@@ -21,8 +21,10 @@ export default function SupportThread({
       currentUserId={currentUserId}
       isStaff={isStaff}
       channelName={`support-${customerId}`}
-      subscriptionTable="direct_messages"
-      subscriptionFilter={`customer_id=eq.${customerId}`}
+      subscriptions={[
+        { table: 'admin_messages',  filter: `customer_id=eq.${customerId}` },
+        { table: 'direct_messages', filter: `customer_id=eq.${customerId}` },
+      ]}
       onSend={(msg) => sendSupportMessage(customerId, msg)}
       emptyStateHint={isStaff ? 'Reply to start the conversation.' : 'Send a message and our team will respond shortly.'}
     />

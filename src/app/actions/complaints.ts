@@ -68,17 +68,20 @@ export async function sendComplaintMessage(
   const { data: profile } = await supabase
     .from('profiles').select('role').eq('id', user.id).single()
 
+  const isStaff = profile?.role === 'super_admin'
+  const table   = isStaff ? 'staff_complaint_messages' : 'complaint_messages'
+
   const admin = createAdminClient()
 
   const { error } = await admin
-    .from('complaint_messages')
+    .from(table)
     .insert({ complaint_id: complaintId, sender_id: user.id, message })
 
   if (error) return { error: error.message }
 
   // Fetch the just-inserted row so the client can optimistically update without a reload
   const { data: newMsg } = await admin
-    .from('complaint_messages')
+    .from(table)
     .select('id, message, created_at, sender_id')
     .eq('complaint_id', complaintId)
     .eq('sender_id', user.id)
@@ -93,7 +96,6 @@ export async function sendComplaintMessage(
     .single()
 
   if (complaint) {
-    const isStaff = ['super_admin', 'branch_manager'].includes(profile?.role ?? '')
     if (isStaff) {
       await createNotification({
         userId: complaint.customer_id,

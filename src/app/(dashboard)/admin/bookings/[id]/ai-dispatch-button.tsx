@@ -1,8 +1,11 @@
 'use client'
 
 import { useActionState } from 'react'
+import dynamic from 'next/dynamic'
 import { previewAIDispatch, confirmAIDispatch, type PreviewState, type ConfirmState } from '@/app/actions/ai-dispatch'
 import type { RankedCleaner } from '@/lib/ai-assignment'
+
+const DispatchMap = dynamic(() => import('./dispatch-map'), { ssr: false })
 
 function NetworkIcon({ className }: { className?: string }) {
   return (
@@ -29,13 +32,20 @@ function PreviewPanel({
   ranked,
   reasoning,
   bookingId,
+  serviceDate,
+  bookingLat,
+  bookingLng,
   onDiscard,
 }: {
   ranked: RankedCleaner[]
   reasoning: string[]
   bookingId: string
+  serviceDate: string
+  bookingLat: number | null
+  bookingLng: number | null
   onDiscard: () => void
 }) {
+  const formattedDate = new Date(serviceDate + 'T00:00:00').toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })
   const [confirmState, confirmAction, confirmPending] = useActionState<ConfirmState, FormData>(
     confirmAIDispatch,
     undefined
@@ -43,6 +53,7 @@ function PreviewPanel({
 
   const toDispatch = ranked.filter((c) => c.dispatched)
   const skipped    = ranked.filter((c) => !c.dispatched)
+  const topCleaner = toDispatch[0] ?? null
 
   if (confirmState && 'dispatched' in confirmState) {
     return <SuccessPanel dispatched={confirmState.dispatched} reasoning={reasoning} onRerun={onDiscard} />
@@ -56,7 +67,7 @@ function PreviewPanel({
         <NetworkIcon className="w-4 h-4 text-gray-500 shrink-0" />
         <p className="text-sm font-semibold text-gray-900">AI Recommendation</p>
         <span className="ml-auto text-[11px] bg-gray-100 text-gray-600 px-2.5 py-0.5 rounded-full font-semibold shrink-0">
-          {toDispatch.length} offer{toDispatch.length !== 1 ? 's' : ''} proposed
+          {toDispatch.length} cleaner{toDispatch.length !== 1 ? 's' : ''} proposed
         </span>
       </div>
 
@@ -73,7 +84,7 @@ function PreviewPanel({
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-semibold text-gray-900 truncate">{c.fullName}</p>
-                <div className="flex items-center gap-2 mt-0.5">
+                <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                   {c.avgRating != null && (
                     <span className="flex items-center gap-0.5 text-[11px] text-amber-600 font-medium">
                       <StarIcon className="w-3 h-3" />
@@ -81,8 +92,13 @@ function PreviewPanel({
                     </span>
                   )}
                   <span className="text-[11px] text-gray-400">
-                    {c.workloadScore} job{c.workloadScore !== 1 ? 's' : ''} today
+                    {c.workloadScore} job{c.workloadScore !== 1 ? 's' : ''} on {formattedDate}
                   </span>
+                  {c.distanceKm != null && (
+                    <span className="text-[11px] text-gray-400">
+                      · {c.distanceKm.toFixed(1)} km away
+                    </span>
+                  )}
                 </div>
               </div>
               <span className="text-[11px] font-bold text-gray-400">#{c.rank}</span>
@@ -100,6 +116,17 @@ function PreviewPanel({
         <p className="text-[11px] text-gray-400">
           +{skipped.length} other cleaner{skipped.length !== 1 ? 's' : ''} evaluated but not selected (ranked lower).
         </p>
+      )}
+
+      {/* Proximity map */}
+      {bookingLat != null && bookingLng != null && (
+        <DispatchMap
+          bookingLat={bookingLat}
+          bookingLng={bookingLng}
+          departureLat={topCleaner?.departureLat ?? null}
+          departureLng={topCleaner?.departureLng ?? null}
+          departureSource={topCleaner?.departureSource ?? null}
+        />
       )}
 
       {/* Reasoning */}
@@ -154,10 +181,10 @@ function PreviewPanel({
               {confirmPending ? (
                 <>
                   <span className="w-4 h-4 border-2 border-white/25 border-t-white rounded-full animate-spin" />
-                  Sending offers...
+                  Assigning...
                 </>
               ) : (
-                `Confirm & Send ${toDispatch.length} Offer${toDispatch.length !== 1 ? 's' : ''}`
+                `Confirm & Assign ${toDispatch.length} Cleaner${toDispatch.length !== 1 ? 's' : ''}`
               )}
             </button>
           </form>
@@ -186,7 +213,7 @@ function SuccessPanel({
           <NetworkIcon className="w-4 h-4 text-gray-600 shrink-0" />
           <p className="text-sm font-semibold text-gray-900">Dispatch Complete</p>
           <span className="ml-auto text-[11px] bg-gray-900 text-white px-2.5 py-0.5 rounded-full font-semibold shrink-0">
-            {dispatched} {dispatched === 1 ? 'offer' : 'offers'} sent
+            {dispatched} cleaner{dispatched !== 1 ? 's' : ''} assigned
           </span>
         </div>
         <ol className="space-y-2">
@@ -218,7 +245,7 @@ function SuccessPanel({
 
 // ── Main component ────────────────────────────────────────────────────────────
 
-export default function AIDispatchButton({ bookingId, disabled = false }: { bookingId: string; disabled?: boolean }) {
+export default function AIDispatchButton({ bookingId, serviceDate, disabled = false }: { bookingId: string; serviceDate: string; disabled?: boolean }) {
   const [previewState, previewAction, previewPending] = useActionState<PreviewState, FormData>(
     previewAIDispatch,
     undefined
@@ -240,6 +267,9 @@ export default function AIDispatchButton({ bookingId, disabled = false }: { book
         ranked={previewState.ranked}
         reasoning={previewState.reasoning}
         bookingId={bookingId}
+        serviceDate={serviceDate}
+        bookingLat={previewState.bookingLat}
+        bookingLng={previewState.bookingLng}
         onDiscard={handleDiscard}
       />
     )

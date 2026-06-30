@@ -17,7 +17,7 @@ export default function ComplaintThread({
   currentUserRole: string
   complaintStatus: string
 }) {
-  const isStaff  = ['super_admin', 'branch_manager'].includes(currentUserRole)
+  const isStaff  = currentUserRole === 'super_admin'
   const isClosed = complaintStatus === 'resolved'
 
   return (
@@ -26,8 +26,10 @@ export default function ComplaintThread({
       currentUserId={currentUserId}
       isStaff={isStaff}
       channelName={`complaint-${complaintId}`}
-      subscriptionTable="complaint_messages"
-      subscriptionFilter={`complaint_id=eq.${complaintId}`}
+      subscriptions={[
+        { table: 'complaint_messages',       filter: `complaint_id=eq.${complaintId}` },
+        { table: 'staff_complaint_messages', filter: `complaint_id=eq.${complaintId}` },
+      ]}
       onSend={(msg) => sendComplaintMessage(complaintId, msg)}
       isLocked={isClosed}
       lockedMessage="This complaint has been resolved and closed. Contact us to open a new one."

@@ -17,22 +17,30 @@ const ASSIGNMENT_META: Record<string, { badge: string; dot: string; label: strin
 
 // ── Date helpers ─────────────────────────────────────────────────────────────
 
+function toLocalDateStr(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
 function getWeekStart(dateStr: string): string {
   const d = new Date(dateStr + 'T00:00:00')
   const day = d.getDay()
   const diff = day === 0 ? -6 : 1 - day
   d.setDate(d.getDate() + diff)
-  return d.toISOString().slice(0, 10)
+  return toLocalDateStr(d)
 }
 
 function addDays(dateStr: string, n: number): string {
   const d = new Date(dateStr + 'T00:00:00')
   d.setDate(d.getDate() + n)
-  return d.toISOString().slice(0, 10)
+  return toLocalDateStr(d)
 }
 
-function fmtShort(dateStr: string) {
-  return new Date(dateStr + 'T00:00:00').toLocaleDateString('en-PH', { month: 'short', day: 'numeric' })
+function fmtShort(dateStr: string, includeYear = false) {
+  return new Date(dateStr + 'T00:00:00').toLocaleDateString('en-PH', {
+    month: 'short',
+    day: 'numeric',
+    ...(includeYear ? { year: 'numeric' } : {}),
+  })
 }
 
 const DAY_ABBR = ['M', 'T', 'W', 'T', 'F', 'S', 'S']
@@ -119,6 +127,7 @@ function CleanerScheduleCalendar({
       .catch(()   => { if (mountedRef.current) setIsLoading(false) })
   }, [weekStart, cleaners])
 
+  const today = toLocalDateStr(new Date())
   const days = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i))
 
   const dayOffSet = new Set(
@@ -133,7 +142,7 @@ function CleanerScheduleCalendar({
 
   const weekEnd         = addDays(weekStart, 6)
   const serviceDayOfWeek = new Date(serviceDate + 'T00:00:00').getDay()
-  const serviceDayIsWeekend = serviceDayOfWeek === 0 || serviceDayOfWeek === 6
+  const serviceDayIsWeekend = serviceDayOfWeek === 0
 
   return (
     <div className="space-y-3">
@@ -150,7 +159,10 @@ function CleanerScheduleCalendar({
           </svg>
         </button>
         <span className="flex-1 text-center text-[11px] font-medium text-gray-500">
-          {fmtShort(weekStart)} – {fmtShort(weekEnd)}
+          {(() => {
+            const crossYear = new Date(weekStart + 'T00:00:00').getFullYear() !== new Date(weekEnd + 'T00:00:00').getFullYear()
+            return <>{fmtShort(weekStart, crossYear)} – {fmtShort(weekEnd, true)}</>
+          })()}
         </span>
         <button
           type="button"
@@ -176,7 +188,7 @@ function CleanerScheduleCalendar({
               {days.map((day, i) => {
                 const isServiceDay = day === serviceDate
                 const dayNum = new Date(day + 'T00:00:00').getDate()
-                const colIsWeekend = i === 5 || i === 6
+                const colIsWeekend = i === 6
                 return (
                   <th key={day} className={`w-8 text-center pb-2 relative`}>
                     {isServiceDay && (
@@ -220,7 +232,8 @@ function CleanerScheduleCalendar({
                   const isAlreadyAssigned = existingAssignmentIds.has(cleaner.id) && bookingIdsOnDay.includes(currentBookingId)
                   const hasOtherBooking   = bookingIdsOnDay.some(bid => bid !== currentBookingId)
                   const isSelected        = selectedIds.includes(cleaner.id)
-                  const colIsWeekend      = colIdx === 5 || colIdx === 6
+                  const colIsWeekend      = colIdx === 6
+                  const isPastDate        = day <= today
 
                   // Cell appearance — determined before service-day override
                   let cellBg = ''
@@ -251,6 +264,9 @@ function CleanerScheduleCalendar({
                     // Service day happens to be a weekend — show violet unless blocked
                     cellBg = allowWeekend ? 'bg-violet-50' : 'bg-violet-50/60'
                     dotEl = <span className="w-2 h-2 rounded-full bg-violet-300 block" />
+                  } else if (isPastDate) {
+                    cellBg = 'bg-gray-50'
+                    dotEl = <span className="w-1.5 h-1.5 rounded-full bg-gray-200 block" />
                   } else {
                     cellBg = 'bg-emerald-50'
                     dotEl = <span className="w-2 h-2 rounded-full bg-emerald-400 block" />
@@ -260,7 +276,7 @@ function CleanerScheduleCalendar({
                   if (isServiceDay) {
                     const isWeekendCell = colIdx === 5 || colIdx === 6
                     // Weekend cells need the toggle enabled; other blocks as usual
-                    const clickable = !isOff && !isAlreadyAssigned && (!isWeekendCell || allowWeekend)
+                    const clickable = !isOff && !isAlreadyAssigned && day >= today && (!isWeekendCell || allowWeekend)
                     const isActive  = isSelected && clickable
 
                     return (
@@ -384,132 +400,13 @@ function CleanerScheduleCalendar({
   )
 }
 
-// ── Custom animated cleaner selector ────────────────────────────────────────
-
-function CleanerDropdown({
-  cleaners,
-  value,
-  onChange,
-}: {
-  cleaners: Cleaner[]
-  value: string
-  onChange: (id: string) => void
-}) {
-  const [open, setOpen] = useState(false)
-  const containerRef = useRef<HTMLDivElement>(null)
-  const selected = cleaners.find((c) => c.id === value)
-
-  useEffect(() => {
-    function handleOutside(e: MouseEvent) {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        setOpen(false)
-      }
-    }
-    document.addEventListener('mousedown', handleOutside)
-    return () => document.removeEventListener('mousedown', handleOutside)
-  }, [])
-
-  return (
-    <div ref={containerRef} className="relative">
-
-      {/* Trigger button */}
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        className={`w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl border text-sm transition-all duration-150 bg-white ${
-          open
-            ? 'border-pink-400 ring-2 ring-pink-100 shadow-sm'
-            : 'border-gray-200 hover:border-gray-300 hover:shadow-sm'
-        }`}
-      >
-        {selected ? (
-          <>
-            <div className="w-7 h-7 rounded-full bg-pink-100 text-pink-600 text-[11px] font-bold flex items-center justify-center shrink-0 select-none">
-              {selected.full_name.charAt(0).toUpperCase()}
-            </div>
-            <div className="flex-1 min-w-0 text-left">
-              <p className="text-sm font-medium text-gray-900 truncate leading-none">
-                {selected.full_name}
-              </p>
-              {selected.phone && (
-                <p className="text-[11px] text-gray-400 mt-0.5 truncate">{selected.phone}</p>
-              )}
-            </div>
-          </>
-        ) : (
-          <>
-            <span className="flex-1 text-left text-sm p-2 text-gray-400">Select a cleaner</span>
-          </>
-        )}
-        <svg
-          className={`w-4 h-4 text-gray-400 shrink-0 transition-transform duration-200 ${open ? 'rotate-180' : ''}`}
-          fill="none" stroke="currentColor" viewBox="0 0 24 24"
-        >
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-        </svg>
-      </button>
-
-      {/* Dropdown panel */}
-      <div
-        className={`absolute z-30 left-0 right-0 mt-1.5 bg-white border border-gray-200 rounded-xl shadow-xl overflow-hidden transition-all duration-200 ease-out ${
-          open
-            ? 'opacity-100 translate-y-0 pointer-events-auto'
-            : 'opacity-0 -translate-y-2 pointer-events-none'
-        }`}
-      >
-        {cleaners.length === 0 ? (
-          <div className="px-4 py-6 text-center">
-            <p className="text-xs text-gray-400">No active cleaners available</p>
-          </div>
-        ) : (
-          <ul className="max-h-56 overflow-y-auto overscroll-contain py-1" role="listbox">
-            {cleaners.map((c) => {
-              const isSelected = value === c.id
-              return (
-                <li key={c.id} role="option" aria-selected={isSelected}>
-                  <button
-                    type="button"
-                    onClick={() => { onChange(c.id); setOpen(false) }}
-                    className={`w-full flex items-center gap-3 px-3.5 py-2.5 transition-colors duration-100 ${
-                      isSelected ? 'bg-pink-50' : 'hover:bg-gray-50'
-                    }`}
-                  >
-                    <div className={`w-8 h-8 rounded-full text-xs font-bold flex items-center justify-center shrink-0 select-none transition-colors ${
-                      isSelected ? 'bg-pink-600 text-white' : 'bg-gray-100 text-gray-600'
-                    }`}>
-                      {c.full_name.charAt(0).toUpperCase()}
-                    </div>
-                    <div className="flex-1 min-w-0 text-left">
-                      <p className={`text-sm font-medium truncate ${isSelected ? 'text-pink-700' : 'text-gray-900'}`}>
-                        {c.full_name}
-                      </p>
-                      {c.phone && (
-                        <p className="text-[11px] text-gray-400 mt-0.5 truncate">{c.phone}</p>
-                      )}
-                    </div>
-                    <span className={`w-4 h-4 shrink-0 transition-opacity duration-150 ${isSelected ? 'opacity-100' : 'opacity-0'}`}>
-                      <svg fill="currentColor" viewBox="0 0 20 20" className="text-pink-600">
-                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                      </svg>
-                    </span>
-                  </button>
-                </li>
-              )
-            })}
-          </ul>
-        )}
-      </div>
-
-    </div>
-  )
-}
-
 // ── Main panel ───────────────────────────────────────────────────────────────
 
 export default function DispatchPanel({
   bookingId,
   bookingStatus,
   paymentStatus,
+  paymentMethod,
   serviceDate,
   cleaners,
   assignments,
@@ -517,26 +414,22 @@ export default function DispatchPanel({
   bookingId: string
   bookingStatus: string
   paymentStatus: string
+  paymentMethod: string
   serviceDate: string
   cleaners: Cleaner[]
   assignments: Assignment[]
 }) {
   const [dispatchState, dispatchAction, dispatchPending] = useActionState<State, FormData>(dispatchCleaners, undefined)
-  const [forceState,    forceAction,    forcePending]    = useActionState<State, FormData>(forceAssignCleaner, undefined)
   const [cancelState,   cancelAction,   cancelPending]   = useActionState<State, FormData>(cancelBooking, undefined)
   const [calendarState, calendarAction, calendarPending] = useActionState<State, FormData>(forceAssignCleaner, undefined)
 
-  const [selected,             setSelected]             = useState<string[]>([])
-  const [showManual,           setShowManual]           = useState(false)
-  const [forceCleanerIds,      setForceCleanerIds]      = useState<string[]>([])
-  const [addingForceCleaner,   setAddingForceCleaner]   = useState(false)
-  const [pendingForceId,       setPendingForceId]       = useState('')
-  const [calendarSelectedIds,  setCalendarSelectedIds]  = useState<string[]>([])
+  const [selected,            setSelected]            = useState<string[]>([])
+  const [calendarSelectedIds, setCalendarSelectedIds] = useState<string[]>([])
 
   const activelyAssigned     = new Set(assignments.filter((a) => a.status === 'assigned').map((a) => a.cleaner_id))
   const availableForDispatch = cleaners.filter((c) => !activelyAssigned.has(c.id))
   const isClosed             = bookingStatus === 'completed' || bookingStatus === 'cancelled'
-  const isPaymentBlocked     = paymentStatus !== 'paid'
+  const isPaymentBlocked     = paymentStatus !== 'paid' && paymentMethod !== 'cash'
 
   const toggle = (id: string) =>
     setSelected((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id])
@@ -670,7 +563,7 @@ export default function DispatchPanel({
             <p className="text-xs text-gray-400 mb-4 leading-relaxed">
               Rule-based AI for manpower estimation and cleaner deployment — evaluates availability, workload, proximity, and performance to assign the right cleaners to each job.
             </p>
-            <AIDispatchButton bookingId={bookingId} disabled={isPaymentBlocked} />
+            <AIDispatchButton bookingId={bookingId} serviceDate={serviceDate} disabled={isPaymentBlocked} />
           </div>
 
           {/* ── Payment gate (manual + force assign) ─────────────── */}
@@ -698,188 +591,73 @@ export default function DispatchPanel({
 
               {/* ── Manual Dispatch ─────────────────────────────── */}
               <div>
-                <button
-                  type="button"
-                  onClick={() => setShowManual((v) => !v)}
-                  className="w-full flex items-center justify-between group mb-1"
-                >
-                  <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-widest group-hover:text-gray-600 transition-colors">
-                    Manual Dispatch
-                  </p>
-                  <svg
-                    className={`w-4 h-4 text-gray-300 group-hover:text-gray-400 transition-all duration-200 ${showManual ? 'rotate-180' : ''}`}
-                    fill="none" stroke="currentColor" viewBox="0 0 24 24"
-                  >
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                  </svg>
-                </button>
-
-                {showManual && (
-                  <div className="mt-3 space-y-3">
-                    {availableForDispatch.length > 0 ? (
-                      <>
-                        <div className="space-y-1.5">
-                          {availableForDispatch.map((c) => {
-                            const isSelected = selected.includes(c.id)
-                            return (
-                              <label
-                                key={c.id}
-                                className={`flex items-center gap-3 p-3 border rounded-xl cursor-pointer transition-all ${
-                                  isSelected
-                                    ? 'border-pink-400 bg-pink-50'
-                                    : 'border-gray-200 hover:border-gray-300 bg-white'
-                                }`}
-                              >
-                                <input type="checkbox" checked={isSelected} onChange={() => toggle(c.id)} className="sr-only" />
-                                <div className={`w-7 h-7 rounded-full text-xs font-bold flex items-center justify-center shrink-0 transition-colors ${
-                                  isSelected ? 'bg-pink-600 text-white' : 'bg-gray-100 text-gray-600'
-                                }`}>
-                                  {c.full_name.charAt(0).toUpperCase()}
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                  <p className="text-sm font-medium text-gray-900 truncate">{c.full_name}</p>
-                                  {c.phone && <p className="text-xs text-gray-400">{c.phone}</p>}
-                                </div>
-                                {isSelected && (
-                                  <svg className="w-4 h-4 text-pink-600 shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                                  </svg>
-                                )}
-                              </label>
-                            )
-                          })}
-                        </div>
-                        <form action={dispatchAction}>
-                          <input type="hidden" name="booking_id" value={bookingId} />
-                          {selected.map((id) => (
-                            <input key={id} type="hidden" name="cleaner_ids" value={id} />
-                          ))}
-                          <button
-                            type="submit"
-                            disabled={dispatchPending || selected.length === 0}
-                            className="w-full py-2.5 bg-gray-900 text-white rounded-xl text-sm font-semibold hover:bg-gray-700 hover:shadow-md active:scale-[0.98] disabled:opacity-40 transition-all duration-150"
-                          >
-                            {dispatchPending
-                              ? 'Sending...'
-                              : selected.length > 0
-                                ? `Send Offer to ${selected.length} Cleaner${selected.length > 1 ? 's' : ''}`
-                                : 'Select cleaners above'}
-                          </button>
-                        </form>
-                        {dispatchState?.success && (
-                          <p className="text-xs text-emerald-700 bg-emerald-50 border border-emerald-100 px-3 py-2 rounded-lg">{dispatchState.success}</p>
-                        )}
-                        {dispatchState?.error && (
-                          <p className="text-xs text-red-600 bg-red-50 border border-red-100 px-3 py-2 rounded-lg">{dispatchState.error}</p>
-                        )}
-                      </>
-                    ) : (
-                      <p className="text-xs text-gray-400 py-1">All active cleaners have already been assigned to this job.</p>
-                    )}
-                  </div>
-                )}
-              </div>
-
-              <div className="border-t border-gray-100" />
-
-              {/* ── Force Assign ─────────────────────────────────── */}
-              <div>
-                <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-widest mb-1.5">
-                  Force Assign
+                <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-widest mb-3">
+                  Manual Dispatch
                 </p>
-                <p className="text-xs text-gray-400 mb-3 leading-relaxed">
-                  Directly confirms cleaners, bypassing the dispatch flow.
-                </p>
-
-                <form action={forceAction} className="space-y-2.5">
-                  <input type="hidden" name="booking_id" value={bookingId} />
-                  {forceCleanerIds.map((id) => (
-                    <input key={id} type="hidden" name="cleaner_id" value={id} />
-                  ))}
-
-                  {/* Selected cleaner chips */}
-                  {forceCleanerIds.length > 0 && (
-                    <div className="space-y-1.5">
-                      {forceCleanerIds.map((id) => {
-                        const c = cleaners.find((x) => x.id === id)
-                        return (
-                          <div key={id} className="flex items-center gap-2.5 px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl">
-                            <div className="w-7 h-7 rounded-full bg-pink-100 text-pink-700 text-xs font-bold flex items-center justify-center shrink-0 select-none">
-                              {c?.full_name.charAt(0).toUpperCase() ?? '?'}
-                            </div>
-                            <span className="flex-1 text-sm font-medium text-gray-900 truncate">{c?.full_name ?? 'Unknown'}</span>
-                            <button
-                              type="button"
-                              onClick={() => setForceCleanerIds((prev) => prev.filter((x) => x !== id))}
-                              className="text-gray-300 hover:text-red-500 transition-colors shrink-0"
+                <div className="space-y-3">
+                  {availableForDispatch.length > 0 ? (
+                    <>
+                      <div className="space-y-1.5">
+                        {availableForDispatch.map((c) => {
+                          const isSelected = selected.includes(c.id)
+                          return (
+                            <label
+                              key={c.id}
+                              className={`flex items-center gap-3 p-3 border rounded-xl cursor-pointer transition-all ${
+                                isSelected
+                                  ? 'border-pink-400 bg-pink-50'
+                                  : 'border-gray-200 hover:border-gray-300 bg-white'
+                              }`}
                             >
-                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                              </svg>
-                            </button>
-                          </div>
-                        )
-                      })}
-                    </div>
-                  )}
-
-                  {/* Dropdown (always shown when empty; shown on demand when adding) */}
-                  {(forceCleanerIds.length === 0 || addingForceCleaner) ? (
-                    <div className="space-y-1">
-                      <CleanerDropdown
-                        cleaners={cleaners.filter((c) => !forceCleanerIds.includes(c.id))}
-                        value={pendingForceId}
-                        onChange={(id) => {
-                          setForceCleanerIds((prev) => prev.includes(id) ? prev : [...prev, id])
-                          setPendingForceId('')
-                          setAddingForceCleaner(false)
-                        }}
-                      />
-                      {addingForceCleaner && (
+                              <input type="checkbox" checked={isSelected} onChange={() => toggle(c.id)} className="sr-only" />
+                              <div className={`w-7 h-7 rounded-full text-xs font-bold flex items-center justify-center shrink-0 transition-colors ${
+                                isSelected ? 'bg-pink-600 text-white' : 'bg-gray-100 text-gray-600'
+                              }`}>
+                                {c.full_name.charAt(0).toUpperCase()}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium text-gray-900 truncate">{c.full_name}</p>
+                                {c.phone && <p className="text-xs text-gray-400">{c.phone}</p>}
+                              </div>
+                              {isSelected && (
+                                <svg className="w-4 h-4 text-pink-600 shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                </svg>
+                              )}
+                            </label>
+                          )
+                        })}
+                      </div>
+                      <form action={dispatchAction}>
+                        <input type="hidden" name="booking_id" value={bookingId} />
+                        {selected.map((id) => (
+                          <input key={id} type="hidden" name="cleaner_ids" value={id} />
+                        ))}
                         <button
-                          type="button"
-                          onClick={() => setAddingForceCleaner(false)}
-                          className="text-xs text-gray-400 hover:text-gray-600 transition-colors"
+                          type="submit"
+                          disabled={dispatchPending || selected.length === 0}
+                          className="w-full py-2.5 bg-gray-900 text-white rounded-xl text-sm font-semibold hover:bg-gray-700 hover:shadow-md active:scale-[0.98] disabled:opacity-40 transition-all duration-150"
                         >
-                          Cancel
+                          {dispatchPending
+                            ? 'Assigning...'
+                            : selected.length > 0
+                              ? `Assign ${selected.length} Cleaner${selected.length > 1 ? 's' : ''}`
+                              : 'Select cleaners above'}
                         </button>
+                      </form>
+                      {dispatchState?.success && (
+                        <p className="text-xs text-emerald-700 bg-emerald-50 border border-emerald-100 px-3 py-2 rounded-lg">{dispatchState.success}</p>
                       )}
-                    </div>
+                      {dispatchState?.error && (
+                        <p className="text-xs text-red-600 bg-red-50 border border-red-100 px-3 py-2 rounded-lg">{dispatchState.error}</p>
+                      )}
+                    </>
                   ) : (
-                    <button
-                      type="button"
-                      onClick={() => setAddingForceCleaner(true)}
-                      disabled={cleaners.filter((c) => !forceCleanerIds.includes(c.id)).length === 0}
-                      className="w-full py-2 border-2 border-dashed border-gray-200 rounded-xl text-sm text-gray-400 hover:border-gray-400 hover:text-gray-600 disabled:opacity-40 transition-colors flex items-center justify-center gap-1.5"
-                    >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                      </svg>
-                      Add another cleaner
-                    </button>
+                    <p className="text-xs text-gray-400 py-1">All active cleaners have already been assigned to this job.</p>
                   )}
-
-                  <button
-                    type="submit"
-                    disabled={forcePending || forceCleanerIds.length === 0}
-                    className="w-full py-2.5 bg-gray-900 text-white rounded-xl text-sm font-semibold hover:bg-gray-700 hover:shadow-md active:scale-[0.98] disabled:opacity-40 transition-all duration-150 flex items-center justify-center gap-2"
-                  >
-                    {forcePending ? (
-                      <>
-                        <span className="w-4 h-4 border-2 border-white/25 border-t-white rounded-full animate-spin" />
-                        Assigning...
-                      </>
-                    ) : forceCleanerIds.length > 1
-                      ? `Force Assign ${forceCleanerIds.length} Cleaners`
-                      : 'Force Assign Cleaner'
-                    }
-                  </button>
-                </form>
-
-                {forceState?.error && (
-                  <p className="mt-2 text-xs text-red-600 bg-red-50 border border-red-100 px-3 py-2 rounded-lg">{forceState.error}</p>
-                )}
+                </div>
               </div>
+
             </>
           )}
 
@@ -941,7 +719,7 @@ export default function DispatchPanel({
               </svg>
             </div>
             <p className="text-sm font-medium text-gray-500 capitalize">{bookingStatus}</p>
-            <p className="text-xs text-gray-400 mt-0.5">No further actions available.</p>
+            <p className="text-xs text-gray-400 mt-0.5">Waiting for customer review.</p>
           </div>
           <div className="border-t border-gray-100 pt-5">
             <DeleteBookingButton bookingId={bookingId} />

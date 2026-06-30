@@ -15,15 +15,19 @@ export async function sendSupportMessage(
 
   const adminClient = createAdminClient()
 
+  // Staff replies go to admin_messages; customer messages go to direct_messages.
+  const isStaffSender = user.id !== customerId
+  const table = isStaffSender ? 'admin_messages' : 'direct_messages'
+
   const { error } = await adminClient
-    .from('direct_messages')
+    .from(table)
     .insert({ customer_id: customerId, sender_id: user.id, message: message.trim() })
 
   if (error) return { error: error.message }
 
   // Fetch the just-inserted row so the client can optimistically update without a reload
   const { data: newMsg } = await adminClient
-    .from('direct_messages')
+    .from(table)
     .select('id, message, created_at, sender_id')
     .eq('customer_id', customerId)
     .eq('sender_id', user.id)
@@ -35,7 +39,7 @@ export async function sendSupportMessage(
   if (user.id === customerId) {
     const [{ data: senderProfile }, { data: admins }] = await Promise.all([
       adminClient.from('profiles').select('full_name').eq('id', user.id).single(),
-      adminClient.from('profiles').select('id').in('role', ['super_admin', 'branch_manager']),
+      adminClient.from('profiles').select('id').eq('role', 'super_admin'),
     ])
 
     const senderName = senderProfile?.full_name ?? 'A customer'

@@ -1,6 +1,27 @@
 import Link from 'next/link'
 import Image from 'next/image'
 import { createAdminClient } from '@/utils/supabase/server'
+function getServiceImage(name: string | null): string | null {
+  if (!name) return null
+  const n = name.toLowerCase()
+  if (n.includes('aircon') || n.includes('air con') || n.includes('air conditioning')) {
+    if (n.includes('repair')) return '/service_image/aircon_repair.webp'
+    return '/service_image/aircon_cleaning.webp'
+  }
+  if (n.includes('sofa') || n.includes('couch')) return '/service_image/sofa_deepcleaning.webp'
+  if (n.includes('carpet')) return '/service_image/carpet_cleaning.webp'
+  if (n.includes('curtain')) return '/service_image/curtain_drycleaning.webp'
+  if (n.includes('mattress')) return '/service_image/mattress_deepCleaning.webp'
+  if (n.includes('grease') || n.includes('greasetrap')) {
+    if (n.includes('install')) return '/service_image/greasetrap_installation.webp'
+    return '/service_image/greasetrap.webp'
+  }
+  if (n.includes('post') || n.includes('construction')) return '/service_image/post_construction.webp'
+  if (n.includes('office')) return '/service_image/office_cleaning.webp'
+  if (n.includes('condo')) return '/service_image/condo_cleaning.jpeg'
+  if (n.includes('general')) return '/service_image/general_cleaning.webp'
+  return null
+}
 
 type Booking = {
   id: string
@@ -32,7 +53,7 @@ const PAYMENT_STYLES: Record<string, string> = {
 }
 
 const PAYMENT_LABELS: Record<string, string> = {
-  unpaid:   'Unpaid',
+  unpaid:   'Payment pending confirmation',
   paid:     'Paid',
   refunded: 'Refunded',
   partial:  'Partial',
@@ -76,18 +97,6 @@ export default async function AdminBookingsPage({
     .order('service_date', { ascending: false })
 
   const all = (bookings ?? []) as unknown as Booking[]
-
-  const uniqueNames = [...new Set(all.map(b => b.service_name).filter(Boolean))] as string[]
-  let serviceImageMap: Record<string, string> = {}
-  if (uniqueNames.length > 0) {
-    const { data: services } = await supabase
-      .from('services')
-      .select('name, image_url')
-      .in('name', uniqueNames)
-    for (const s of services ?? []) {
-      if (s.name && s.image_url) serviceImageMap[s.name] = s.image_url
-    }
-  }
 
   const counts: Record<string, number> = {}
   for (const b of all) counts[b.status] = (counts[b.status] ?? 0) + 1
@@ -153,9 +162,8 @@ export default async function AdminBookingsPage({
         ) : (
           <>
             {/* Column header row */}
-            <div className="hidden sm:grid grid-cols-[2rem_1fr_8rem] px-5 py-2.5 border-b border-gray-100 bg-gray-50/80">
-              <span />
-              <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider ">Booking</span>
+            <div className="hidden sm:grid grid-cols-[1fr_8rem] px-5 py-2.5 border-b border-gray-100 bg-gray-50/80">
+              <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Booking</span>
               <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider text-right">Amount</span>
             </div>
 
@@ -164,43 +172,42 @@ export default async function AdminBookingsPage({
                 const sm = STATUS_META[b.status] ?? { dot: 'bg-gray-400', pill: 'bg-gray-50 text-gray-600 border-gray-200', label: b.status }
                 const pm = PAYMENT_STYLES[b.payment_status] ?? 'bg-gray-50 text-gray-500 border-gray-200'
                 const serviceLabel = b.service_name ?? '—'
-                const serviceImage = serviceImageMap[b.service_name ?? ''] ?? null
+                const serviceImage = getServiceImage(b.service_name)
                 return (
                   <Link
                     key={b.id}
                     href={`/admin/bookings/${b.id}`}
-                    className="grid grid-cols-[2rem_1fr_auto] sm:grid-cols-[2rem_1fr_8rem] items-center px-5 py-4 hover:bg-gray-50/70 transition-colors group"
+                    className="grid grid-cols-[1fr_auto] sm:grid-cols-[1fr_8rem] items-center px-5 py-3.5 hover:bg-gray-50/70 transition-colors group"
                   >
-                    {/* Status dot */}
-                    <div className="flex items-center pt-0.5">
-                      <span className={`w-2 h-2 rounded-full shrink-0 ${sm.dot}`} />
-                    </div>
-
                     {/* Main info */}
-                    <div className="min-w-0  flex items-center gap-3">
-                      {/* Service thumbnail */}
-                      <div className="shrink-0 w-20 h-20 rounded-lg overflow-hidden bg-gray-100 border border-gray-200">
-                        {serviceImage ? (
-                          <Image
-                            src={serviceImage}
-                            alt={serviceLabel}
-                            width={80}
-                            height={80}
-                            className="w-full h-full object-cover"
-                          />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center">
-                            <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
-                                d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-                            </svg>
-                          </div>
-                        )}
+                    <div className="min-w-0 flex items-center gap-4">
+                      {/* Service thumbnail with status badge */}
+                      <div className="relative shrink-0">
+                        <div className="w-[72px] h-[72px] rounded-2xl overflow-hidden shadow-sm bg-pink-50">
+                          {serviceImage ? (
+                            <Image
+                              src={serviceImage}
+                              alt={serviceLabel}
+                              width={72}
+                              height={72}
+                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                            />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center">
+                              <svg className="w-6 h-6 text-pink-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
+                                  d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                              </svg>
+                            </div>
+                          )}
+                        </div>
+                        {/* Status badge overlaid on image corner */}
+                        <span className={`absolute -bottom-1 -right-1 w-3.5 h-3.5 rounded-full border-2 border-white shadow-sm ${sm.dot}`} />
                       </div>
 
                       {/* Text content */}
                       <div className="min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap mb-0.5">
+                        <div className="flex items-center gap-2 flex-wrap mb-1">
                           <span className="text-sm font-semibold text-gray-900 group-hover:text-pink-700 transition-colors">
                             {serviceLabel}
                           </span>

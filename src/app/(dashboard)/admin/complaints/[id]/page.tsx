@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { createClient } from '@/utils/supabase/server'
+import { createClient, createAdminClient } from '@/utils/supabase/server'
 import ComplaintThread from '@/components/dashboard/complaint-thread'
 import { updateComplaintStatus } from '@/app/actions/complaints'
 
@@ -27,7 +27,9 @@ export default async function AdminComplaintDetailPage({
 
   const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
 
-  const [{ data: complaint }, { data: messages }] = await Promise.all([
+  const adminDb = createAdminClient()
+
+  const [{ data: complaint }, { data: customerMsgs }] = await Promise.all([
     supabase
       .from('complaints')
       .select('id, subject, status, created_at, profiles (full_name, phone)')
@@ -41,6 +43,17 @@ export default async function AdminComplaintDetailPage({
   ])
 
   if (!complaint) notFound()
+
+  const { data: staffMsgs } = await adminDb
+    .from('staff_complaint_messages')
+    .select('id, message, created_at, sender_id')
+    .eq('complaint_id', id)
+    .order('created_at', { ascending: true })
+
+  const messages = [
+    ...(customerMsgs ?? []),
+    ...(staffMsgs   ?? []),
+  ].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
 
   const profileData = Array.isArray(complaint.profiles) ? complaint.profiles[0] : complaint.profiles
   const customer    = profileData as { full_name: string; phone: string | null } | null

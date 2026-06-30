@@ -7,7 +7,7 @@ import { runAIDispatch, type RankedCleaner } from '@/lib/ai-assignment'
 // ── Preview (dry-run): evaluate without writing assignments ──────────────────
 
 export type PreviewState =
-  | { ranked: RankedCleaner[]; reasoning: string[] }
+  | { ranked: RankedCleaner[]; reasoning: string[]; bookingLat: number | null; bookingLng: number | null }
   | { error: string }
   | undefined
 
@@ -28,7 +28,7 @@ export async function previewAIDispatch(
 
   try {
     const result = await runAIDispatch(bookingId, true) // dry run — no DB writes
-    return { ranked: result.rankedCleaners, reasoning: result.reasoning }
+    return { ranked: result.rankedCleaners, reasoning: result.reasoning, bookingLat: result.bookingLat, bookingLng: result.bookingLng }
   } catch (e) {
     return { error: e instanceof Error ? e.message : 'AI evaluation failed.' }
   }

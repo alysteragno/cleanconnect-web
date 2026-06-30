@@ -16,23 +16,32 @@ export default async function AdminSupportThreadPage({
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) notFound()
 
-  const [{ data: customerProfile }, { data: messages }] = await Promise.all([
-    // Admin client bypasses RLS to read any customer profile reliably
+  const [{ data: customerProfile }, { data: customerMsgs }, { data: adminMsgs }] = await Promise.all([
     adminDb
       .from('profiles')
       .select('full_name, phone')
       .eq('id', customerId)
       .single(),
-    // Omit the profiles FK join — direct_messages has two FKs to profiles
-    // (customer_id and sender_id) which makes !sender_id ambiguous in PostgREST
-    supabase
+    // Customer → staff messages
+    adminDb
       .from('direct_messages')
+      .select('id, message, created_at, sender_id')
+      .eq('customer_id', customerId)
+      .order('created_at', { ascending: true }),
+    // Staff → customer replies
+    adminDb
+      .from('admin_messages')
       .select('id, message, created_at, sender_id')
       .eq('customer_id', customerId)
       .order('created_at', { ascending: true }),
   ])
 
   if (!customerProfile) notFound()
+
+  const messages = [
+    ...(customerMsgs ?? []),
+    ...(adminMsgs    ?? []),
+  ].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
 
   return (
     <div
@@ -67,7 +76,7 @@ export default async function AdminSupportThreadPage({
       <div className="flex-1 overflow-hidden min-h-0">
         <SupportThread
           customerId={customerId}
-          initialMessages={(messages ?? []) as unknown as ChatMessage[]}
+          initialMessages={messages as unknown as ChatMessage[]}
           currentUserId={user.id}
           isStaff={true}
         />

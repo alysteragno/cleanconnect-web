@@ -25,6 +25,7 @@ const ADMIN_NAV = [
       { href: '/admin/bookings',      label: 'Bookings',      icon: <IconCalendar /> },
       { href: '/admin/cleaners',      label: 'Cleaners',      icon: <IconUsers /> },
       { href: '/admin/customers',     label: 'Customers',     icon: <IconUsers /> },
+      { href: '/admin/day-off-requests', label: 'Day-Off Requests', icon: <IconCalendar /> },
       { href: '/admin/complaints',    label: 'Complaints',    icon: <IconChat /> },
       { href: '/admin/support',       label: 'Support Chat',  icon: <IconHeadset /> },
       { href: '/admin/feedback',      label: 'Feedback',      icon: <IconStar /> },

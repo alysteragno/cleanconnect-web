@@ -4,13 +4,17 @@ import { useState, useEffect, useRef } from 'react'
 import { createClient } from '@/utils/supabase/client'
 import { type ChatMessage, formatMsgTime, formatDayLabel, groupMessagesByDay } from '@/utils/chat-helpers'
 
+interface SubscriptionConfig {
+  table: string
+  filter: string
+}
+
 interface Props {
   initialMessages: ChatMessage[]
   currentUserId: string
   isStaff: boolean
   channelName: string
-  subscriptionTable: string
-  subscriptionFilter: string
+  subscriptions: SubscriptionConfig[]
   onSend: (message: string) => Promise<{ error?: string; message?: ChatMessage } | undefined>
   isLocked?: boolean
   lockedMessage?: string
@@ -22,8 +26,7 @@ export function ChatThread({
   currentUserId,
   isStaff,
   channelName,
-  subscriptionTable,
-  subscriptionFilter,
+  subscriptions,
   onSend,
   isLocked = false,
   lockedMessage = 'This conversation is closed.',
@@ -44,7 +47,7 @@ export function ChatThread({
     const supabase = createClient()
     let mounted = true
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    let channel: any
+    const channels: any[] = []
 
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (!mounted) return
@@ -57,39 +60,46 @@ export function ChatThread({
         supabase.realtime.setAuth(session.access_token)
       }
 
-      channel = supabase
-        .channel(channelName)
-        .on(
-          'postgres_changes',
-          { event: 'INSERT', schema: 'public', table: subscriptionTable, filter: subscriptionFilter },
-          (payload) => {
-            const incoming = payload.new as unknown as ChatMessage
-            setMessages((prev) => {
-              if (prev.some((m) => m.id === incoming.id)) return prev
-              // Replace the matching optimistic entry with the confirmed DB row
-              const optIdx = prev.findIndex(
-                (m) =>
-                  m.id.startsWith('opt-') &&
-                  m.sender_id === incoming.sender_id &&
-                  m.message === incoming.message
-              )
-              if (optIdx !== -1) {
-                const next = [...prev]
-                next[optIdx] = incoming
-                return next
-              }
-              return [...prev, incoming]
-            })
+      const handleInsert = (payload: { new: unknown }) => {
+        const incoming = payload.new as unknown as ChatMessage
+        setMessages((prev) => {
+          if (prev.some((m) => m.id === incoming.id)) return prev
+          const optIdx = prev.findIndex(
+            (m) =>
+              m.id.startsWith('opt-') &&
+              m.sender_id === incoming.sender_id &&
+              m.message === incoming.message
+          )
+          if (optIdx !== -1) {
+            const next = [...prev]
+            next[optIdx] = incoming
+            return next
           }
-        )
-        .subscribe()
+          return [...prev, incoming]
+        })
+      }
+
+      // Each table gets its own channel — Supabase Realtime drops events when
+      // multiple postgres_changes listeners share the same channel name.
+      for (const sub of subscriptions) {
+        const ch = supabase
+          .channel(`${channelName}-${sub.table}`)
+          .on(
+            'postgres_changes',
+            { event: 'INSERT', schema: 'public', table: sub.table, filter: sub.filter },
+            handleInsert
+          )
+          .subscribe()
+        channels.push(ch)
+      }
     })
 
     return () => {
       mounted = false
-      if (channel) supabase.removeChannel(channel)
+      channels.forEach((ch) => supabase.removeChannel(ch))
     }
-  }, [channelName, subscriptionTable, subscriptionFilter])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [channelName])
 
   async function handleSend() {
     const trimmed = text.trim()

@@ -27,15 +27,15 @@ type Announcement = {
 
 function getHref(n: Notification, role: string): string {
   if (n.customer_id && n.type === 'direct_message') {
-    if (role === 'super_admin' || role === 'branch_manager') return `/admin/support/${n.customer_id}`
+    if (role === 'super_admin') return `/admin/support/${n.customer_id}`
   }
   if (n.booking_id) {
-    if (role === 'super_admin' || role === 'branch_manager') return `/admin/bookings/${n.booking_id}`
+    if (role === 'super_admin') return `/admin/bookings/${n.booking_id}`
     if (role === 'cleaner') return `/cleaner/jobs`
     return `/customer/bookings/${n.booking_id}`
   }
   if (n.complaint_id) {
-    if (role === 'super_admin' || role === 'branch_manager') return `/admin/complaints/${n.complaint_id}`
+    if (role === 'super_admin') return `/admin/complaints/${n.complaint_id}`
     return `/customer/complaints/${n.complaint_id}`
   }
   return '#'
@@ -117,7 +117,7 @@ export default function NotificationBell({
 
       {(open || closing) && (
         <div
-          className={`absolute right-0 mt-1 w-80 bg-white border border-gray-200 rounded-xl shadow-lg z-50 overflow-hidden ${closing ? 'animate-dropdown-out' : 'animate-dropdown-in'}`}
+          className={`fixed left-2 right-2 top-14 sm:absolute sm:left-auto sm:right-0 sm:top-auto sm:mt-1 sm:w-80 bg-white border border-gray-200 rounded-xl shadow-lg z-50 overflow-hidden ${closing ? 'animate-dropdown-out' : 'animate-dropdown-in'}`}
           onAnimationEnd={() => { if (closing) { setClosing(false); setOpen(false) } }}
         >
           <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
