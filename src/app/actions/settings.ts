@@ -59,22 +59,44 @@ export async function updateSettings(
     maya_number:            'Maya Number',
     maya_name:              'Maya Account Name',
     maya_qr_url:            'Maya QR Code',
-    bank_name:              'Bank Name',
-    bank_account_number:    'Bank Account Number',
-    bank_account_name:      'Bank Account Name',
     check_payable_to:       'Check Payable To',
     check_delivery_address: 'Check Delivery Address',
     payment_reference_note: 'Payment Reference Note',
   }
 
-  const keys = Object.keys(FIELD_LABELS)
-
   const admin = createAdminClient()
-  for (const key of keys) {
+
+  for (const [key, label] of Object.entries(FIELD_LABELS)) {
     const value = (formData.get(key) as string)?.trim()
-    if (!value) return { error: `${FIELD_LABELS[key]} is required.` }
+    if (!value) return { error: `${label} is required.` }
     await admin.from('settings').upsert({ key, value, updated_at: new Date().toISOString() })
   }
+
+  // Bank accounts stored as a JSON array
+  const bankAccountsRaw = (formData.get('bank_accounts') as string)?.trim()
+  if (!bankAccountsRaw) return { error: 'Bank accounts are required.' }
+
+  type BankEntry = { bank_name: string; account_number: string; account_name: string }
+  let bankAccounts: BankEntry[]
+  try {
+    bankAccounts = JSON.parse(bankAccountsRaw)
+    if (!Array.isArray(bankAccounts)) throw new Error()
+  } catch {
+    return { error: 'Invalid bank accounts data.' }
+  }
+
+  for (let i = 0; i < bankAccounts.length; i++) {
+    const b = bankAccounts[i]
+    if (!b.bank_name?.trim())     return { error: `Bank ${i + 1}: Bank name is required.` }
+    if (!b.account_number?.trim()) return { error: `Bank ${i + 1}: Account number is required.` }
+    if (!b.account_name?.trim())  return { error: `Bank ${i + 1}: Account name is required.` }
+  }
+
+  await admin.from('settings').upsert({
+    key: 'bank_accounts',
+    value: JSON.stringify(bankAccounts),
+    updated_at: new Date().toISOString(),
+  })
 
   revalidatePath('/admin/settings')
   return { success: 'Payment settings updated.' }

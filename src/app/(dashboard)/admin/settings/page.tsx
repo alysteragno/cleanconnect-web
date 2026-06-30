@@ -6,6 +6,10 @@ import { useFormStatus } from 'react-dom'
 import { createClient } from '@/utils/supabase/client'
 import { PaymentMethodIcon } from '@/components/payment-icons'
 
+type BankEntry = { bank_name: string; account_number: string; account_name: string }
+
+const EMPTY_BANK: BankEntry = { bank_name: '', account_number: '', account_name: '' }
+
 function SubmitButton() {
   const { pending } = useFormStatus()
   return (
@@ -16,6 +20,68 @@ function SubmitButton() {
     >
       {pending ? 'Saving...' : 'Save changes'}
     </button>
+  )
+}
+
+function BankCard({
+  bank,
+  index,
+  onUpdate,
+  onRemove,
+}: {
+  bank: BankEntry
+  index: number
+  onUpdate: (index: number, field: keyof BankEntry, value: string) => void
+  onRemove: (index: number) => void
+}) {
+  return (
+    <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 space-y-3 relative">
+      <div className="flex justify-end">
+        <button
+          type="button"
+          onClick={() => onRemove(index)}
+          className="text-gray-400 hover:text-red-500 transition-colors p-1 rounded-lg hover:bg-red-50"
+          aria-label="Remove bank"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">Bank Name</label>
+        <input
+          type="text"
+          value={bank.bank_name}
+          onChange={e => onUpdate(index, 'bank_name', e.target.value)}
+          placeholder="e.g. BDO Unibank"
+          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-pink-500"
+        />
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">Account Number</label>
+        <input
+          type="text"
+          value={bank.account_number}
+          onChange={e => onUpdate(index, 'account_number', e.target.value)}
+          placeholder="XXXX-XXXX-XXXX"
+          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-pink-500"
+        />
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">Account Name</label>
+        <input
+          type="text"
+          value={bank.account_name}
+          onChange={e => onUpdate(index, 'account_name', e.target.value)}
+          placeholder="Maid For You Cleaning Services"
+          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-pink-500"
+        />
+      </div>
+    </div>
   )
 }
 
@@ -116,15 +182,33 @@ type Settings = Record<string, string>
 export default function AdminSettingsPage() {
   const [state, action] = useActionState(updateSettings, undefined)
   const [settings, setSettings] = useState<Settings>({})
+  const [banks, setBanks] = useState<BankEntry[]>([])
 
   useEffect(() => {
     createClient()
       .from('settings')
       .select('key, value')
       .then(({ data }) => {
-        if (data) setSettings(Object.fromEntries(data.map((r) => [r.key, r.value])))
+        if (!data) return
+        const map = Object.fromEntries(data.map((r) => [r.key, r.value]))
+        setSettings(map)
+        if (map['bank_accounts']) {
+          try { setBanks(JSON.parse(map['bank_accounts'])) } catch {}
+        }
       })
   }, [])
+
+  function updateBank(index: number, field: keyof BankEntry, value: string) {
+    setBanks(prev => prev.map((b, i) => i === index ? { ...b, [field]: value } : b))
+  }
+
+  function addBank() {
+    setBanks(prev => [...prev, { ...EMPTY_BANK }])
+  }
+
+  function removeBank(index: number) {
+    setBanks(prev => prev.filter((_, i) => i !== index))
+  }
 
   const field = (key: string, label: string, placeholder?: string) => (
     <div>
@@ -177,15 +261,45 @@ export default function AdminSettingsPage() {
           />
         </div>
 
-        {/* Bank Transfer */}
+        {/* Bank Transfer — dynamic list */}
         <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
-          <div className="flex items-center gap-2.5">
-            <PaymentMethodIcon method="bank_transfer" size={48} />
-            <p className="text-sm font-semibold text-gray-700">Bank Transfer</p>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <PaymentMethodIcon method="bank_transfer" size={48} />
+              <p className="text-sm font-semibold text-gray-700">Bank Transfer</p>
+            </div>
+            <button
+              type="button"
+              onClick={addBank}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-pink-600 bg-pink-50 hover:bg-pink-100 border border-pink-200 rounded-lg transition-colors"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
+              </svg>
+              Add bank
+            </button>
           </div>
-          {field('bank_name', 'Bank Name', 'BDO Unibank')}
-          {field('bank_account_number', 'Account Number', 'XXXX-XXXX-XXXX')}
-          {field('bank_account_name', 'Account Name', 'Maid For You Cleaning Services')}
+
+          {/* Hidden input — submits the full array as JSON */}
+          <input type="hidden" name="bank_accounts" value={JSON.stringify(banks)} />
+
+          {banks.length === 0 ? (
+            <p className="text-xs text-gray-400 text-center py-4">
+              No banks added yet. Click <span className="font-semibold">+ Add bank</span> to configure a bank transfer option.
+            </p>
+          ) : (
+            <div className="space-y-3">
+              {banks.map((bank, i) => (
+                <BankCard
+                  key={i}
+                  bank={bank}
+                  index={i}
+                  onUpdate={updateBank}
+                  onRemove={removeBank}
+                />
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Bank Check */}

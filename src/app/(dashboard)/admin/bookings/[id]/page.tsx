@@ -6,6 +6,7 @@ import PaymentForm from './payment-form'
 import AdjustForm from './adjust-form'
 import DispatchPanel from './dispatch-panel'
 import PaymentVerificationCard from './payment-verification'
+import CleanersForm from './cleaners-form'
 
 type Booking = {
   id: string
@@ -27,6 +28,7 @@ type Booking = {
   status: string
   payment_status: string
   payment_method: string
+  bank_used: string | null
   payment_reference: string | null
   payment_proof_url: string | null
   address_unit: string | null
@@ -86,7 +88,7 @@ export default async function AdminBookingDetailPage({
         property_sqm, required_cleaners, duration_hours, base_price,
         cancellation_fee, couch_quantity, mattress_quantity,
         furniture_quantity, furniture_photo_urls,
-        status, payment_status, payment_method, payment_reference, payment_proof_url,
+        status, payment_status, payment_method, bank_used, payment_reference, payment_proof_url,
         address_unit, address_street, address_city, address_province,
         special_notes,
         profiles!customer_id (full_name, phone)
@@ -227,7 +229,7 @@ export default async function AdminBookingDetailPage({
               <DetailRow label="Service"            value={serviceLabel} />
               <DetailRow label="Space Type"         value={b.space_type ? b.space_type.charAt(0).toUpperCase() + b.space_type.slice(1) : '—'} />
               <DetailRow label="Property Size"      value={`${b.property_sqm} sqm`} />
-              <DetailRow label="Cleaners Required"  value={String(b.required_cleaners ?? '—')} />
+              <CleanersForm bookingId={b.id} currentCount={b.required_cleaners ?? 1} />
               <DetailRow label="Duration"           value={b.duration_hours ? `${b.duration_hours} hours` : '—'} />
               {b.couch_quantity > 0    && <DetailRow label="Sofa Seater"         value={String(b.couch_quantity)} />}
               {b.mattress_quantity > 0 && <DetailRow label="Mattresses"           value={String(b.mattress_quantity)} />}
@@ -351,6 +353,7 @@ export default async function AdminBookingDetailPage({
                   <PaymentVerificationCard
                     bookingId={b.id}
                     paymentMethod={b.payment_method}
+                    bankUsed={b.bank_used}
                     paymentStatus={b.payment_status}
                     paymentReference={b.payment_reference}
                     paymentProofUrl={b.payment_proof_url}
@@ -384,6 +387,7 @@ export default async function AdminBookingDetailPage({
               bookingId={b.id}
               bookingStatus={b.status}
               paymentStatus={b.payment_status}
+              paymentMethod={b.payment_method}
               serviceDate={b.service_date}
               cleaners={cleanerList}
               assignments={assignmentList}

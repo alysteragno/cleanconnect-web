@@ -5,7 +5,7 @@ import { updatePaymentStatus } from '@/app/actions/admin'
 import { PAYMENT_METHOD_META } from '@/components/payment-icons'
 
 const STATUS_META: Record<string, { pill: string; dot: string; label: string }> = {
-  unpaid:   { pill: 'bg-red-50 text-red-700 border-red-200',               dot: 'bg-red-500',     label: 'Processing Payment' },
+  unpaid:   { pill: 'bg-red-50 text-red-700 border-red-200',               dot: 'bg-red-500',     label: 'Unpaid' },
   paid:     { pill: 'bg-emerald-50 text-emerald-700 border-emerald-200',   dot: 'bg-emerald-500', label: 'Paid'     },
   refunded: { pill: 'bg-blue-50 text-blue-700 border-blue-200',            dot: 'bg-blue-500',    label: 'Refunded' },
   partial:  { pill: 'bg-amber-50 text-amber-700 border-amber-200',         dot: 'bg-amber-400',   label: 'Partial'  },
@@ -14,12 +14,14 @@ const STATUS_META: Record<string, { pill: string; dot: string; label: string }> 
 export default function PaymentVerificationCard({
   bookingId,
   paymentMethod,
+  bankUsed,
   paymentStatus,
   paymentReference,
   paymentProofUrl,
 }: {
   bookingId: string
   paymentMethod: string
+  bankUsed: string | null
   paymentStatus: string
   paymentReference: string | null
   paymentProofUrl: string | null
@@ -32,8 +34,12 @@ export default function PaymentVerificationCard({
 
   const meta = PAYMENT_METHOD_META[paymentMethod]
   const isDigital = meta?.isDigital ?? false
+  const isCash = paymentMethod === 'cash'
   const isPaid = paymentStatus === 'paid'
   const statusStyle = STATUS_META[paymentStatus] ?? STATUS_META.unpaid
+  const statusLabel = paymentStatus === 'unpaid'
+    ? isCash ? 'Awaiting Cash Payment' : 'Pending Confirmation'
+    : statusStyle.label
 
   function handleCopy() {
     if (!paymentReference) return
@@ -103,14 +109,19 @@ export default function PaymentVerificationCard({
                 </svg>
               </div>
             )}
-            <span className="text-sm font-semibold text-gray-900">
-              {meta?.label ?? paymentMethod.replace('_', ' ')}
-            </span>
+            <div>
+              <span className="text-sm font-semibold text-gray-900">
+                {meta?.label ?? paymentMethod.replace('_', ' ')}
+              </span>
+              {paymentMethod === 'bank_transfer' && bankUsed && (
+                <p className="text-xs text-gray-500 mt-0.5">{bankUsed}</p>
+              )}
+            </div>
           </div>
 
           <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-full border shrink-0 ${statusStyle.pill}`}>
             <span className={`w-1.5 h-1.5 rounded-full ${statusStyle.dot}`} />
-            {statusStyle.label}
+            {statusLabel}
           </span>
         </div>
 
@@ -170,7 +181,17 @@ export default function PaymentVerificationCard({
         )}
 
         {/* Mark as paid */}
-        {!isPaid && (
+        {!isPaid && isCash && (
+          <div className="flex items-start gap-2.5 px-3.5 py-3 bg-amber-50 border border-amber-200 rounded-xl">
+            <svg className="w-4 h-4 text-amber-500 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <p className="text-xs text-amber-700 leading-snug">
+              <span className="font-semibold">Pending cash collection.</span> The cleaner confirms payment via the mobile app.
+            </p>
+          </div>
+        )}
+        {!isPaid && !isCash && (
           <button
             type="button"
             onClick={handleMarkAsPaid}
