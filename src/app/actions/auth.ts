@@ -6,6 +6,8 @@ import { createClient, createAdminClient } from '@/utils/supabase/server'
 import { getRateLimitBlock, recordLoginFailure, clearLoginFailures } from '@/utils/rate-limit'
 
 export type AuthState = { error: string; remainingAttempts?: number } | undefined
+export type ForgotState = { error?: string; success?: boolean } | undefined
+export type ResetState = { error?: string } | undefined
 
 async function getClientIp(): Promise<string> {
   const h = await headers()
@@ -21,7 +23,7 @@ const ROLE_ROUTES: Record<string, string> = {
   customer: '/customer',
 }
 
-const MOBILE_ONLY_ROLES = new Set(['branch_manager', 'cleaner'])
+const MOBILE_ONLY_ROLES = new Set(['cleaner'])
 
 export async function login(state: AuthState, formData: FormData): Promise<AuthState> {
   const email = formData.get('email') as string
@@ -91,10 +93,16 @@ export async function register(state: AuthState, formData: FormData): Promise<Au
   const name = formData.get('name') as string
   const email = formData.get('email') as string
   const password = formData.get('password') as string
+  const confirm = formData.get('confirm_password') as string
   const phone = (formData.get('phone') as string | null)?.trim() || null
 
-  if (!name || !email || !password) return { error: 'All fields are required.' }
-  if (password.length < 8) return { error: 'Password must be at least 8 characters.' }
+  if (!name || !email || !password || !confirm) return { error: 'All fields are required.' }
+  if (password !== confirm) return { error: 'Passwords do not match.' }
+  if (password.length < 8)       return { error: 'Password must be at least 8 characters.' }
+  if (!/[A-Z]/.test(password))   return { error: 'Password must contain at least one uppercase letter.' }
+  if (!/[a-z]/.test(password))   return { error: 'Password must contain at least one lowercase letter.' }
+  if (!/[0-9]/.test(password))   return { error: 'Password must contain at least one number.' }
+  if (!/[^A-Za-z0-9]/.test(password)) return { error: 'Password must contain at least one special character.' }
 
   const supabase = await createClient()
   const { data, error } = await supabase.auth.signUp({ email, password })
@@ -117,6 +125,36 @@ export async function register(state: AuthState, formData: FormData): Promise<Au
   cookieStore.delete('cleanconnect-role')
 
   redirect('/login?registered=true')
+}
+
+export async function forgotPassword(state: ForgotState, formData: FormData): Promise<ForgotState> {
+  const email = formData.get('email') as string
+  if (!email) return { error: 'Email is required.' }
+
+  const supabase = await createClient()
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000'
+
+  await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: `${siteUrl}/auth/callback?next=/reset-password`,
+  })
+
+  return { success: true }
+}
+
+export async function resetPassword(state: ResetState, formData: FormData): Promise<ResetState> {
+  const password = formData.get('password') as string
+  const confirm = formData.get('confirm') as string
+
+  if (!password || !confirm) return { error: 'All fields are required.' }
+  if (password.length < 8) return { error: 'Password must be at least 8 characters.' }
+  if (password !== confirm) return { error: 'Passwords do not match.' }
+
+  const supabase = await createClient()
+  const { error } = await supabase.auth.updateUser({ password })
+
+  if (error) return { error: error.message }
+
+  redirect('/login?reset=true')
 }
 
 export async function logout() {

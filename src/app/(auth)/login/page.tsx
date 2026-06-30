@@ -5,9 +5,9 @@ import Link from 'next/link'
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ registered?: string }>
+  searchParams: Promise<{ registered?: string; reset?: string; error?: string }>
 }) {
-  const { registered } = await searchParams
+  const { registered, reset, error } = await searchParams
 
   return (
     <div className="min-h-screen bg-gray-50 flex">
@@ -60,14 +60,19 @@ export default async function LoginPage({
             </div>
           )}
 
-          <LoginForm />
+          {reset && (
+            <div className="mb-5 px-4 py-3 bg-emerald-50 border border-emerald-200 rounded-lg text-sm text-emerald-700">
+              Password updated successfully. Sign in with your new password.
+            </div>
+          )}
 
-          <p className="text-center text-sm text-gray-500 mt-6">
-            Don&apos;t have an account?{' '}
-            <a href="/register" className="text-pink-600 font-medium hover:text-pink-700 transition-colors">
-              Register
-            </a>
-          </p>
+          {error && (
+            <div className="mb-5 px-4 py-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+              {error}
+            </div>
+          )}
+
+          <LoginForm />
         </div>
       </div>
     </div>
