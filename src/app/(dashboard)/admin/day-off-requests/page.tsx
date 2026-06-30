@@ -38,7 +38,7 @@ function fmtDate(d: string) {
 
 function fmtTs(ts: string) {
   return new Date(ts).toLocaleDateString('en-PH', {
-    month: 'short', day: 'numeric', year: 'numeric',
+    month: 'short', day: 'numeric', year: 'numeric', timeZone: 'Asia/Manila',
   })
 }
 

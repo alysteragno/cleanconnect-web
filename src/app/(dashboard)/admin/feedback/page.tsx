@@ -94,7 +94,7 @@ export default async function AdminFeedbackPage() {
                     </p>
                   </div>
                   <p className="text-xs text-gray-400 shrink-0">
-                    {new Date(f.created_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })}
+                    {new Date(f.created_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'Asia/Manila' })}
                   </p>
                 </div>
                 {f.comment && (

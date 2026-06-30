@@ -82,7 +82,7 @@ export default async function AdminAnnouncementsPage() {
                   </div>
                   {a.body && <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">{a.body}</p>}
                   <p className="text-xs text-gray-400 mt-1">
-                    {new Date(a.created_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })}
+                    {new Date(a.created_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'Asia/Manila' })}
                     <span className="ml-1.5">· Posted by <span className="font-medium text-gray-500">{a.poster_name}</span></span>
                   </p>
                 </div>

@@ -753,7 +753,7 @@ export default async function ReportsPage({
                       ))}
                     </div>
                     <span className="text-xs text-gray-400">
-                      {new Date(f.created_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric' })}
+                      {new Date(f.created_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', timeZone: 'Asia/Manila' })}
                     </span>
                   </div>
                   <p className="text-xs text-gray-500">

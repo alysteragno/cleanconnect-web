@@ -59,7 +59,7 @@ export default async function AdminComplaintDetailPage({
   const profileData = Array.isArray(complaint.profiles) ? complaint.profiles[0] : complaint.profiles
   const customer    = profileData as { full_name: string; phone: string | null } | null
   const openedDate  = new Date(complaint.created_at).toLocaleDateString('en-PH', {
-    month: 'short', day: 'numeric', year: 'numeric',
+    month: 'short', day: 'numeric', year: 'numeric', timeZone: 'Asia/Manila',
   })
 
   return (

@@ -51,7 +51,7 @@ export default async function AdminComplaintsPage() {
                 <p className="text-sm font-medium text-gray-900">{c.subject}</p>
                 <p className="text-xs text-gray-400 mt-0.5">
                   {((Array.isArray(c.profiles) ? c.profiles[0] : c.profiles) as { full_name: string } | null)?.full_name ?? 'Customer'} ·{' '}
-                  {new Date(c.created_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })}
+                  {new Date(c.created_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'Asia/Manila' })}
                 </p>
               </div>
               <span className={`text-xs px-2 py-0.5 rounded-full border font-medium shrink-0 ${STATUS_STYLES[c.status] ?? ''}`}>
