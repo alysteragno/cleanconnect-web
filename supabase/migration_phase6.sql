@@ -20,18 +20,6 @@ CREATE POLICY "Cleaners can manage their own availability"
 ON cleaner_availability FOR ALL
 USING (cleaner_id = auth.uid());
 
--- Branch managers can view availability of cleaners in their branch
-CREATE POLICY "Branch managers can view branch cleaner availability"
-ON cleaner_availability FOR SELECT
-USING (
-  EXISTS (
-    SELECT 1 FROM profiles cleaner
-    INNER JOIN profiles manager ON manager.branch_id = cleaner.branch_id
-    WHERE cleaner.id = cleaner_availability.cleaner_id
-      AND manager.id = auth.uid()
-      AND manager.role = 'branch_manager'
-  )
-);
 
 -- Super admins have full access
 CREATE POLICY "Super admins have full access to cleaner availability"

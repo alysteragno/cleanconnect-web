@@ -22,15 +22,6 @@ USING (
   )
 );
 
--- Branch managers can view profiles in their branch
-CREATE POLICY "Branch managers can view branch profiles"
-ON profiles FOR SELECT
-USING (
-  branch_id IN (
-    SELECT branch_id FROM profiles 
-    WHERE id = auth.uid() AND role = 'branch_manager'
-  )
-);
 
 -- Users can update their own profile (e.g. name, phone)
 CREATE POLICY "Users can update own profile"
@@ -64,15 +55,6 @@ USING (
   )
 );
 
--- Branch Manager Isolation
-CREATE POLICY "Branch managers can access their branch bookings"
-ON bookings FOR ALL
-USING (
-  branch_id IN (
-    SELECT branch_id FROM profiles 
-    WHERE id = auth.uid() AND role = 'branch_manager'
-  )
-);
 
 -- Cleaner Job Visibility (Can only SELECT bookings they are assigned to)
 CREATE POLICY "Cleaners can view bookings they are assigned to"
@@ -101,19 +83,6 @@ USING (
   )
 );
 
--- Branch managers have access to their branch's cleaner assignments
-CREATE POLICY "Branch managers can manage branch cleaner assignments"
-ON cleaner_assignments FOR ALL
-USING (
-  EXISTS (
-    SELECT 1 FROM bookings 
-    WHERE bookings.id = cleaner_assignments.booking_id
-    AND bookings.branch_id IN (
-      SELECT branch_id FROM profiles 
-      WHERE id = auth.uid() AND role = 'branch_manager'
-    )
-  )
-);
 
 -- Cleaners can see their own assignments
 CREATE POLICY "Cleaners can access their own assignments"

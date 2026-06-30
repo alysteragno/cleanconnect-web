@@ -6,8 +6,13 @@ import AnnouncementCarousel from '@/components/marketing/announcement-carousel'
 import { SERVICES, BRANCH, STEPS } from '@/lib/marketing-data'
 import { createClient } from '@/utils/supabase/server'
 
+function formatPrice(price: number) {
+  return '₱' + price.toLocaleString('en-PH')
+}
+
 export default async function HomePage() {
   const supabase = await createClient()
+
   const { data } = await supabase
     .from('announcements')
     .select('id, title, body, created_at')
@@ -15,6 +20,7 @@ export default async function HomePage() {
     .order('created_at', { ascending: false })
 
   const announcements = (data ?? []) as { id: string; title: string; body: string | null; created_at: string }[]
+
   return (
     <div className="min-h-screen bg-white">
       <MarketingHeader />
@@ -51,14 +57,8 @@ export default async function HomePage() {
                 href="/register"
                 className="px-6 py-3 bg-pink-600 text-white rounded-lg font-semibold text-sm hover:bg-pink-700 transition-colors"
               >
-                Download the App
-              </Link>
-              <a
-                href="/register"
-                className="px-6 py-3 bg-white text-gray-700 border border-gray-200 rounded-lg font-semibold text-sm hover:bg-gray-50 transition-colors"
-              >
                 Create Account
-              </a>
+              </Link>
             </div>
             <p className="mt-6 text-xs text-gray-400 border border-orange-200 bg-white rounded-full inline-flex items-center gap-2 px-4 py-2">
               <span className="w-2 h-2 rounded-full bg-pink-500 inline-block" />
@@ -101,14 +101,34 @@ export default async function HomePage() {
             ))}
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-px bg-gray-200 rounded-xl overflow-hidden border border-gray-200">
-            {SERVICES.map((service) => (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {SERVICES.map((svc) => (
               <div
-                key={service.title}
-                className="bg-white px-6 py-5 hover:bg-[#FFF5EC] transition-colors"
+                key={svc.title}
+                className="group rounded-2xl border border-gray-100 bg-white overflow-hidden shadow-sm hover:shadow-md hover:border-gray-200 transition-all duration-200"
               >
-                <p className="text-sm font-semibold text-gray-900 mb-1.5">{service.title}</p>
-                <p className="text-xs text-gray-500 leading-relaxed">{service.description}</p>
+                {svc.image ? (
+                  <div className="relative aspect-square overflow-hidden rounded-t-2xl">
+                    <Image
+                      src={svc.image}
+                      alt={svc.title}
+                      fill
+                      className="object-cover group-hover:scale-105 transition-transform duration-500"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/25 to-transparent" />
+                  </div>
+                ) : (
+                  <div className="aspect-square bg-[#FDF2F8] rounded-t-2xl" />
+                )}
+
+                <div className="px-5 py-4">
+                  <p className="font-semibold text-gray-900 text-sm mb-1.5 leading-snug">{svc.title}</p>
+                  <p className="text-xs text-gray-500 leading-relaxed line-clamp-2 mb-3">{svc.description}</p>
+                  <div className="border-t border-gray-100 pt-3">
+                    <p className="text-[10px] uppercase tracking-wide text-gray-400 font-medium">Starting at</p>
+                    <p className="text-sm font-bold text-pink-600">{formatPrice(svc.price)}</p>
+                  </div>
+                </div>
               </div>
             ))}
           </div>
@@ -193,7 +213,7 @@ export default async function HomePage() {
             href="/register"
             className="inline-block px-8 py-3 bg-pink-600 text-white rounded-lg font-semibold text-sm hover:bg-pink-700 transition-colors"
           >
-            Download the App
+            Create Account
           </Link>
         </div>
       </section>

@@ -10,7 +10,7 @@ export default function AboutPage() {
       {/* Hero */}
       <section className="max-w-6xl mx-auto px-4 sm:px-6 py-16 sm:py-24 text-center">
         <div className="inline-flex items-center gap-2 bg-pink-50 text-pink-700 text-xs font-semibold px-3 py-1.5 rounded-full mb-6">
-          Est. 2016
+          Est. 2021
         </div>
         <h1 className="text-4xl sm:text-5xl font-bold text-gray-900 mb-6">
           About Maid For You Cleaning Services
@@ -53,33 +53,12 @@ export default function AboutPage() {
         </div>
       </section>
 
-      {/* Services */}
-      <section className="py-16 sm:py-20">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6">
-          <SectionHeader
-            title="What We Offer"
-            subtitle="Professional cleaning services tailored to every need."
-          />
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-px bg-gray-200 rounded-xl overflow-hidden border border-gray-200">
-            {SERVICES.map((service) => (
-              <div
-                key={service.title}
-                className="bg-white px-6 py-5 hover:bg-pink-50 transition-colors"
-              >
-                <p className="text-sm font-semibold text-gray-900 mb-1.5">{service.title}</p>
-                <p className="text-xs text-gray-500 leading-relaxed">{service.description}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
+     
       {/* Coverage */}
       <section className="bg-pink-600 py-16 sm:py-20">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 text-center">
           <h2 className="text-3xl font-bold text-white mb-3">Where We Operate</h2>
-          <p className="text-pink-200 mb-10">Serving Metro Manila (NCR).</p>
-          <div className="flex justify-center">
+<p className="text-pink-200 mb-10">Serving Metro Manila (NCR), except Novaliches.</p>          <div className="flex justify-center">
             <div className="bg-white/10 border border-white/20 rounded-xl px-8 py-4 text-white">
               <p className="font-semibold text-lg">{BRANCH.name}</p>
               <p className="text-sm text-pink-200 mt-1">{BRANCH.area}</p>
@@ -98,7 +77,7 @@ export default function AboutPage() {
             href="/register"
             className="inline-block px-10 py-3.5 bg-pink-600 text-white rounded-xl font-semibold text-base hover:bg-pink-700 transition-colors"
           >
-            Create free account
+            Create account
           </Link>
         </div>
       </section>

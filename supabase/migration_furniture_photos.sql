@@ -41,7 +41,7 @@ CREATE POLICY "Customers read own furniture photos"
     AND auth.uid()::text = (storage.foldername(name))[1]
   );
 
--- Staff (super_admin, branch_manager) can read all furniture photos
+-- Super admin can read all furniture photos
 CREATE POLICY "Staff read all furniture photos"
   ON storage.objects FOR SELECT
   USING (
@@ -49,6 +49,6 @@ CREATE POLICY "Staff read all furniture photos"
     AND EXISTS (
       SELECT 1 FROM profiles
       WHERE id = auth.uid()
-        AND role IN ('super_admin', 'branch_manager')
+        AND role = 'super_admin'
     )
   );

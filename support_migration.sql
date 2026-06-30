@@ -39,12 +39,12 @@ CREATE POLICY "dm_customer_access"
   USING  (customer_id = auth.uid())
   WITH CHECK (customer_id = auth.uid() AND sender_id = auth.uid());
 
--- Staff (super_admin, branch_manager): full read/write access to every thread.
+-- Staff (super_admin): full read/write access to every thread.
 CREATE POLICY "dm_staff_access"
   ON direct_messages FOR ALL
   TO authenticated
-  USING  (auth_user_role() IN ('super_admin', 'branch_manager'))
-  WITH CHECK (auth_user_role() IN ('super_admin', 'branch_manager'));
+  USING  (auth_user_role() = 'super_admin')
+  WITH CHECK (auth_user_role() = 'super_admin');
 
 -- Allow real-time subscriptions on this table (idempotent).
 DO $$

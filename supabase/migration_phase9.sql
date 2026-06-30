@@ -16,7 +16,7 @@ BEGIN
 
   FOR staff_id IN
     SELECT id FROM profiles
-    WHERE role IN ('super_admin', 'branch_manager')
+    WHERE role = 'super_admin'
       AND is_active = true
   LOOP
     INSERT INTO notifications (user_id, title, body, type, booking_id)

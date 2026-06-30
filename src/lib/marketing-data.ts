@@ -2,42 +2,74 @@ export const SERVICES = [
   {
     title: 'General Cleaning',
     description: 'Complete top-to-bottom cleaning of your home — floors, surfaces, bathrooms, and kitchen included.',
+    image: '/service_image/general_cleaning.webp',
+    price: 1500,
   },
   {
     title: 'Air Conditioning Cleaning',
     description: 'Professional cleaning and maintenance of aircon units to improve efficiency and air quality.',
+    image: '/service_image/aircon_cleaning.webp',
+    price: 800,
+  },
+  {
+    title: 'Air Conditioning Repair',
+    description: 'Expert diagnosis and repair of faulty aircon units to restore full cooling performance.',
+    image: '/service_image/aircon_repair.webp',
+    price: 1200,
   },
   {
     title: 'Curtain Dry Cleaning',
     description: 'Specialized dry cleaning for curtains and drapes to remove dust, stains, and allergens.',
+    image: '/service_image/curtain_drycleaning.webp',
+    price: 600,
   },
   {
     title: 'Carpet Cleaning',
     description: 'Deep extraction cleaning for carpets to lift embedded dirt, stains, and odors.',
+    image: '/service_image/carpet_cleaning.webp',
+    price: 1000,
   },
   {
     title: 'Sofa Cleaning',
     description: 'Thorough cleaning and sanitizing of sofas and upholstered furniture.',
+    image: '/service_image/sofa_deepcleaning.webp',
+    price: 900,
   },
   {
-    title: 'Post-Construction Cleaning',
-    description: 'Thorough removal of construction dust, debris, and residues after renovation or building work.',
+    title: 'Grease Trap Cleaning',
+    description: 'Professional grease trap cleaning and maintenance for kitchens and commercial spaces.',
+    image: '/service_image/greasetrap.webp',
+    price: 2000,
+  },
+  {
+    title: 'Grease Trap Installation',
+    description: 'Supply and installation of grease traps for residential and commercial kitchens.',
+    image: '/service_image/greasetrap_installation.webp',
+    price: 3500,
   },
   {
     title: 'Mattress Cleaning',
     description: 'Deep cleaning and sanitizing of mattresses to eliminate dust mites, stains, and allergens.',
+    image: '/service_image/mattress_deepCleaning.webp',
+    price: 800,
   },
   {
-    title: 'Carpet Shampooing',
-    description: 'Hot water extraction shampooing to revive and deep-clean heavily soiled carpets.',
+    title: 'Post-Construction Cleaning',
+    description: 'Thorough removal of construction dust, debris, and residues after renovation or building work.',
+    image: '/service_image/post_construction.webp',
+    price: 5000,
   },
   {
     title: 'Office Cleaning',
     description: 'Professional cleaning of office spaces, workstations, common areas, and restrooms.',
+    image: '/service_image/office_cleaning.webp',
+    price: 2500,
   },
   {
     title: 'Condo Cleaning',
     description: 'Specialized cleaning packages tailored for condo units — flexible scheduling available.',
+    image: '/service_image/condo_cleaning.jpeg',
+    price: 1800,
   },
 ]
 
