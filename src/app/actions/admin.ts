@@ -38,6 +38,7 @@ export async function createCleanerAccount(
   const full_name = (formData.get('full_name') as string).trim()
   const email = (formData.get('email') as string).trim()
   const password = formData.get('password') as string
+  const confirm_password = formData.get('confirm_password') as string
   const phone = (formData.get('phone') as string).trim() || null
   const address_street           = (formData.get('address_street') as string)?.trim() || null
   const address_city             = (formData.get('address_city') as string)?.trim() || null
@@ -45,8 +46,14 @@ export async function createCleanerAccount(
   const date_of_birth            = (formData.get('date_of_birth') as string)?.trim() || null
   const emergency_contact_name   = (formData.get('emergency_contact_name') as string)?.trim() || null
   const emergency_contact_phone  = (formData.get('emergency_contact_phone') as string)?.trim() || null
-  if (!full_name || !email || !password) return { error: 'All fields are required.' }
-  if (password.length < 8) return { error: 'Password must be at least 8 characters.' }
+
+  if (!full_name || !email || !password) return { error: 'Full name, email, and password are required.' }
+  if (password !== confirm_password)     return { error: 'Passwords do not match.' }
+  if (password.length < 8)              return { error: 'Password must be at least 8 characters.' }
+  if (!/[A-Z]/.test(password))          return { error: 'Password must contain at least one uppercase letter.' }
+  if (!/[a-z]/.test(password))          return { error: 'Password must contain at least one lowercase letter.' }
+  if (!/[0-9]/.test(password))          return { error: 'Password must contain at least one number.' }
+  if (!/[^A-Za-z0-9]/.test(password))  return { error: 'Password must contain at least one special character.' }
 
   const { data: signUpData, error: signUpError } = await adminClient.auth.admin.createUser({
     email,
@@ -99,8 +106,11 @@ export async function updateCleanerProfile(
   const home_lat = home_lat_raw && !isNaN(parseFloat(home_lat_raw)) ? parseFloat(home_lat_raw) : undefined
   const home_lng = home_lng_raw && !isNaN(parseFloat(home_lng_raw)) ? parseFloat(home_lng_raw) : undefined
   if (!full_name) return { error: 'Name is required.' }
+  if (phone && !/^09[0-9]{9}$/.test(phone)) return { error: 'Phone must be a valid Philippine mobile number (09XXXXXXXXX).' }
+  if (emergency_contact_phone && !/^09[0-9]{9}$/.test(emergency_contact_phone)) return { error: 'Emergency contact phone must be a valid Philippine mobile number (09XXXXXXXXX).' }
 
-  const { error } = await supabase
+  const adminClient = createAdminClient()
+  const { error } = await adminClient
     .from('profiles')
     .update({
       full_name,
@@ -122,28 +132,6 @@ export async function updateCleanerProfile(
   return { success: 'Cleaner profile updated.' }
 }
 
-export async function toggleCleanerStatus(
-  state: AdminActionState,
-  formData: FormData
-): Promise<AdminActionState> {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user || !(await assertSuperAdmin(supabase, user.id))) return { error: 'Unauthorized.' }
-
-  const cleaner_id = formData.get('cleaner_id') as string
-  const current = formData.get('is_active') === 'true'
-
-  const { error } = await supabase
-    .from('profiles')
-    .update({ is_active: !current })
-    .eq('id', cleaner_id)
-
-  if (error) return { error: error.message }
-
-  revalidatePath(`/admin/cleaners/${cleaner_id}`)
-  revalidatePath('/admin/cleaners')
-  return { success: current ? 'Cleaner deactivated.' : 'Cleaner reactivated.' }
-}
 
 export async function toggleCustomerStatus(
   state: AdminActionState,

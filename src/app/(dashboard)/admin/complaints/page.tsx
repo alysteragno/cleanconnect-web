@@ -1,5 +1,6 @@
 ﻿import Link from 'next/link'
-import { createClient } from '@/utils/supabase/server'
+import { notFound } from 'next/navigation'
+import { createClient, createAdminClient } from '@/utils/supabase/server'
 
 const STATUS_STYLES: Record<string, string> = {
   open: 'bg-yellow-50 text-yellow-700 border-yellow-200',
@@ -12,9 +13,15 @@ const STATUS_LABELS: Record<string, string> = {
 
 export default async function AdminComplaintsPage() {
   const supabase = await createClient()
-  const { data: complaints } = await supabase
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) notFound()
+  const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+  if (profile?.role !== 'super_admin') notFound()
+
+  const adminDb = createAdminClient()
+  const { data: complaints } = await adminDb
     .from('complaints')
-    .select('id, subject, status, created_at, profiles (full_name)')
+    .select('id, subject, status, created_at, profiles!customer_id (full_name)')
     .order('created_at', { ascending: false })
 
   const open = (complaints ?? []).filter((c) => c.status !== 'resolved').length

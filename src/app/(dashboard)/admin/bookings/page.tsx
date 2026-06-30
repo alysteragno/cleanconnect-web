@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import Image from 'next/image'
-import { createAdminClient } from '@/utils/supabase/server'
+import { notFound } from 'next/navigation'
+import { createClient, createAdminClient } from '@/utils/supabase/server'
 function getServiceImage(name: string | null): string | null {
   if (!name) return null
   const n = name.toLowerCase()
@@ -33,6 +34,7 @@ type Booking = {
   base_price: number
   status: string
   payment_status: string
+  payment_method: string
   address_city: string | null
   profiles: { full_name: string } | null
 }
@@ -89,11 +91,17 @@ export default async function AdminBookingsPage({
   searchParams: Promise<{ status?: string }>
 }) {
   const { status } = await searchParams
+  const authClient = await createClient()
+  const { data: { user } } = await authClient.auth.getUser()
+  if (!user) notFound()
+  const { data: profile } = await authClient.from('profiles').select('role').eq('id', user.id).single()
+  if (profile?.role !== 'super_admin') notFound()
+
   const supabase = createAdminClient()
 
   const { data: bookings } = await supabase
     .from('bookings')
-    .select('id, created_at, service_date, service_time, service_name, property_sqm, base_price, status, payment_status, address_city, profiles!customer_id (full_name)')
+    .select('id, created_at, service_date, service_time, service_name, property_sqm, base_price, status, payment_status, payment_method, address_city, profiles!customer_id (full_name)')
     .order('service_date', { ascending: false })
 
   const all = (bookings ?? []) as unknown as Booking[]
@@ -243,6 +251,7 @@ export default async function AdminBookingsPage({
                       <span className={`text-[11px] px-2 py-0.5 rounded-full border font-semibold mt-0.5 inline-block ${pm}`}>
                         {PAYMENT_LABELS[b.payment_status] ?? b.payment_status}
                       </span>
+                      <p className="text-[11px] text-gray-400 mt-0.5 capitalize">{b.payment_method}</p>
                     </div>
                   </Link>
                 )

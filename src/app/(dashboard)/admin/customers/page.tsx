@@ -1,5 +1,6 @@
 import Link from 'next/link'
-import { createAdminClient } from '@/utils/supabase/server'
+import { notFound } from 'next/navigation'
+import { createClient, createAdminClient } from '@/utils/supabase/server'
 
 type Customer = {
   id: string
@@ -10,6 +11,12 @@ type Customer = {
 }
 
 export default async function AdminCustomersPage() {
+  const authClient = await createClient()
+  const { data: { user } } = await authClient.auth.getUser()
+  if (!user) notFound()
+  const { data: profile } = await authClient.from('profiles').select('role').eq('id', user.id).single()
+  if (profile?.role !== 'super_admin') notFound()
+
   const supabase = createAdminClient()
 
   const { data: customers } = await supabase

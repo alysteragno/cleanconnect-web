@@ -96,10 +96,7 @@ export default function RegisterForm() {
 
       <AuthButton pending={pending} label="Create account" pendingLabel="Creating account..." />
 
-      <AuthFooter>
-        Already have an account?{' '}
-        <a href="/login" className={authLinkClass}>Sign in</a>
-      </AuthFooter>
+      
     </form>
   )
 }

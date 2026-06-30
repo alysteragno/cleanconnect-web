@@ -16,6 +16,9 @@ export default async function AdminSupportThreadPage({
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) notFound()
 
+  const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+  if (profile?.role !== 'super_admin') notFound()
+
   const [{ data: customerProfile }, { data: customerMsgs }, { data: adminMsgs }] = await Promise.all([
     adminDb
       .from('profiles')

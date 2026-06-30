@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { notFound } from 'next/navigation'
 import { createClient, createAdminClient } from '@/utils/supabase/server'
 
 function formatRelativeTime(iso: string) {
@@ -28,6 +29,11 @@ function getInitials(name: string) {
 export default async function AdminSupportPage() {
   const supabase = await createClient()
   const adminDb  = createAdminClient()
+
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) notFound()
+  const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+  if (profile?.role !== 'super_admin') notFound()
 
   const [{ data: customers }, { data: msgRows }] = await Promise.all([
     // Admin client bypasses RLS to list all customers reliably

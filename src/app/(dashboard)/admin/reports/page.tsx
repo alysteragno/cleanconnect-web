@@ -1,5 +1,6 @@
 import Link from 'next/link'
-import { createClient } from '@/utils/supabase/server'
+import { notFound } from 'next/navigation'
+import { createClient, createAdminClient } from '@/utils/supabase/server'
 import { PrintButton } from '@/components/ui/print-button'
 
 type CompletedBooking = {
@@ -83,37 +84,41 @@ type Period = (typeof PERIODS)[number]['value']
 type DateRange = { start: string; end: string }
 
 function getDateRange(period: string): DateRange | null {
-  const now = new Date()
+  // Always derive dates in Philippines time (UTC+8)
+  const phToday = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' }) // 'YYYY-MM-DD'
+  const [y, mo, d] = phToday.split('-').map(Number) // mo is 1-indexed
+  const pad = (n: number) => String(n).padStart(2, '0')
+
   if (period === 'day') {
-    const d = now.toISOString().split('T')[0]
-    return { start: d, end: d }
+    return { start: phToday, end: phToday }
   }
   if (period === 'week') {
-    const dow = now.getDay()
-    const mon = new Date(now)
-    mon.setDate(now.getDate() + (dow === 0 ? -6 : 1 - dow))
-    mon.setHours(0, 0, 0, 0)
-    const sun = new Date(mon)
-    sun.setDate(mon.getDate() + 6)
-    return { start: mon.toISOString().split('T')[0], end: sun.toISOString().split('T')[0] }
+    const noonPH = new Date(`${phToday}T12:00:00+08:00`)
+    const dow = noonPH.getDay() // 0=Sun
+    const diffToMon = dow === 0 ? -6 : 1 - dow
+    const mon = new Date(noonPH); mon.setDate(noonPH.getDate() + diffToMon)
+    const sun = new Date(mon);    sun.setDate(mon.getDate() + 6)
+    return {
+      start: mon.toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' }),
+      end:   sun.toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' }),
+    }
   }
   if (period === 'month') {
-    const first = new Date(now.getFullYear(), now.getMonth(), 1)
-    const last  = new Date(now.getFullYear(), now.getMonth() + 1, 0)
-    return { start: first.toISOString().split('T')[0], end: last.toISOString().split('T')[0] }
+    const lastDay = new Date(y, mo, 0).getDate() // mo is 1-indexed so this gives last day of that month
+    return { start: `${y}-${pad(mo)}-01`, end: `${y}-${pad(mo)}-${pad(lastDay)}` }
   }
   return null
 }
 
 function periodSubtitle(period: string, range: DateRange | null): string {
   const fmt = (d: string, opts: Intl.DateTimeFormatOptions) =>
-    new Date(d + 'T00:00:00').toLocaleDateString('en-PH', opts)
+    new Date(`${d}T12:00:00+08:00`).toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', ...opts })
   if (period === 'day' && range)
     return fmt(range.start, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })
   if (period === 'week' && range)
     return `${fmt(range.start, { month: 'short', day: 'numeric' })} – ${fmt(range.end, { month: 'short', day: 'numeric', year: 'numeric' })}`
   if (period === 'month')
-    return new Date().toLocaleDateString('en-PH', { month: 'long', year: 'numeric' })
+    return new Date().toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', month: 'long', year: 'numeric' })
   return 'All time'
 }
 
@@ -140,31 +145,36 @@ export default async function ReportsPage({
   const subtitle = periodSubtitle(period, range)
 
   const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) notFound()
+  const { data: authProfile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+  if (authProfile?.role !== 'super_admin') notFound()
+
+  const adminDb = createAdminClient()
   const now = new Date()
 
-  // Weekly schedule always shows current week regardless of period tab
-  const dow = now.getDay()
-  const monday = new Date(now)
-  monday.setDate(now.getDate() + (dow === 0 ? -6 : 1 - dow))
-  monday.setHours(0, 0, 0, 0)
-  const sunday = new Date(monday)
-  sunday.setDate(monday.getDate() + 6)
-  const weekStart = monday.toISOString().split('T')[0]
-  const weekEnd   = sunday.toISOString().split('T')[0]
+  // Weekly schedule always shows current week in Philippines time
+  const phToday = now.toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' })
+  const noonPH  = new Date(`${phToday}T12:00:00+08:00`)
+  const curDow  = noonPH.getDay()
+  const monPH   = new Date(noonPH); monPH.setDate(noonPH.getDate() + (curDow === 0 ? -6 : 1 - curDow))
+  const sunPH   = new Date(monPH);  sunPH.setDate(monPH.getDate() + 6)
+  const weekStart = monPH.toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' })
+  const weekEnd   = sunPH.toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' })
 
-  // Period-filtered queries
+  // Period-filtered queries — filter by created_at (Philippines time) so bookings appear in the period they were made
   const allBookingsQ = range
-    ? supabase.from('bookings').select('status, base_price, payment_status, service_name, space_type, property_sqm')
-        .gte('service_date', range.start).lte('service_date', range.end)
-    : supabase.from('bookings').select('status, base_price, payment_status, service_name, space_type, property_sqm')
+    ? adminDb.from('bookings').select('status, base_price, payment_status, service_name, space_type, property_sqm')
+        .gte('created_at', `${range.start}T00:00:00+08:00`).lte('created_at', `${range.end}T23:59:59+08:00`)
+    : adminDb.from('bookings').select('status, base_price, payment_status, service_name, space_type, property_sqm')
 
   const completedQ = range
-    ? supabase.from('bookings')
+    ? adminDb.from('bookings')
         .select('id, service_date, service_name, property_sqm, base_price, payment_status, payment_method, profiles!customer_id(full_name)')
         .eq('status', 'completed')
-        .gte('service_date', range.start).lte('service_date', range.end)
+        .gte('created_at', `${range.start}T00:00:00+08:00`).lte('created_at', `${range.end}T23:59:59+08:00`)
         .order('service_date', { ascending: false })
-    : supabase.from('bookings')
+    : adminDb.from('bookings')
         .select('id, service_date, service_name, property_sqm, base_price, payment_status, payment_method, profiles!customer_id(full_name)')
         .eq('status', 'completed')
         .order('service_date', { ascending: false })
@@ -172,13 +182,13 @@ export default async function ReportsPage({
 
   // Period-filtered recent feedback (by created_at)
   const recentFeedbackQ = range
-    ? supabase.from('feedback')
+    ? adminDb.from('feedback')
         .select('id, rating, comment, created_at, bookings(service_name), profiles!customer_id(full_name)')
-        .gte('created_at', `${range.start}T00:00:00`)
-        .lte('created_at', `${range.end}T23:59:59`)
+        .gte('created_at', `${range.start}T00:00:00+08:00`)
+        .lte('created_at', `${range.end}T23:59:59+08:00`)
         .order('created_at', { ascending: false })
         .limit(5)
-    : supabase.from('feedback')
+    : adminDb.from('feedback')
         .select('id, rating, comment, created_at, bookings(service_name), profiles!customer_id(full_name)')
         .order('created_at', { ascending: false })
         .limit(5)
@@ -193,9 +203,9 @@ export default async function ReportsPage({
   ] = await Promise.all([
     allBookingsQ,
     completedQ,
-    supabase.from('profiles').select('id, full_name').eq('role', 'cleaner').eq('is_active', true).order('full_name'),
-    supabase.from('feedback').select('cleaner_id, rating'),
-    supabase.from('bookings')
+    adminDb.from('profiles').select('id, full_name').eq('role', 'cleaner').eq('is_active', true).order('full_name'),
+    adminDb.from('feedback').select('cleaner_id, rating'),
+    adminDb.from('bookings')
       .select('id, service_date, service_time, service_name, status, base_price, profiles!customer_id(full_name)')
       .gte('service_date', weekStart).lte('service_date', weekEnd)
       .not('status', 'eq', 'cancelled')
@@ -226,9 +236,9 @@ export default async function ReportsPage({
     return acc
   }, {})
   const weekDays = Array.from({ length: 7 }, (_, i) => {
-    const d = new Date(monday)
-    d.setDate(monday.getDate() + i)
-    return d.toISOString().split('T')[0]
+    const d = new Date(monPH)
+    d.setDate(monPH.getDate() + i)
+    return d.toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' })
   })
 
   // Financial KPIs
@@ -283,7 +293,7 @@ export default async function ReportsPage({
   // Cleaner performance (always all-time)
   const cleanerStats = await Promise.all(
     cleanerList.map(async (c) => {
-      const { count } = await supabase
+      const { count } = await adminDb
         .from('cleaner_assignments')
         .select('*', { count: 'exact', head: true })
         .eq('cleaner_id', c.id).eq('status', 'completed')

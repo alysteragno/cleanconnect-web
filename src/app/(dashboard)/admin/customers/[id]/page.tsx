@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { createAdminClient } from '@/utils/supabase/server'
+import { createClient, createAdminClient } from '@/utils/supabase/server'
 import CustomerToggleForm from './customer-toggle-form'
 import { IconHeadset } from '@/components/icons'
 
@@ -48,6 +48,12 @@ export default async function CustomerDetailPage({
   params: Promise<{ id: string }>
 }) {
   const { id } = await params
+  const authClient = await createClient()
+  const { data: { user } } = await authClient.auth.getUser()
+  if (!user) notFound()
+  const { data: userProfile } = await authClient.from('profiles').select('role').eq('id', user.id).single()
+  if (userProfile?.role !== 'super_admin') notFound()
+
   const supabase = createAdminClient()
 
   const [{ data: customer }, { data: bookings }] = await Promise.all([

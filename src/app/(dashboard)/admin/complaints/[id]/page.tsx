@@ -26,16 +26,17 @@ export default async function AdminComplaintDetailPage({
   if (!user) notFound()
 
   const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+  if (profile?.role !== 'super_admin') notFound()
 
   const adminDb = createAdminClient()
 
   const [{ data: complaint }, { data: customerMsgs }] = await Promise.all([
-    supabase
+    adminDb
       .from('complaints')
-      .select('id, subject, status, created_at, profiles (full_name, phone)')
+      .select('id, subject, status, created_at, customer_id, profiles!customer_id (full_name, phone)')
       .eq('id', id)
       .single(),
-    supabase
+    adminDb
       .from('complaint_messages')
       .select('id, message, created_at, sender_id, profiles (full_name, role)')
       .eq('complaint_id', id)
@@ -86,7 +87,8 @@ export default async function AdminComplaintDetailPage({
             </span>
           </div>
           <p className="text-xs text-gray-400 mt-0.5">
-            {customer?.full_name ?? 'Customer'}{customer?.phone ? ` · ${customer.phone}` : ''} · Opened {openedDate}
+            {customer?.full_name ?? 'Unknown Customer'}
+            {customer?.phone ? ` · ${customer.phone}` : ''} · Opened {openedDate}
           </p>
         </div>
 

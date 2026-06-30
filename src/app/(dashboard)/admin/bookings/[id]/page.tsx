@@ -1,12 +1,13 @@
 import Link from 'next/link'
 import Image from 'next/image'
 import { notFound } from 'next/navigation'
-import { createAdminClient } from '@/utils/supabase/server'
+import { createClient, createAdminClient } from '@/utils/supabase/server'
 import PaymentForm from './payment-form'
 import AdjustForm from './adjust-form'
 import DispatchPanel from './dispatch-panel'
 import PaymentVerificationCard from './payment-verification'
 import CleanersForm from './cleaners-form'
+import FurniturePhotoGrid from './furniture-photo-grid'
 
 type Booking = {
   id: string
@@ -24,7 +25,7 @@ type Booking = {
   couch_quantity: number
   mattress_quantity: number
   furniture_quantity: number | null
-  furniture_photo_urls: string[] | null
+  furniture_images: string[] | null
   status: string
   payment_status: string
   payment_method: string
@@ -78,6 +79,12 @@ export default async function AdminBookingDetailPage({
   params: Promise<{ id: string }>
 }) {
   const { id } = await params
+  const authClient = await createClient()
+  const { data: { user } } = await authClient.auth.getUser()
+  if (!user) notFound()
+  const { data: profile } = await authClient.from('profiles').select('role').eq('id', user.id).single()
+  if (profile?.role !== 'super_admin') notFound()
+
   const adminClient = createAdminClient()
 
   const [{ data: booking }, { data: assignments }, { data: cleaners }] = await Promise.all([
@@ -87,7 +94,7 @@ export default async function AdminBookingDetailPage({
         id, created_at, customer_id, service_date, service_time, service_name, space_type,
         property_sqm, required_cleaners, duration_hours, base_price,
         cancellation_fee, couch_quantity, mattress_quantity,
-        furniture_quantity, furniture_photo_urls,
+        furniture_quantity, furniture_images,
         status, payment_status, payment_method, bank_used, payment_reference, payment_proof_url,
         address_unit, address_street, address_city, address_province,
         special_notes,
@@ -122,34 +129,9 @@ export default async function AdminBookingDetailPage({
   const serviceLabel    = b.service_name ?? '—'
   const serviceImageUrl = serviceRow?.image_url ?? null
 
-  // Resolve furniture photo signed URLs from private bucket (1-hour expiry)
-  let signedPhotoUrls: string[] = []
-  const storedPaths = b.furniture_photo_urls ?? []
-
-  if (storedPaths.length > 0) {
-    // Paths already saved on the record — sign them directly
-    const { data: signed } = await adminClient.storage
-      .from('furniture-photos')
-      .createSignedUrls(storedPaths, 3600)
-    signedPhotoUrls = (signed ?? []).map(item => item.signedUrl ?? '')
-  } else {
-    // Discover from bucket: files live under {customer_id}/
-    const { data: files } = await adminClient.storage
-      .from('furniture-photos')
-      .list(b.customer_id, { sortBy: { column: 'created_at', order: 'asc' } })
-
-    const imageFiles = (files ?? []).filter(f =>
-      f.name !== '.emptyFolderPlaceholder' && f.metadata != null
-    )
-    if (imageFiles.length > 0) {
-      const paths = imageFiles.map(f => `${b.customer_id}/${f.name}`)
-      const { data: signed } = await adminClient.storage
-        .from('furniture-photos')
-        .createSignedUrls(paths, 3600)
-      signedPhotoUrls = (signed ?? []).map(item => item.signedUrl ?? '')
-    }
-  }
-  const photoCount = storedPaths.length > 0 ? storedPaths.length : signedPhotoUrls.length
+  // furniture_images is a text[] of fully-qualified public URLs saved by the mobile app
+  const signedPhotoUrls: string[] = b.furniture_images ?? []
+  const photoCount = signedPhotoUrls.length
   const sm = STATUS_META[b.status] ?? { label: b.status, dot: 'bg-gray-400', badge: 'bg-gray-50 text-gray-600 border-gray-200' }
   const address = [b.address_unit, b.address_street, b.address_city, b.address_province].filter(Boolean).join(', ')
 
@@ -202,6 +184,28 @@ export default async function AdminBookingDetailPage({
 
         {/* ── Left column ─────────────────────────────────────────── */}
         <div className="space-y-5">
+
+          {/* Customer */}
+          <section className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+            <div className="px-6 py-4 border-b border-gray-100">
+              <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-widest">
+                Customer
+              </p>
+            </div>
+            <div className="px-6 py-5">
+              <div className="flex items-center gap-3.5">
+                <div className="w-10 h-10 rounded-full bg-pink-100 text-pink-600 font-bold text-sm flex items-center justify-center shrink-0 select-none">
+                  {b.profiles?.full_name?.charAt(0).toUpperCase() ?? '?'}
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-gray-900">{b.profiles?.full_name ?? '—'}</p>
+                  {b.profiles?.phone && (
+                    <p className="text-xs text-gray-400 mt-0.5">{b.profiles.phone}</p>
+                  )}
+                </div>
+              </div>
+            </div>
+          </section>
 
           {/* Booking Details */}
           <section className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
@@ -261,64 +265,8 @@ export default async function AdminBookingDetailPage({
                   <p className="text-xs text-gray-300 mt-1">Customer must upload 5 photos before service.</p>
                 </div>
               ) : (
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
-                  {Array.from({ length: 5 }).map((_, i) => {
-                    const url = signedPhotoUrls[i]
-                    return url ? (
-                      <a
-                        key={i}
-                        href={url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="relative aspect-square rounded-xl overflow-hidden border border-gray-200 hover:border-pink-400 transition-colors group"
-                      >
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src={url}
-                          alt={`Furniture photo ${i + 1}`}
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
-                        />
-                        <span className="absolute bottom-1.5 right-1.5 bg-black/50 text-white text-[10px] font-semibold px-1.5 py-0.5 rounded-full">
-                          {i + 1}
-                        </span>
-                      </a>
-                    ) : (
-                      <div
-                        key={i}
-                        className="relative aspect-square rounded-xl border-2 border-dashed border-gray-200 flex flex-col items-center justify-center gap-1"
-                      >
-                        <svg className="w-5 h-5 text-gray-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
-                            d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                        </svg>
-                        <span className="text-[10px] text-gray-300 font-medium">Photo {i + 1}</span>
-                      </div>
-                    )
-                  })}
-                </div>
+                <FurniturePhotoGrid urls={signedPhotoUrls} />
               )}
-            </div>
-          </section>
-
-          {/* Customer */}
-          <section className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-            <div className="px-6 py-4 border-b border-gray-100">
-              <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-widest">
-                Customer
-              </p>
-            </div>
-            <div className="px-6 py-5">
-              <div className="flex items-center gap-3.5">
-                <div className="w-10 h-10 rounded-full bg-pink-100 text-pink-600 font-bold text-sm flex items-center justify-center shrink-0 select-none">
-                  {b.profiles?.full_name?.charAt(0).toUpperCase() ?? '?'}
-                </div>
-                <div>
-                  <p className="text-sm font-semibold text-gray-900">{b.profiles?.full_name ?? '—'}</p>
-                  {b.profiles?.phone && (
-                    <p className="text-xs text-gray-400 mt-0.5">{b.profiles.phone}</p>
-                  )}
-                </div>
-              </div>
             </div>
           </section>
 

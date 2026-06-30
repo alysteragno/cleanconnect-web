@@ -1,5 +1,6 @@
 import Link from 'next/link'
-import { createAdminClient } from '@/utils/supabase/server'
+import { notFound } from 'next/navigation'
+import { createClient, createAdminClient } from '@/utils/supabase/server'
 import { toggleAnnouncement, deleteAnnouncement } from '@/app/actions/announcements'
 import AnnouncementCreateForm from './create-form'
 
@@ -14,6 +15,12 @@ type Announcement = {
 }
 
 export default async function AdminAnnouncementsPage() {
+  const authClient = await createClient()
+  const { data: { user } } = await authClient.auth.getUser()
+  if (!user) notFound()
+  const { data: profile } = await authClient.from('profiles').select('role').eq('id', user.id).single()
+  if (profile?.role !== 'super_admin') notFound()
+
   const admin = createAdminClient()
 
   const { data: rows } = await admin

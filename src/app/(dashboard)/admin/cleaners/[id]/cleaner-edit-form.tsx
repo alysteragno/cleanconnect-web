@@ -1,7 +1,7 @@
 'use client'
 
 import { useActionState, useState } from 'react'
-import { updateCleanerProfile, toggleCleanerStatus } from '@/app/actions/admin'
+import { updateCleanerProfile } from '@/app/actions/admin'
 
 export type Cleaner = {
   id: string
@@ -36,6 +36,9 @@ function Field({
   onChange,
   placeholder,
   required,
+  maxLength,
+  pattern,
+  hint,
 }: {
   label: string
   name: string
@@ -45,6 +48,9 @@ function Field({
   onChange?: (e: React.ChangeEvent<HTMLInputElement>) => void
   placeholder?: string
   required?: boolean
+  maxLength?: number
+  pattern?: string
+  hint?: string
 }) {
   const isControlled = value !== undefined
   return (
@@ -64,8 +70,11 @@ function Field({
         )}
         required={required}
         placeholder={placeholder}
+        maxLength={maxLength}
+        pattern={pattern}
         className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-pink-500"
       />
+      {hint && <p className="text-xs text-gray-400 mt-1">{hint}</p>}
     </div>
   )
 }
@@ -74,7 +83,6 @@ type GeocodeStatus = 'idle' | 'loading' | 'found' | 'not_found'
 
 export default function CleanerEditForm({ cleaner }: { cleaner: Cleaner }) {
   const [editState, editAction, editPending] = useActionState(updateCleanerProfile, undefined)
-  const [toggleState, toggleAction, togglePending] = useActionState(toggleCleanerStatus, undefined)
 
   const [addressStreet,   setAddressStreet]   = useState(cleaner.address_street ?? '')
   const [addressCity,     setAddressCity]     = useState(cleaner.address_city ?? '')
@@ -113,7 +121,7 @@ export default function CleanerEditForm({ cleaner }: { cleaner: Cleaner }) {
         <SectionLabel>Personal Information</SectionLabel>
         <Field label="Full Name" name="full_name" defaultValue={cleaner.full_name} required />
         <div className="grid grid-cols-2 gap-4">
-          <Field label="Phone" name="phone" type="tel" defaultValue={cleaner.phone} placeholder="+63 9XX XXX XXXX" />
+          <Field label="Phone" name="phone" type="tel" defaultValue={cleaner.phone} placeholder="09XX XXX XXXX" maxLength={11} pattern="09[0-9]{9}" hint="Philippine mobile number (09XXXXXXXXX)" />
           <Field label="Date of Birth" name="date_of_birth" type="date" defaultValue={cleaner.date_of_birth} />
         </div>
 
@@ -187,7 +195,7 @@ export default function CleanerEditForm({ cleaner }: { cleaner: Cleaner }) {
         <SectionLabel>Emergency Contact</SectionLabel>
         <div className="grid grid-cols-2 gap-4">
           <Field label="Contact Name" name="emergency_contact_name" defaultValue={cleaner.emergency_contact_name} placeholder="Juan Santos" />
-          <Field label="Contact Phone" name="emergency_contact_phone" type="tel" defaultValue={cleaner.emergency_contact_phone} placeholder="+63 9XX XXX XXXX" />
+          <Field label="Contact Phone" name="emergency_contact_phone" type="tel" defaultValue={cleaner.emergency_contact_phone} placeholder="09XX XXX XXXX" maxLength={11} pattern="09[0-9]{9}" />
         </div>
 
         {editState?.error && (
@@ -206,38 +214,6 @@ export default function CleanerEditForm({ cleaner }: { cleaner: Cleaner }) {
         </button>
       </form>
 
-      {/* ── Account Status ──────────────────────────────────────────────── */}
-      <div className="border-t border-gray-100 pt-5">
-        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Account Status</p>
-        <form action={toggleAction}>
-          <input type="hidden" name="cleaner_id" value={cleaner.id} />
-          <input type="hidden" name="is_active" value={String(cleaner.is_active)} />
-          <div className="flex items-center justify-between p-3 border border-gray-200 rounded-lg">
-            <div>
-              <p className="text-sm font-medium text-gray-900">
-                {cleaner.is_active ? 'Active' : 'Deactivated'}
-              </p>
-              <p className="text-xs text-gray-400 mt-0.5">
-                {cleaner.is_active ? 'Cleaner can log in and receive job offers.' : 'Cleaner cannot receive new offers.'}
-              </p>
-            </div>
-            <button
-              type="submit"
-              disabled={togglePending}
-              className={`text-sm px-4 py-1.5 rounded-lg font-medium transition-colors disabled:opacity-50 ${
-                cleaner.is_active
-                  ? 'bg-red-50 text-red-600 hover:bg-red-100 border border-red-200'
-                  : 'bg-green-50 text-green-600 hover:bg-green-100 border border-green-200'
-              }`}
-            >
-              {togglePending ? '...' : cleaner.is_active ? 'Deactivate' : 'Reactivate'}
-            </button>
-          </div>
-          {toggleState?.success && (
-            <p className="mt-2 text-sm text-green-700 bg-green-50 border border-green-100 px-3 py-2 rounded-lg">{toggleState.success}</p>
-          )}
-        </form>
-      </div>
     </div>
   )
 }

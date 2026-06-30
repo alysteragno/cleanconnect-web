@@ -1,5 +1,6 @@
 import Link from 'next/link'
-import { createAdminClient } from '@/utils/supabase/server'
+import { notFound } from 'next/navigation'
+import { createClient, createAdminClient } from '@/utils/supabase/server'
 import { StatCard } from '@/components/ui/stat-card'
 import {
   IconCalendar, IconClock, IconCheck, IconUsers, IconChart,
@@ -93,6 +94,12 @@ function QuickActionCard({
 // ─── Page ────────────────────────────────────────────────────────────────────
 
 export default async function AdminPage() {
+  const authClient = await createClient()
+  const { data: { user } } = await authClient.auth.getUser()
+  if (!user) notFound()
+  const { data: profile } = await authClient.from('profiles').select('role').eq('id', user.id).single()
+  if (profile?.role !== 'super_admin') notFound()
+
   const supabase = createAdminClient()
   const today   = new Date().toISOString().split('T')[0]
   const hour    = new Date().getHours()
