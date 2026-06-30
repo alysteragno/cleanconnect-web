@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import Image from 'next/image'
 import { NAV_LINKS, CONTACT } from '@/lib/marketing-data'
+import pkg from '../../../package.json'
 
 const FOOTER_CONTACTS: { href: string; label: string; icon: React.ReactNode; external?: boolean }[] = [
   {
@@ -118,7 +119,7 @@ export default function MarketingFooter() {
           <p className="text-xs text-gray-400">
             &copy; {new Date().getFullYear()} Maid For You Cleaning Services. All rights reserved.
           </p> 
-          <p className="text-xs text-gray-400">Developed by SyncLab</p>
+          <p className="text-xs text-gray-400">Developed by SyncLab <span className="text-gray-300">|</span> v{pkg.version}</p>
         </div>
       </div>
     </footer>
