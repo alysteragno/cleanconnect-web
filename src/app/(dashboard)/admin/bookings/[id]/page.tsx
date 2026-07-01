@@ -117,6 +117,15 @@ export default async function AdminBookingDetailPage({
 
   if (!booking) notFound()
 
+  // Fetched separately so a missing column (migration not yet applied) degrades
+  // gracefully to null instead of 404ing the entire page.
+  const { data: enRouteRow } = await adminClient
+    .from('bookings')
+    .select('cleaner_en_route_at')
+    .eq('id', id)
+    .maybeSingle()
+  const cleanerEnRouteAt: string | null = (enRouteRow as { cleaner_en_route_at?: string | null } | null)?.cleaner_en_route_at ?? null
+
   const b = booking as unknown as Booking
   const assignmentList = (assignments ?? []) as unknown as Assignment[]
   const cleanerList = (cleaners ?? []) as Cleaner[]
@@ -179,6 +188,21 @@ export default async function AdminBookingDetailPage({
           </div>
         </div>
       </div>
+
+      {/* ── Transportation fee warning ─────────────────────────────── */}
+      {b.status === 'cancelled' && cleanerEnRouteAt && (
+        <div className="mb-6 flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3.5">
+          <svg className="w-4 h-4 text-amber-500 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+          </svg>
+          <div>
+            <p className="text-sm font-semibold text-amber-800">₱200 Transportation Fee Owed</p>
+            <p className="text-xs text-amber-700 mt-0.5">
+              The cleaner was already en route when this booking was cancelled. The assigned cleaner(s) are entitled to a ₱200 transportation fee — please follow up on collection manually.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* ── Two-column layout ──────────────────────────────────────── */}
       <div className="grid grid-cols-1 xl:grid-cols-[1fr_360px] gap-6 items-start">

@@ -1,7 +1,6 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { createClient, createAdminClient } from '@/utils/supabase/server'
-import { PrintButton } from '@/components/ui/print-button'
 
 type CompletedBooking = {
   id: string
@@ -321,7 +320,6 @@ export default async function ReportsPage({
           <h1 className="text-xl font-bold text-gray-900 tracking-tight mt-2">Reports & Analytics</h1>
           <p className="text-sm text-gray-400 mt-0.5">Bookings, revenue, and cleaner performance</p>
         </div>
-        <PrintButton />
       </div>
 
       {/* Period tabs */}

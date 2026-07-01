@@ -38,7 +38,7 @@ export default function PaymentVerificationCard({
   const isPaid = paymentStatus === 'paid'
   const statusStyle = STATUS_META[paymentStatus] ?? STATUS_META.unpaid
   const statusLabel = paymentStatus === 'unpaid'
-    ? isCash ? 'Awaiting Cash Payment' : 'Pending Confirmation'
+    ? isCash ? 'Awaiting Cash' : 'Pending'
     : statusStyle.label
 
   function handleCopy() {
@@ -70,7 +70,7 @@ export default function PaymentVerificationCard({
         </p>
 
         {/* Method + status row */}
-        <div className="flex items-center justify-between gap-3">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-3">
             {/* Logo display */}
             {paymentMethod === 'gcash' && (

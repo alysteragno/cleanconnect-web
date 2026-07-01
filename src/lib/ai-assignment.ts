@@ -276,7 +276,7 @@ export async function runAIDispatch(bookingId: string, dryRun = false): Promise<
 
   // ── Step 6: Create 'assigned' assignments (skipped on dry-run preview) ──
   if (!dryRun && toDispatch.length > 0) {
-    await supabase.from('cleaner_assignments').upsert(
+    const { error: upsertError } = await supabase.from('cleaner_assignments').upsert(
       toDispatch.map((c) => ({
         booking_id: bookingId,
         cleaner_id: c.id,
@@ -284,6 +284,7 @@ export async function runAIDispatch(bookingId: string, dryRun = false): Promise<
       })),
       { onConflict: 'booking_id,cleaner_id', ignoreDuplicates: true }
     )
+    if (upsertError) throw new Error(`Failed to create assignments: ${upsertError.message}`)
   }
 
   const rankedCleaners: RankedCleaner[] = sorted.map((c, i) => {

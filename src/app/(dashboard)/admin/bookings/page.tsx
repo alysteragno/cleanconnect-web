@@ -55,7 +55,7 @@ const PAYMENT_STYLES: Record<string, string> = {
 }
 
 const PAYMENT_LABELS: Record<string, string> = {
-  unpaid:   'Payment pending confirmation',
+  unpaid:   'Unpaid',
   paid:     'Paid',
   refunded: 'Refunded',
   partial:  'Partial',
@@ -171,9 +171,9 @@ export default async function AdminBookingsPage({
         ) : (
           <>
             {/* Column header row */}
-            <div className="hidden sm:grid grid-cols-[1fr_8rem] px-5 py-2.5 border-b border-gray-100 bg-gray-50/80">
-              <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Booking</span>
-              <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider text-right">Amount</span>
+            <div className="flex items-center px-5 py-2.5 border-b border-gray-100 bg-gray-50/80">
+              <span className="flex-1 text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Booking</span>
+              <span className="w-24 text-[11px] font-semibold text-gray-400 uppercase tracking-wider text-right">Amount</span>
             </div>
 
             <div className="divide-y divide-gray-100">
@@ -186,66 +186,62 @@ export default async function AdminBookingsPage({
                   <Link
                     key={b.id}
                     href={`/admin/bookings/${b.id}`}
-                    className="grid grid-cols-[1fr_auto] sm:grid-cols-[1fr_8rem] items-center px-5 py-3.5 hover:bg-gray-50/70 transition-colors group"
+                    className="flex items-center gap-4 px-5 py-3.5 hover:bg-gray-50/70 transition-colors group"
                   >
-                    {/* Main info */}
-                    <div className="min-w-0 flex items-center gap-4">
-                      {/* Service thumbnail with status badge */}
-                      <div className="relative shrink-0">
-                        <div className="w-[72px] h-[72px] rounded-2xl overflow-hidden shadow-sm bg-pink-50">
-                          {serviceImage ? (
-                            <Image
-                              src={serviceImage}
-                              alt={serviceLabel}
-                              width={72}
-                              height={72}
-                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                            />
-                          ) : (
-                            <div className="w-full h-full flex items-center justify-center">
-                              <svg className="w-6 h-6 text-pink-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
-                                  d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-                              </svg>
-                            </div>
-                          )}
-                        </div>
-                        {/* Status badge overlaid on image corner */}
-                        <span className={`absolute -bottom-1 -right-1 w-3.5 h-3.5 rounded-full border-2 border-white shadow-sm ${sm.dot}`} />
+                    {/* Service thumbnail with status dot */}
+                    <div className="relative shrink-0">
+                      <div className="w-[60px] h-[60px] rounded-xl overflow-hidden shadow-sm bg-pink-50">
+                        {serviceImage ? (
+                          <Image
+                            src={serviceImage}
+                            alt={serviceLabel}
+                            width={60}
+                            height={60}
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center">
+                            <svg className="w-5 h-5 text-pink-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
+                                d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                            </svg>
+                          </div>
+                        )}
                       </div>
-
-                      {/* Text content */}
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap mb-1">
-                          <span className="text-sm font-semibold text-gray-900 group-hover:text-pink-700 transition-colors">
-                            {serviceLabel}
-                          </span>
-                          <span className="text-xs text-gray-400">{b.property_sqm} sqm</span>
-                          <span className={`text-[11px] px-2 py-0.5 rounded-full border font-semibold ${sm.pill}`}>
-                            {sm.label}
-                          </span>
-                        </div>
-                        <p className="text-xs text-gray-500 truncate">
-                          <span className="font-medium text-gray-700">{b.profiles?.full_name ?? '—'}</span>
-                          <span className="mx-1.5 text-gray-300">·</span>
-                          {formatDate(b.service_date)}
-                          <span className="mx-1.5 text-gray-300">·</span>
-                          {formatTime(b.service_time)}
-                          {b.address_city && (
-                            <>
-                              <span className="mx-1.5 text-gray-300">·</span>
-                              {b.address_city}
-                            </>
-                          )}
-                        </p>
-                        <p className="text-[11px] text-gray-400 mt-0.5">
-                          Booked {formatBookedAt(b.created_at)}
-                        </p>
-                      </div>
+                      <span className={`absolute -bottom-1 -right-1 w-3 h-3 rounded-full border-2 border-white shadow-sm ${sm.dot}`} />
                     </div>
 
-                    {/* Price + payment */}
-                    <div className="text-right shrink-0">
+                    {/* Text content — grows, truncates */}
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5 mb-0.5 flex-wrap">
+                        <span className="text-sm font-semibold text-gray-900 group-hover:text-pink-700 transition-colors truncate">
+                          {serviceLabel}
+                        </span>
+                        <span className="text-xs text-gray-400 shrink-0">{b.property_sqm} sqm</span>
+                        <span className={`text-[11px] px-2 py-0.5 rounded-full border font-semibold shrink-0 ${sm.pill}`}>
+                          {sm.label}
+                        </span>
+                      </div>
+                      <p className="text-xs text-gray-500 truncate">
+                        <span className="font-medium text-gray-700">{b.profiles?.full_name ?? '—'}</span>
+                        <span className="mx-1 text-gray-300">·</span>
+                        {formatDate(b.service_date)}
+                        <span className="mx-1 text-gray-300">·</span>
+                        {formatTime(b.service_time)}
+                        {b.address_city && (
+                          <>
+                            <span className="mx-1 text-gray-300">·</span>
+                            {b.address_city}
+                          </>
+                        )}
+                      </p>
+                      <p className="text-[11px] text-gray-400 mt-0.5 truncate">
+                        Booked {formatBookedAt(b.created_at)}
+                      </p>
+                    </div>
+
+                    {/* Price + payment — fixed width, never shrinks */}
+                    <div className="text-right shrink-0 w-24">
                       <p className="text-sm font-bold text-gray-900 tabular-nums">
                         ₱{Number(b.base_price).toLocaleString('en-PH')}
                       </p>
