@@ -62,17 +62,17 @@ export function DashboardShell({ sidebarContent, topBarContent, children }: Prop
   return (
     <div className="min-h-screen bg-gray-50 flex">
 
-      {/* Mobile backdrop */}
+      {/* Mobile backdrop — z-40 covers header (z-10) and notification dropdown (z-30) */}
       <div
-        className={`fixed inset-0 bg-black/40 z-20 md:hidden transition-opacity duration-300 ${
+        className={`fixed inset-0 bg-black/60 z-40 md:hidden transition-opacity duration-300 ${
           open ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
         }`}
         onClick={() => setOpen(false)}
         aria-hidden="true"
       />
 
-      {/* Sidebar */}
-      <aside className={`fixed inset-y-0 left-0 z-30 w-56 bg-pink-700 flex flex-col transition-all duration-300 ease-out ${
+      {/* Sidebar — z-50 sits above backdrop and everything else */}
+      <aside className={`fixed inset-y-0 left-0 z-50 w-56 bg-pink-700 flex flex-col transition-all duration-300 ease-out ${
         open ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
       }`}>
         {/* Mobile close button */}

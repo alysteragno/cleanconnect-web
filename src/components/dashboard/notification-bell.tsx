@@ -117,7 +117,7 @@ export default function NotificationBell({
 
       {(open || closing) && (
         <div
-          className={`fixed left-2 right-2 top-14 sm:absolute sm:left-auto sm:right-0 sm:top-auto sm:mt-1 sm:w-80 bg-white border border-gray-200 rounded-xl shadow-lg z-50 overflow-hidden ${closing ? 'animate-dropdown-out' : 'animate-dropdown-in'}`}
+          className={`fixed left-2 right-2 top-14 sm:absolute sm:left-auto sm:right-0 sm:top-auto sm:mt-1 sm:w-80 bg-white border border-gray-200 rounded-xl shadow-lg z-30 overflow-hidden ${closing ? 'animate-dropdown-out' : 'animate-dropdown-in'}`}
           onAnimationEnd={() => { if (closing) { setClosing(false); setOpen(false) } }}
         >
           <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
