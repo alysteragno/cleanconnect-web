@@ -203,13 +203,13 @@ export default function ContactPage() {
         <div className="max-w-xl mx-auto px-4 sm:px-6 text-center">
           <h2 className="text-2xl font-bold text-gray-900 mb-2">Ready to book?</h2>
           <p className="text-gray-500 text-sm mb-6">
-            Create an account and book through our mobile app when it launches.
+            Download our app and book our cleaning services!
           </p>
           <Link
-            href="/register"
+            href="/customer"
             className="inline-block px-8 py-3 bg-pink-600 text-white rounded-lg font-semibold text-sm hover:bg-pink-700 transition-colors"
           >
-            Create account
+            Download our app
           </Link>
         </div>
       </section>

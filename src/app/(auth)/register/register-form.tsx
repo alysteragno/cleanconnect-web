@@ -2,7 +2,7 @@
 
 import { useActionState, useState } from 'react'
 import { register } from '@/app/actions/auth'
-import { AuthField, AuthButton, AuthError, AuthFooter, authLinkClass } from '@/components/auth/auth-ui'
+import { AuthField, AuthButton, AuthError } from '@/components/auth/auth-ui'
 
 const PASSWORD_REQUIREMENTS = [
   { label: 'Minimum 8 characters',          test: (p: string) => p.length >= 8 },
@@ -19,6 +19,8 @@ export default function RegisterForm() {
   const [showConfirm, setShowConfirm] = useState(false)
   const typed = password.length > 0
 
+  const fe = state?.fieldErrors
+
   return (
     <form action={action} className="space-y-4">
       <AuthField
@@ -27,8 +29,11 @@ export default function RegisterForm() {
         label="Full name"
         type="text"
         required
+        maxLength={100}
         autoComplete="name"
         placeholder="Juan dela Cruz"
+        defaultValue={state?.fields?.name}
+        error={fe?.name}
       />
 
       <AuthField
@@ -39,6 +44,8 @@ export default function RegisterForm() {
         required
         autoComplete="email"
         placeholder="example@gmail.com"
+        defaultValue={state?.fields?.email}
+        error={fe?.email}
       />
 
       <AuthField
@@ -51,6 +58,8 @@ export default function RegisterForm() {
         pattern="09[0-9]{9}"
         autoComplete="tel"
         placeholder="09XX XXX XXXX"
+        defaultValue={state?.fields?.phone}
+        error={fe?.phone}
       />
 
       <div>
@@ -65,6 +74,7 @@ export default function RegisterForm() {
             placeholder="Create a strong password"
             value={password}
             onChange={e => setPassword(e.target.value)}
+            error={fe?.password}
           />
           <button
             type="button"
@@ -80,7 +90,6 @@ export default function RegisterForm() {
             )}
           </button>
         </div>
-
 
         <ul className="mt-2 space-y-1">
           {PASSWORD_REQUIREMENTS.map(req => {
@@ -109,6 +118,7 @@ export default function RegisterForm() {
           required
           autoComplete="new-password"
           placeholder="Re-enter your password"
+          error={fe?.confirm_password}
         />
         <button
           type="button"
@@ -128,8 +138,6 @@ export default function RegisterForm() {
       {state?.error && <AuthError>{state.error}</AuthError>}
 
       <AuthButton pending={pending} label="Create account" pendingLabel="Creating account..." />
-
-      
     </form>
   )
 }

@@ -74,10 +74,10 @@ export default function AboutPage() {
           <h2 className="text-3xl font-bold text-gray-900 mb-3">Ready to get started?</h2>
           <p className="text-gray-500 mb-8">Book your first cleaning online in under 2 minutes.</p>
           <Link
-            href="/register"
+            href="/customer"
             className="inline-block px-10 py-3.5 bg-pink-600 text-white rounded-xl font-semibold text-base hover:bg-pink-700 transition-colors"
           >
-            Create account
+            Download our app
           </Link>
         </div>
       </section>

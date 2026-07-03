@@ -115,10 +115,6 @@ export default async function HomePage() {
                 <div className="px-5 py-4">
                   <p className="font-semibold text-gray-900 text-sm mb-1.5 leading-snug">{svc.title}</p>
                   <p className="text-xs text-gray-500 leading-relaxed line-clamp-2 mb-3">{svc.description}</p>
-                  <div className="border-t border-gray-100 pt-3">
-                    <p className="text-[10px] uppercase tracking-wide text-gray-400 font-medium">Starting at</p>
-                    <p className="text-sm font-bold text-pink-600">{formatPrice(svc.price)}</p>
-                  </div>
                 </div>
               </div>
             ))}
@@ -183,10 +179,10 @@ export default async function HomePage() {
       </div>
 
       <Link
-        href="/register"
+        href="/customer"
         className="px-6 py-3 bg-white text-pink-600 rounded-lg font-semibold text-sm hover:bg-pink-50 transition-colors self-start shrink-0"
       >
-        Create account
+        Book through our app
       </Link>
     </div>
   </div>
@@ -201,10 +197,10 @@ export default async function HomePage() {
           </p>
           <p className="text-gray-400 text-xs mb-8">Create a free account now to be ready when the app launches.</p>
           <Link
-            href="/register"
+            href="/customer"
             className="inline-block px-8 py-3 bg-pink-600 text-white rounded-lg font-semibold text-sm hover:bg-pink-700 transition-colors"
           >
-            Create Account
+            Book through our app
           </Link>
         </div>
       </section>

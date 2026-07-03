@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { createClient, createAdminClient } from '@/utils/supabase/server'
+import { SortSelect } from '@/components/dashboard/sort-select'
 
 function formatRelativeTime(iso: string) {
   const diff  = Date.now() - new Date(iso).getTime()
@@ -26,7 +27,19 @@ function getInitials(name: string) {
   return name.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase()
 }
 
-export default async function AdminSupportPage() {
+const SORT_OPTIONS = [
+  { value: 'recent',   label: 'Most Recent' },
+  { value: 'oldest',   label: 'Oldest First' },
+  { value: 'name_asc', label: 'Name A–Z' },
+  { value: 'name_desc',label: 'Name Z–A' },
+]
+
+export default async function AdminSupportPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ sort?: string }>
+}) {
+  const { sort } = await searchParams
   const supabase = await createClient()
   const adminDb  = createAdminClient()
 
@@ -35,19 +48,11 @@ export default async function AdminSupportPage() {
   const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
   if (profile?.role !== 'super_admin') notFound()
 
-  const [{ data: customers }, { data: msgRows }] = await Promise.all([
-    // Admin client bypasses RLS to list all customers reliably
-    adminDb
-      .from('profiles')
-      .select('id, full_name, phone')
-      .eq('role', 'customer')
-      .eq('is_active', true)
-      .order('full_name'),
-    supabase
-      .from('direct_messages')
-      .select('customer_id, message, created_at')
-      .order('created_at', { ascending: false }),
-  ])
+  // Fetch only customer messages (direct_messages are sent by customers)
+  const { data: msgRows } = await supabase
+    .from('direct_messages')
+    .select('customer_id, message, created_at')
+    .order('created_at', { ascending: false })
 
   // Build last-message map: customerId → most recent message
   const lastMsg = new Map<string, { message: string; created_at: string }>()
@@ -55,77 +60,99 @@ export default async function AdminSupportPage() {
     if (!lastMsg.has(row.customer_id)) lastMsg.set(row.customer_id, row)
   }
 
-  // Sort: conversations with messages first (newest first), then remaining customers
+  // Only fetch customers who have actually sent messages
+  const customerIds = [...lastMsg.keys()]
+
+  if (customerIds.length === 0) {
+    return (
+      <div className="max-w-2xl space-y-6">
+        <div>
+          <h1 className="text-xl font-bold text-gray-900">Support Chat</h1>
+          <p className="text-sm text-gray-500 mt-0.5">No active conversations</p>
+        </div>
+        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
+          <div className="text-center py-16">
+            <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center mx-auto mb-3">
+              <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
+                  d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+              </svg>
+            </div>
+            <p className="text-sm text-gray-400 font-medium">No conversations yet</p>
+            <p className="text-xs text-gray-300 mt-1">Conversations will appear here once a customer sends a message.</p>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  const { data: customers } = await adminDb
+    .from('profiles')
+    .select('id, full_name, phone')
+    .in('id', customerIds)
+
+  // Sort based on selected option
+  const sortKey = sort ?? 'recent'
   const sorted = [...(customers ?? [])].sort((a, b) => {
     const aMsg = lastMsg.get(a.id)
     const bMsg = lastMsg.get(b.id)
-    if (aMsg && bMsg) return new Date(bMsg.created_at).getTime() - new Date(aMsg.created_at).getTime()
-    if (aMsg) return -1
-    if (bMsg) return 1
-    return a.full_name.localeCompare(b.full_name)
+    switch (sortKey) {
+      case 'oldest':
+        return new Date(aMsg!.created_at).getTime() - new Date(bMsg!.created_at).getTime()
+      case 'name_asc':
+        return a.full_name.localeCompare(b.full_name)
+      case 'name_desc':
+        return b.full_name.localeCompare(a.full_name)
+      default: // recent
+        return new Date(bMsg!.created_at).getTime() - new Date(aMsg!.created_at).getTime()
+    }
   })
-
-  const activeCount = lastMsg.size
 
   return (
     <div className="max-w-2xl space-y-6">
-      <div>
-        <h1 className="text-xl font-bold text-gray-900">Support Chat</h1>
-        <p className="text-sm text-gray-500 mt-0.5">
-          {sorted.length} {sorted.length === 1 ? 'customer' : 'customers'} &mdash; {activeCount} active {activeCount === 1 ? 'conversation' : 'conversations'}
-        </p>
+      <div className="flex items-end justify-between">
+        <div>
+          <h1 className="text-xl font-bold text-gray-900">Support Chat</h1>
+          <p className="text-sm text-gray-500 mt-0.5">
+            {sorted.length} active {sorted.length === 1 ? 'conversation' : 'conversations'}
+          </p>
+        </div>
+        <SortSelect options={SORT_OPTIONS} />
       </div>
 
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
-        {sorted.length === 0 ? (
-          <div className="text-center py-16">
-            <p className="text-sm text-gray-400 font-medium">No customers yet.</p>
-            <p className="text-xs text-gray-300 mt-1">Customers will appear here once registered.</p>
-          </div>
-        ) : (
-          <div className="divide-y divide-gray-100">
-            {sorted.map((c) => {
-              const msg = lastMsg.get(c.id)
-              return (
-                <Link
-                  key={c.id}
-                  href={`/admin/support/${c.id}`}
-                  className="flex items-center gap-3 px-4 py-3.5 hover:bg-gray-50 transition-colors group"
-                >
-                  <div className={`w-9 h-9 rounded-full ${avatarColor(c.id)} text-white flex items-center justify-center text-xs font-bold shrink-0 select-none`}>
-                    {getInitials(c.full_name)}
-                  </div>
+        <div className="divide-y divide-gray-100">
+          {sorted.map((c) => {
+            const msg = lastMsg.get(c.id)!
+            return (
+              <Link
+                key={c.id}
+                href={`/admin/support/${c.id}`}
+                className="flex items-center gap-3 px-4 py-3.5 hover:bg-gray-50 transition-colors group"
+              >
+                <div className={`w-9 h-9 rounded-full ${avatarColor(c.id)} text-white flex items-center justify-center text-xs font-bold shrink-0 select-none`}>
+                  {getInitials(c.full_name)}
+                </div>
 
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-gray-900">{c.full_name}</p>
-                    {msg ? (
-                      <p className="text-xs text-gray-400 truncate mt-0.5">{msg.message}</p>
-                    ) : (
-                      <p className="text-xs text-gray-300 mt-0.5 italic">No messages yet</p>
-                    )}
-                  </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-gray-900">{c.full_name}</p>
+                  <p className="text-xs text-gray-400 truncate mt-0.5">{msg.message}</p>
+                </div>
 
-                  <div className="text-right shrink-0 ml-2 flex flex-col items-end gap-1">
-                    {msg ? (
-                      <p className="text-xs text-gray-400">{formatRelativeTime(msg.created_at)}</p>
-                    ) : (
-                      <span className="text-[10px] text-gray-300 border border-gray-200 rounded-full px-2 py-0.5">
-                        New
-                      </span>
-                    )}
-                    <svg
-                      width="13" height="13" viewBox="0 0 16 16" fill="none"
-                      stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"
-                      className="text-gray-300 group-hover:text-pink-500 transition-colors"
-                    >
-                      <path d="M6 3l5 5-5 5" />
-                    </svg>
-                  </div>
-                </Link>
-              )
-            })}
-          </div>
-        )}
+                <div className="text-right shrink-0 ml-2 flex flex-col items-end gap-1">
+                  <p className="text-xs text-gray-400">{formatRelativeTime(msg.created_at)}</p>
+                  <svg
+                    width="13" height="13" viewBox="0 0 16 16" fill="none"
+                    stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"
+                    className="text-gray-300 group-hover:text-pink-500 transition-colors"
+                  >
+                    <path d="M6 3l5 5-5 5" />
+                  </svg>
+                </div>
+              </Link>
+            )
+          })}
+        </div>
       </div>
     </div>
   )

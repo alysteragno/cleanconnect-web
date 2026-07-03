@@ -2,6 +2,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { notFound } from 'next/navigation'
 import { createClient, createAdminClient } from '@/utils/supabase/server'
+import { SortSelect } from '@/components/dashboard/sort-select'
 function getServiceImage(name: string | null): string | null {
   if (!name) return null
   const n = name.toLowerCase()
@@ -86,12 +87,21 @@ function formatBookedAt(ts: string) {
   })
 }
 
+const SORT_OPTIONS = [
+  { value: 'date_desc',    label: 'Service Date (Newest)' },
+  { value: 'date_asc',     label: 'Service Date (Oldest)' },
+  { value: 'booked_desc',  label: 'Booked Date (Newest)' },
+  { value: 'booked_asc',   label: 'Booked Date (Oldest)' },
+  { value: 'price_desc',   label: 'Price (High → Low)' },
+  { value: 'price_asc',    label: 'Price (Low → High)' },
+]
+
 export default async function AdminBookingsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string }>
+  searchParams: Promise<{ status?: string; sort?: string }>
 }) {
-  const { status } = await searchParams
+  const { status, sort } = await searchParams
   const authClient = await createClient()
   const { data: { user } } = await authClient.auth.getUser()
   if (!user) notFound()
@@ -110,7 +120,19 @@ export default async function AdminBookingsPage({
   const counts: Record<string, number> = {}
   for (const b of all) counts[b.status] = (counts[b.status] ?? 0) + 1
 
-  const list = status ? all.filter((b) => b.status === status) : all
+  const filtered = status ? all.filter((b) => b.status === status) : all
+
+  const sortKey = sort ?? 'date_desc'
+  const list = [...filtered].sort((a, b) => {
+    switch (sortKey) {
+      case 'date_asc':    return a.service_date.localeCompare(b.service_date)
+      case 'booked_desc': return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      case 'booked_asc':  return new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+      case 'price_desc':  return Number(b.base_price) - Number(a.base_price)
+      case 'price_asc':   return Number(a.base_price) - Number(b.base_price)
+      default:            return b.service_date.localeCompare(a.service_date)
+    }
+  })
 
   return (
     <div className="max-w-5xl space-y-6">
@@ -120,7 +142,10 @@ export default async function AdminBookingsPage({
           <p className="text-xs text-gray-400 mb-1">Admin</p>
           <h1 className="text-2xl font-bold text-gray-900">Bookings</h1>
         </div>
-        <p className="text-sm text-gray-400 tabular-nums">{all.length} total</p>
+        <div className="flex items-center gap-3">
+          <SortSelect options={SORT_OPTIONS} />
+          <p className="text-sm text-gray-400 tabular-nums">{all.length} total</p>
+        </div>
       </div>
 
       {/* Status filter chips */}

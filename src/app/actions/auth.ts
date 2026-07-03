@@ -5,7 +5,12 @@ import { cookies, headers } from 'next/headers'
 import { createClient, createAdminClient } from '@/utils/supabase/server'
 import { getRateLimitBlock, recordLoginFailure, clearLoginFailures } from '@/utils/rate-limit'
 
-export type AuthState = { error: string; remainingAttempts?: number } | undefined
+export type AuthState = {
+  error?: string
+  remainingAttempts?: number
+  fieldErrors?: Record<string, string>
+  fields?: Record<string, string>
+} | undefined
 export type ForgotState = { error?: string; success?: boolean } | undefined
 export type ResetState = { error?: string } | undefined
 
@@ -26,10 +31,19 @@ const ROLE_ROUTES: Record<string, string> = {
 const MOBILE_ONLY_ROLES = new Set(['cleaner'])
 
 export async function login(state: AuthState, formData: FormData): Promise<AuthState> {
-  const email = formData.get('email') as string
-  const password = formData.get('password') as string
+  const rawEmail = (formData.get('email') as string ?? '').trim().toLowerCase()
+  const password = formData.get('password') as string ?? ''
 
-  if (!email || !password) return { error: 'Email and password are required.' }
+  const fields = { email: rawEmail }
+  const fieldErrors: Record<string, string> = {}
+
+  if (!rawEmail) fieldErrors.email = 'Email is required.'
+  else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(rawEmail)) fieldErrors.email = 'Enter a valid email address.'
+  if (!password) fieldErrors.password = 'Password is required.'
+
+  if (Object.keys(fieldErrors).length > 0) return { fieldErrors, fields }
+
+  const email = rawEmail
 
   const ip = await getClientIp()
   const rateLimitKey = `login:${ip}`
@@ -37,7 +51,7 @@ export async function login(state: AuthState, formData: FormData): Promise<AuthS
   const blocked = getRateLimitBlock(rateLimitKey)
   if (blocked > 0) {
     const minutes = Math.ceil(blocked / 60)
-    return { error: `Too many failed attempts. Please try again in ${minutes} minute${minutes !== 1 ? 's' : ''}.` }
+    return { error: `Too many failed attempts. Please try again in ${minutes} minute${minutes !== 1 ? 's' : ''}.`, fields }
   }
 
   const supabase = await createClient()
@@ -47,13 +61,13 @@ export async function login(state: AuthState, formData: FormData): Promise<AuthS
     const result = recordLoginFailure(rateLimitKey)
     if (result.lockedFor) {
       const minutes = Math.ceil(result.lockedFor / 60)
-      return { error: `Too many failed attempts. Please try again in ${minutes} minute${minutes !== 1 ? 's' : ''}.` }
+      return { error: `Too many failed attempts. Please try again in ${minutes} minute${minutes !== 1 ? 's' : ''}.`, fields }
     }
     const WARN_THRESHOLD = 3
     if (result.remaining !== undefined && result.remaining <= WARN_THRESHOLD) {
-      return { error: 'Invalid email or password.', remainingAttempts: result.remaining }
+      return { error: 'Invalid email or password.', remainingAttempts: result.remaining, fields }
     }
-    return { error: 'Invalid email or password.' }
+    return { error: 'Invalid email or password.', fields }
   }
 
   const adminClient = createAdminClient()
@@ -90,35 +104,61 @@ export async function login(state: AuthState, formData: FormData): Promise<AuthS
 }
 
 export async function register(state: AuthState, formData: FormData): Promise<AuthState> {
-  const name = formData.get('name') as string
-  const email = formData.get('email') as string
-  const password = formData.get('password') as string
-  const confirm = formData.get('confirm_password') as string
-  const phone = (formData.get('phone') as string | null)?.trim() || null
+  const rawName  = (formData.get('name') as string ?? '').trim().slice(0, 100)
+  const rawEmail = (formData.get('email') as string ?? '').trim().toLowerCase()
+  const rawPhone = (formData.get('phone') as string ?? '').trim()
+  const password = formData.get('password') as string ?? ''
+  const confirm  = formData.get('confirm_password') as string ?? ''
 
-  if (!name || !email || !password || !confirm) return { error: 'All fields are required.' }
-  if (password !== confirm) return { error: 'Passwords do not match.' }
-  if (password.length < 8)       return { error: 'Password must be at least 8 characters.' }
-  if (!/[A-Z]/.test(password))   return { error: 'Password must contain at least one uppercase letter.' }
-  if (!/[a-z]/.test(password))   return { error: 'Password must contain at least one lowercase letter.' }
-  if (!/[0-9]/.test(password))   return { error: 'Password must contain at least one number.' }
-  if (!/[^A-Za-z0-9]/.test(password)) return { error: 'Password must contain at least one special character.' }
+  const fields = { name: rawName, email: rawEmail, phone: rawPhone }
+  const fieldErrors: Record<string, string> = {}
+
+  // Name
+  if (!rawName) fieldErrors.name = 'Full name is required.'
+  else if (rawName.length < 2) fieldErrors.name = 'Name must be at least 2 characters.'
+
+  // Email
+  if (!rawEmail) fieldErrors.email = 'Email is required.'
+  else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(rawEmail)) fieldErrors.email = 'Enter a valid email address.'
+
+  // Phone
+  if (!rawPhone) fieldErrors.phone = 'Phone number is required.'
+  else if (!/^09\d{9}$/.test(rawPhone)) fieldErrors.phone = 'Enter a valid PH mobile number (09XXXXXXXXX).'
+
+  // Password
+  if (!password) {
+    fieldErrors.password = 'Password is required.'
+  } else {
+    const missing: string[] = []
+    if (password.length < 8)           missing.push('8+ characters')
+    if (!/[A-Z]/.test(password))       missing.push('uppercase letter')
+    if (!/[a-z]/.test(password))       missing.push('lowercase letter')
+    if (!/[0-9]/.test(password))       missing.push('number')
+    if (!/[^A-Za-z0-9]/.test(password)) missing.push('special character')
+    if (missing.length > 0) fieldErrors.password = `Needs: ${missing.join(', ')}.`
+  }
+
+  // Confirm
+  if (!confirm) fieldErrors.confirm_password = 'Please confirm your password.'
+  else if (password && confirm !== password) fieldErrors.confirm_password = 'Passwords do not match.'
+
+  if (Object.keys(fieldErrors).length > 0) return { fieldErrors, fields }
 
   const supabase = await createClient()
-  const { data, error } = await supabase.auth.signUp({ email, password })
+  const { data, error } = await supabase.auth.signUp({ email: rawEmail, password })
 
-  if (error) return { error: error.message }
-  if (!data.user) return { error: 'Registration failed. Please try again.' }
+  if (error) return { error: error.message, fields }
+  if (!data.user) return { error: 'Registration failed. Please try again.', fields }
 
   const adminClient = createAdminClient()
   const { error: profileError } = await adminClient.from('profiles').insert({
     id: data.user.id,
-    full_name: name,
+    full_name: rawName,
     role: 'customer',
-    ...(phone && { phone }),
+    ...(rawPhone && { phone: rawPhone }),
   })
 
-  if (profileError) return { error: 'Account created but profile setup failed. Please contact support.' }
+  if (profileError) return { error: 'Account created but profile setup failed. Please contact support.', fields }
 
   // Sign out the auto-created session so the proxy won't redirect /login → /customer in a loop
   await supabase.auth.signOut()

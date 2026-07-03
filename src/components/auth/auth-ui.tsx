@@ -3,6 +3,9 @@ import type { InputHTMLAttributes, ReactNode } from 'react'
 export const inputClass =
   'w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent transition'
 
+const inputErrorClass =
+  'w-full px-3 py-2.5 border border-red-300 rounded-lg text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent transition bg-red-50/30'
+
 // ─── Field ───────────────────────────────────────────────────────────────────
 
 type AuthFieldProps = InputHTMLAttributes<HTMLInputElement> & {
@@ -11,19 +14,21 @@ type AuthFieldProps = InputHTMLAttributes<HTMLInputElement> & {
   label: string
   hint?: string
   aside?: ReactNode
+  error?: string
 }
 
-export function AuthField({ id, name, label, hint, aside, ...inputProps }: AuthFieldProps) {
+export function AuthField({ id, name, label, hint, aside, error, ...inputProps }: AuthFieldProps) {
   return (
     <div>
       <div className="flex items-center justify-between mb-1.5">
-        <label htmlFor={id} className="block text-sm font-medium text-gray-700">
+        <label htmlFor={id} className={`block text-sm font-medium ${error ? 'text-red-600' : 'text-gray-700'}`}>
           {label}
         </label>
         {aside}
       </div>
-      <input id={id} name={name} className={inputClass} {...inputProps} />
-      {hint && <p className="text-xs text-gray-400 mt-1">{hint}</p>}
+      <input id={id} name={name} className={error ? inputErrorClass : inputClass} aria-invalid={!!error} {...inputProps} />
+      {error && <p className="text-xs text-red-500 mt-1">{error}</p>}
+      {hint && !error && <p className="text-xs text-gray-400 mt-1">{hint}</p>}
     </div>
   )
 }
