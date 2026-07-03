@@ -91,12 +91,7 @@ export default function MarketingHeader() {
 
             <div className="flex items-center gap-2">
               {/* Desktop sign in */}
-              <Link
-                href="/login"
-                className="hidden sm:block text-sm text-gray-500 hover:text-gray-900 transition-colors"
-              >
-                SIGN IN
-              </Link>
+             
 
               {/* Hamburger — mobile only */}
               <button
@@ -139,12 +134,6 @@ export default function MarketingHeader() {
                   {link.label}
                 </Link>
               ))}
-              <Link
-                href="/login"
-                className="block px-3 py-3 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
-              >
-                Sign in
-              </Link>
 
               {/* Contact shortcuts */}
               <div className="border-t border-gray-100 mt-3 pt-3 space-y-1">

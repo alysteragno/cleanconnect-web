@@ -120,7 +120,9 @@ export async function register(state: AuthState, formData: FormData): Promise<Au
 
   if (profileError) return { error: 'Account created but profile setup failed. Please contact support.' }
 
-  // Clear any stale role cookie so a previous admin session can't redirect this new user to /admin
+  // Sign out the auto-created session so the proxy won't redirect /login → /customer in a loop
+  await supabase.auth.signOut()
+
   const cookieStore = await cookies()
   cookieStore.delete('cleanconnect-role')
 

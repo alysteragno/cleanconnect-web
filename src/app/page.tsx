@@ -51,16 +51,7 @@ export default async function HomePage() {
               </svg>
               <p className="text-sm text-gray-500">{BRANCH.address}</p>
             </div>
-
-            <div className="flex flex-col sm:flex-row items-start gap-3">
-              <Link
-                href="/register"
-                className="px-6 py-3 bg-pink-600 text-white rounded-lg font-semibold text-sm hover:bg-pink-700 transition-colors"
-              >
-                Create Account
-              </Link>
-            </div>
-            <p className="mt-6 text-xs text-gray-400 border border-orange-200 bg-white rounded-full inline-flex items-center gap-2 px-4 py-2">
+            <p className="text-xs text-gray-400 border border-orange-200 bg-white rounded-full inline-flex items-center gap-2 px-4 py-2">
               <span className="w-2 h-2 rounded-full bg-pink-500 inline-block" />
               Book via our mobile app
             </p>
