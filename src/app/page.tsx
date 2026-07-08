@@ -179,7 +179,7 @@ export default async function HomePage() {
       </div>
 
       <Link
-        href="/customer"
+        href="/download"
         className="px-6 py-3 bg-white text-pink-600 rounded-lg font-semibold text-sm hover:bg-pink-50 transition-colors self-start shrink-0"
       >
         Book through our app
@@ -197,7 +197,7 @@ export default async function HomePage() {
           </p>
           <p className="text-gray-400 text-xs mb-8">Create a free account now to be ready when the app launches.</p>
           <Link
-            href="/customer"
+            href="/download"
             className="inline-block px-8 py-3 bg-pink-600 text-white rounded-lg font-semibold text-sm hover:bg-pink-700 transition-colors"
           >
             Book through our app

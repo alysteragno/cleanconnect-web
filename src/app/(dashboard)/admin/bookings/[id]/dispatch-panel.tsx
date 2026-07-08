@@ -5,8 +5,8 @@ import { dispatchCleaners, forceAssignCleaner, cancelBooking, getCleanerWeekSche
 import AIDispatchButton from './ai-dispatch-button'
 import DeleteBookingButton from './delete-booking-button'
 
-type Cleaner    = { id: string; full_name: string; phone: string | null }
-type Assignment = { cleaner_id: string; status: string; profiles: { full_name: string } | null }
+type Cleaner    = { id: string; full_name: string; phone: string | null; photo_url: string | null }
+type Assignment = { cleaner_id: string; status: string; profiles: { full_name: string; photo_url: string | null } | null }
 type State      = { error?: string; success?: string } | undefined
 
 const ASSIGNMENT_META: Record<string, { badge: string; dot: string; label: string }> = {
@@ -451,9 +451,18 @@ export default function DispatchPanel({
               const m = ASSIGNMENT_META[a.status] ?? { badge: 'bg-gray-50 text-gray-600 border-gray-200', dot: 'bg-gray-400', label: a.status }
               return (
                 <div key={a.cleaner_id} className="flex items-center gap-3 py-1.5">
-                  <div className="w-8 h-8 rounded-full bg-gray-100 text-gray-600 text-xs font-bold flex items-center justify-center shrink-0 select-none">
-                    {a.profiles?.full_name?.charAt(0).toUpperCase() ?? '?'}
-                  </div>
+                  {a.profiles?.photo_url ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={a.profiles.photo_url}
+                      alt={a.profiles.full_name ?? 'Cleaner'}
+                      className="w-8 h-8 rounded-full object-cover border border-gray-200 shrink-0"
+                    />
+                  ) : (
+                    <div className="w-8 h-8 rounded-full bg-gray-100 text-gray-600 text-xs font-bold flex items-center justify-center shrink-0 select-none">
+                      {a.profiles?.full_name?.charAt(0).toUpperCase() ?? '?'}
+                    </div>
+                  )}
                   <span className="text-sm font-medium text-gray-900 flex-1 min-w-0 truncate">
                     {a.profiles?.full_name ?? 'Cleaner'}
                   </span>
@@ -610,11 +619,22 @@ export default function DispatchPanel({
                               }`}
                             >
                               <input type="checkbox" checked={isSelected} onChange={() => toggle(c.id)} className="sr-only" />
-                              <div className={`w-7 h-7 rounded-full text-xs font-bold flex items-center justify-center shrink-0 transition-colors ${
-                                isSelected ? 'bg-pink-600 text-white' : 'bg-gray-100 text-gray-600'
-                              }`}>
-                                {c.full_name.charAt(0).toUpperCase()}
-                              </div>
+                              {c.photo_url ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img
+                                  src={c.photo_url}
+                                  alt={c.full_name}
+                                  className={`w-7 h-7 rounded-full object-cover shrink-0 border ${
+                                    isSelected ? 'border-pink-500 ring-2 ring-pink-300' : 'border-gray-200'
+                                  }`}
+                                />
+                              ) : (
+                                <div className={`w-7 h-7 rounded-full text-xs font-bold flex items-center justify-center shrink-0 transition-colors ${
+                                  isSelected ? 'bg-pink-600 text-white' : 'bg-gray-100 text-gray-600'
+                                }`}>
+                                  {c.full_name.charAt(0).toUpperCase()}
+                                </div>
+                              )}
                               <div className="flex-1 min-w-0">
                                 <p className="text-sm font-medium text-gray-900 truncate">{c.full_name}</p>
                                 {c.phone && <p className="text-xs text-gray-400">{c.phone}</p>}

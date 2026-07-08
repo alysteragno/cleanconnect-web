@@ -26,6 +26,7 @@ import { BUSINESS_LAT, BUSINESS_LNG } from '@/lib/constants'
 export type RankedCleaner = {
   cleanerId: string
   fullName: string
+  photoUrl: string | null
   workloadScore: number
   distanceKm: number | null
   departureLat: number | null
@@ -75,7 +76,7 @@ export async function runAIDispatch(bookingId: string, dryRun = false): Promise<
   // ── Step 2: All active cleaners ─────────────────────────────────────────
   const { data: allCleaners } = await adminClient
     .from('profiles')
-    .select('id, full_name')
+    .select('id, full_name, photo_url')
     .eq('role', 'cleaner')
     .eq('is_active', true)
 
@@ -292,6 +293,7 @@ export async function runAIDispatch(bookingId: string, dryRun = false): Promise<
     return {
       cleanerId: c.id,
       fullName: c.full_name,
+      photoUrl: c.photo_url ?? null,
       workloadScore: c.workload,
       distanceKm: c.distanceKm != null ? Math.round(c.distanceKm * 10) / 10 : null,
       departureLat: dep?.lat ?? null,

@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { createClient, createAdminClient } from '@/utils/supabase/server'
 import CustomerToggleForm from './customer-toggle-form'
+import ConvertToCleanerForm from './convert-to-cleaner-form'
 import { IconHeadset } from '@/components/icons'
 
 type Customer = {
@@ -118,6 +119,12 @@ export default async function CustomerDetailPage({
         <div>
           <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Account Status</p>
           <CustomerToggleForm customerId={c.id} isActive={c.is_active} />
+        </div>
+
+        {/* Convert to cleaner */}
+        <div>
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Role</p>
+          <ConvertToCleanerForm customerId={c.id} fullName={c.full_name} defaultPhone={c.phone} />
         </div>
       </div>
 

@@ -19,7 +19,7 @@ export default async function CleanerDetailPage({ params }: { params: Promise<{ 
     { count: jobsDone },
     { data: dayOffRows },
   ] = await Promise.all([
-    adminDb.from('profiles').select('id, full_name, phone, is_active, created_at, address_street, address_city, address_province, date_of_birth, emergency_contact_name, emergency_contact_phone, home_lat, home_lng').eq('id', id).eq('role', 'cleaner').single(),
+    adminDb.from('profiles').select('id, full_name, phone, is_active, created_at, address_street, address_city, address_province, date_of_birth, emergency_contact_name, emergency_contact_phone, home_lat, home_lng, photo_url').eq('id', id).eq('role', 'cleaner').single(),
     adminDb.from('cleaner_assignments').select('*', { count: 'exact', head: true }).eq('cleaner_id', id).eq('status', 'completed'),
     adminDb.from('cleaner_availability').select('id, unavailable_date').eq('cleaner_id', id).order('unavailable_date'),
   ])
@@ -38,9 +38,18 @@ export default async function CleanerDetailPage({ params }: { params: Promise<{ 
 
       <div className="bg-white rounded-xl border border-gray-200 p-6">
         <div className="flex items-center gap-4 mb-6 pb-5 border-b border-gray-100">
-          <div className="w-12 h-12 bg-pink-100 text-pink-600 rounded-full flex items-center justify-center text-lg font-bold shrink-0">
-            {c.full_name.charAt(0).toUpperCase()}
-          </div>
+          {c.photo_url ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={c.photo_url}
+              alt={c.full_name}
+              className="w-12 h-12 rounded-full object-cover border border-gray-200 shrink-0"
+            />
+          ) : (
+            <div className="w-12 h-12 bg-pink-100 text-pink-600 rounded-full flex items-center justify-center text-lg font-bold shrink-0">
+              {c.full_name.charAt(0).toUpperCase()}
+            </div>
+          )}
           <div>
             <p className="text-base font-semibold text-gray-900">{c.full_name}</p>
             <p className="text-xs text-gray-500">{jobsDone ?? 0} jobs completed</p>

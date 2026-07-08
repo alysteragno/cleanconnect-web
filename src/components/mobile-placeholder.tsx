@@ -1,7 +1,13 @@
 ﻿import Image from 'next/image'
 import { logout } from '@/app/actions/auth'
 
-export default function MobileAppPlaceholder({ role }: { role: 'customer' | 'cleaner' }) {
+export default function MobileAppPlaceholder({
+  role,
+  showSignOut = true,
+}: {
+  role: 'customer' | 'cleaner'
+  showSignOut?: boolean
+}) {
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center px-4">
@@ -61,13 +67,15 @@ export default function MobileAppPlaceholder({ role }: { role: 'customer' | 'cle
           The mobile app is currently in development. We will notify you when it is ready.
         </p>
 
-        <div className="border-t border-gray-100 pt-4">
-          <form action={logout}>
-            <button type="submit" className="text-sm text-gray-400 hover:text-gray-600 transition-colors">
-              Sign out
-            </button>
-          </form>
-        </div>
+        {showSignOut && (
+          <div className="border-t border-gray-100 pt-4">
+            <form action={logout}>
+              <button type="submit" className="text-sm text-gray-400 hover:text-gray-600 transition-colors">
+                Sign out
+              </button>
+            </form>
+          </div>
+        )}
       </div>
 
     </div>

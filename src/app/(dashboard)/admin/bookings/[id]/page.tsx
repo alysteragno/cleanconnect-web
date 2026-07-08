@@ -43,10 +43,10 @@ type Booking = {
 type Assignment = {
   cleaner_id: string
   status: string
-  profiles: { full_name: string } | null
+  profiles: { full_name: string; photo_url: string | null } | null
 }
 
-type Cleaner = { id: string; full_name: string; phone: string | null }
+type Cleaner = { id: string; full_name: string; phone: string | null; photo_url: string | null }
 
 const STATUS_META: Record<string, { label: string; dot: string; badge: string }> = {
   pending:     { label: 'Pending',     dot: 'bg-amber-400',    badge: 'bg-amber-50 text-amber-700 border-amber-200'          },
@@ -105,11 +105,11 @@ export default async function AdminBookingDetailPage({
       .single(),
     adminClient
       .from('cleaner_assignments')
-      .select('cleaner_id, status, profiles!cleaner_id (full_name)')
+      .select('cleaner_id, status, profiles!cleaner_id (full_name, photo_url)')
       .eq('booking_id', id),
     adminClient
       .from('profiles')
-      .select('id, full_name, phone')
+      .select('id, full_name, phone, photo_url')
       .eq('role', 'cleaner')
       .eq('is_active', true)
       .order('full_name'),

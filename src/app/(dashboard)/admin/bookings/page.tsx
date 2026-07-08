@@ -143,6 +143,12 @@ export default async function AdminBookingsPage({
           <h1 className="text-2xl font-bold text-gray-900">Bookings</h1>
         </div>
         <div className="flex items-center gap-3">
+          <Link
+            href="/admin/bookings/new"
+            className="px-4 py-2 bg-pink-600 text-white rounded-lg text-sm font-semibold hover:bg-pink-700 transition-colors shadow-sm"
+          >
+            + New Booking
+          </Link>
           <SortSelect options={SORT_OPTIONS} />
           <p className="text-sm text-gray-400 tabular-nums">{all.length} total</p>
         </div>

@@ -79,9 +79,18 @@ function PreviewPanel({
               key={c.cleanerId}
               className="flex items-center gap-3 p-3 bg-gray-50 border border-gray-200 rounded-xl"
             >
-              <div className="w-8 h-8 rounded-full bg-pink-100 text-pink-700 text-xs font-bold flex items-center justify-center shrink-0 select-none">
-                {c.fullName.charAt(0).toUpperCase()}
-              </div>
+              {c.photoUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={c.photoUrl}
+                  alt={c.fullName}
+                  className="w-8 h-8 rounded-full object-cover border border-gray-200 shrink-0"
+                />
+              ) : (
+                <div className="w-8 h-8 rounded-full bg-pink-100 text-pink-700 text-xs font-bold flex items-center justify-center shrink-0 select-none">
+                  {c.fullName.charAt(0).toUpperCase()}
+                </div>
+              )}
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-semibold text-gray-900 truncate">{c.fullName}</p>
                 <div className="flex items-center gap-2 mt-0.5 flex-wrap">

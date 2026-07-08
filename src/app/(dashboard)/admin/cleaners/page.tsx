@@ -8,6 +8,7 @@ type Cleaner = {
   phone: string | null
   is_active: boolean
   created_at: string
+  photo_url: string | null
 }
 
 export default async function AdminCleanersPage() {
@@ -21,7 +22,7 @@ export default async function AdminCleanersPage() {
 
   const { data: cleaners } = await supabase
     .from('profiles')
-    .select('id, full_name, phone, is_active, created_at')
+    .select('id, full_name, phone, is_active, created_at, photo_url')
     .eq('role', 'cleaner')
     .order('full_name')
 
@@ -68,9 +69,18 @@ function CleanerSection({ title, cleaners, dimmed = false }: { title: string; cl
               className={`flex items-center justify-between p-4 hover:bg-gray-50 transition-colors group ${dimmed ? 'opacity-60' : ''}`}
             >
               <div className="flex items-center gap-3">
-                <div className="w-9 h-9 bg-pink-100 text-pink-600 rounded-full flex items-center justify-center text-sm font-bold shrink-0">
-                  {c.full_name.charAt(0).toUpperCase()}
-                </div>
+                {c.photo_url ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={c.photo_url}
+                    alt={c.full_name}
+                    className="w-9 h-9 rounded-full object-cover border border-gray-200 shrink-0"
+                  />
+                ) : (
+                  <div className="w-9 h-9 bg-pink-100 text-pink-600 rounded-full flex items-center justify-center text-sm font-bold shrink-0">
+                    {c.full_name.charAt(0).toUpperCase()}
+                  </div>
+                )}
                 <div>
                   <p className="text-sm font-medium text-gray-900">{c.full_name}</p>
                   <p className="text-xs text-gray-400">{c.phone ?? 'No phone'}</p>

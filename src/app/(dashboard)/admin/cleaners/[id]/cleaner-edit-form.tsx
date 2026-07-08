@@ -2,6 +2,7 @@
 
 import { useActionState, useState } from 'react'
 import { updateCleanerProfile } from '@/app/actions/admin'
+import CleanerPhotoField from '../cleaner-photo-field'
 
 export type Cleaner = {
   id: string
@@ -17,6 +18,7 @@ export type Cleaner = {
   emergency_contact_phone: string | null
   home_lat: number | null
   home_lng: number | null
+  photo_url: string | null
 }
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
@@ -36,6 +38,7 @@ function Field({
   onChange,
   placeholder,
   required,
+  max,
   maxLength,
   pattern,
   hint,
@@ -48,6 +51,7 @@ function Field({
   onChange?: (e: React.ChangeEvent<HTMLInputElement>) => void
   placeholder?: string
   required?: boolean
+  max?: string
   maxLength?: number
   pattern?: string
   hint?: string
@@ -70,6 +74,7 @@ function Field({
         )}
         required={required}
         placeholder={placeholder}
+        max={max}
         maxLength={maxLength}
         pattern={pattern}
         className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-pink-500"
@@ -91,6 +96,13 @@ export default function CleanerEditForm({ cleaner }: { cleaner: Cleaner }) {
   const [homeLat,        setHomeLat]        = useState<number | null>(cleaner.home_lat ?? null)
   const [homeLng,        setHomeLng]        = useState<number | null>(cleaner.home_lng ?? null)
   const [geocodeStatus,  setGeocodeStatus]  = useState<GeocodeStatus>('idle')
+
+  // Latest DOB that still makes the cleaner 18 today.
+  const maxDob = (() => {
+    const d = new Date()
+    d.setFullYear(d.getFullYear() - 18)
+    return d.toISOString().slice(0, 10)
+  })()
 
   async function geocodeAddress() {
     const parts = [addressStreet, addressCity, addressProvince, 'Philippines'].filter(Boolean)
@@ -119,27 +131,28 @@ export default function CleanerEditForm({ cleaner }: { cleaner: Cleaner }) {
 
         {/* ── Personal Information ─────────────────────────────────────── */}
         <SectionLabel>Personal Information</SectionLabel>
+        <CleanerPhotoField initialUrl={cleaner.photo_url} required />
         <Field label="Full Name" name="full_name" defaultValue={cleaner.full_name} required />
         <div className="grid grid-cols-2 gap-4">
-          <Field label="Phone" name="phone" type="tel" defaultValue={cleaner.phone} placeholder="09XX XXX XXXX" maxLength={11} pattern="09[0-9]{9}" hint="Philippine mobile number (09XXXXXXXXX)" />
-          <Field label="Date of Birth" name="date_of_birth" type="date" defaultValue={cleaner.date_of_birth} />
+          <Field label="Phone" name="phone" type="tel" defaultValue={cleaner.phone} required placeholder="09XX XXX XXXX" maxLength={11} pattern="09[0-9]{9}" hint="Philippine mobile number (09XXXXXXXXX)" />
+          <Field label="Date of Birth" name="date_of_birth" type="date" defaultValue={cleaner.date_of_birth} required max={maxDob} hint="Must be at least 18 years old" />
         </div>
 
         {/* ── Home Address ─────────────────────────────────────────────── */}
         <SectionLabel>Address</SectionLabel>
         <Field
-          label="Street Address" name="address_street"
+          label="Street Address" name="address_street" required
           value={addressStreet} onChange={e => setAddressStreet(e.target.value)}
           placeholder="123 Sampaguita St., Brgy. Malaya"
         />
         <div className="grid grid-cols-2 gap-4">
           <Field
-            label="City / Municipality" name="address_city"
+            label="City / Municipality" name="address_city" required
             value={addressCity} onChange={e => setAddressCity(e.target.value)}
             placeholder="Quezon City"
           />
           <Field
-            label="Province" name="address_province"
+            label="Province" name="address_province" required
             value={addressProvince} onChange={e => setAddressProvince(e.target.value)}
             placeholder="Metro Manila"
           />
@@ -194,8 +207,8 @@ export default function CleanerEditForm({ cleaner }: { cleaner: Cleaner }) {
         {/* ── Emergency Contact ─────────────────────────────────────────── */}
         <SectionLabel>Emergency Contact</SectionLabel>
         <div className="grid grid-cols-2 gap-4">
-          <Field label="Contact Name" name="emergency_contact_name" defaultValue={cleaner.emergency_contact_name} placeholder="Juan Santos" />
-          <Field label="Contact Phone" name="emergency_contact_phone" type="tel" defaultValue={cleaner.emergency_contact_phone} placeholder="09XX XXX XXXX" maxLength={11} pattern="09[0-9]{9}" />
+          <Field label="Contact Name" name="emergency_contact_name" defaultValue={cleaner.emergency_contact_name} required placeholder="Juan Santos" />
+          <Field label="Contact Phone" name="emergency_contact_phone" type="tel" defaultValue={cleaner.emergency_contact_phone} required placeholder="09XX XXX XXXX" maxLength={11} pattern="09[0-9]{9}" />
         </div>
 
         {editState?.error && (

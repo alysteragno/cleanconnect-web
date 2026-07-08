@@ -7,6 +7,7 @@ type CleanerInfo = {
   id: string
   full_name: string
   phone: string | null
+  photo_url: string | null
 }
 
 type ReviewerInfo = { id: string; full_name: string } | null
@@ -77,7 +78,8 @@ export default async function AdminDayOffRequestsPage({
       cleaner:profiles!cleaner_id (
         id,
         full_name,
-        phone
+        phone,
+        photo_url
       ),
       reviewer:profiles!reviewed_by (
         id,
@@ -168,9 +170,18 @@ export default async function AdminDayOffRequestsPage({
                       {/* Cleaner */}
                       <td className="px-5 py-4">
                         <div className="flex items-center gap-3 min-w-[160px]">
-                          <div className="w-9 h-9 rounded-full bg-pink-100 text-pink-700 text-xs font-bold flex items-center justify-center shrink-0 select-none">
-                            {initials}
-                          </div>
+                          {r.cleaner?.photo_url ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              src={r.cleaner.photo_url}
+                              alt={r.cleaner.full_name ?? 'Cleaner'}
+                              className="w-9 h-9 rounded-full object-cover border border-gray-200 shrink-0"
+                            />
+                          ) : (
+                            <div className="w-9 h-9 rounded-full bg-pink-100 text-pink-700 text-xs font-bold flex items-center justify-center shrink-0 select-none">
+                              {initials}
+                            </div>
+                          )}
                           <div className="min-w-0">
                             <p className="text-sm font-semibold text-gray-900 truncate max-w-[140px]">
                               {r.cleaner?.full_name ?? '—'}

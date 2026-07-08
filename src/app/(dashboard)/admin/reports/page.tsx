@@ -22,7 +22,7 @@ type SpaceTypeStat = {
   paidRevenue: number
 }
 
-type CleanerRow = { id: string; full_name: string }
+type CleanerRow = { id: string; full_name: string; photo_url: string | null }
 
 type RecentFeedback = {
   id: string
@@ -202,7 +202,7 @@ export default async function ReportsPage({
   ] = await Promise.all([
     allBookingsQ,
     completedQ,
-    adminDb.from('profiles').select('id, full_name').eq('role', 'cleaner').eq('is_active', true).order('full_name'),
+    adminDb.from('profiles').select('id, full_name, photo_url').eq('role', 'cleaner').eq('is_active', true).order('full_name'),
     adminDb.from('feedback').select('cleaner_id, rating'),
     adminDb.from('bookings')
       .select('id, service_date, service_time, service_name, status, base_price, profiles!customer_id(full_name)')
@@ -621,9 +621,18 @@ export default async function ReportsPage({
                   className="flex sm:grid sm:grid-cols-[1fr_100px_100px_80px] gap-3 sm:gap-4 items-center px-5 py-3.5 hover:bg-gray-50 transition-colors group"
                 >
                   <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-8 h-8 bg-pink-100 text-pink-600 rounded-full flex items-center justify-center text-xs font-bold shrink-0">
-                      {c.full_name.charAt(0).toUpperCase()}
-                    </div>
+                    {c.photo_url ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={c.photo_url}
+                        alt={c.full_name}
+                        className="w-8 h-8 rounded-full object-cover border border-gray-200 shrink-0"
+                      />
+                    ) : (
+                      <div className="w-8 h-8 bg-pink-100 text-pink-600 rounded-full flex items-center justify-center text-xs font-bold shrink-0">
+                        {c.full_name.charAt(0).toUpperCase()}
+                      </div>
+                    )}
                     <p className="text-sm font-medium text-gray-900 group-hover:text-pink-700 transition-colors truncate">
                       {c.full_name}
                     </p>

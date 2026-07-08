@@ -206,7 +206,7 @@ export default function ContactPage() {
             Download our app and book our cleaning services!
           </p>
           <Link
-            href="/customer"
+            href="/download"
             className="inline-block px-8 py-3 bg-pink-600 text-white rounded-lg font-semibold text-sm hover:bg-pink-700 transition-colors"
           >
             Download our app
