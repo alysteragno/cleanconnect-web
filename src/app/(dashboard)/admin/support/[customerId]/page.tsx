@@ -3,7 +3,8 @@ import { notFound } from 'next/navigation'
 import { createClient, createAdminClient } from '@/utils/supabase/server'
 import { getBasePath } from '@/utils/base-path'
 import SupportThread from '@/components/dashboard/support-thread'
-import { type ChatMessage } from '@/utils/chat-helpers'
+import { type ChatMessage, isSupportConversationArchived, daysUntilSupportAutoArchive } from '@/utils/chat-helpers'
+import ArchiveSupportButton from '../archive-button'
 
 export default async function AdminSupportThreadPage({
   params,
@@ -25,7 +26,7 @@ export default async function AdminSupportThreadPage({
   const [{ data: customerProfile }, { data: customerMsgs }, { data: adminMsgs }] = await Promise.all([
     adminDb
       .from('profiles')
-      .select('full_name, phone')
+      .select('full_name, phone, created_at')
       .eq('id', customerId)
       .single(),
     // Customer → staff messages
@@ -49,6 +50,20 @@ export default async function AdminSupportThreadPage({
     ...(adminMsgs    ?? []),
   ].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
 
+  // Fetched separately so a missing table (migration not yet applied)
+  // degrades gracefully to "not manually archived" instead of erroring.
+  const { data: archiveRow } = await adminDb
+    .from('support_conversations')
+    .select('archived_at, restored_at')
+    .eq('customer_id', customerId)
+    .maybeSingle()
+
+  const lastActivityAt = messages[messages.length - 1]?.created_at ?? customerProfile.created_at
+  const archivedAt = archiveRow?.archived_at ?? null
+  const restoredAt = archiveRow?.restored_at ?? null
+  const isArchived = isSupportConversationArchived({ archivedAt, restoredAt, lastActivityAt })
+  const daysUntilArchive = daysUntilSupportAutoArchive({ archivedAt, restoredAt, lastActivityAt })
+
   return (
     <div
       className="-m-4 sm:-m-6 flex flex-col overflow-hidden"
@@ -67,15 +82,29 @@ export default async function AdminSupportThreadPage({
         </Link>
 
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-semibold text-gray-900 truncate">{customerProfile.full_name}</p>
+          <div className="flex items-center gap-2 flex-wrap">
+            <p className="text-sm font-semibold text-gray-900 truncate">{customerProfile.full_name}</p>
+            {isArchived && (
+              <span className="text-xs px-2 py-0.5 rounded-full border font-medium shrink-0 bg-gray-100 text-gray-500 border-gray-200">
+                Archived
+              </span>
+            )}
+          </div>
           {customerProfile.phone && (
             <p className="text-xs text-gray-400 mt-0.5">{customerProfile.phone}</p>
+          )}
+          {!isArchived && daysUntilArchive !== null && (
+            <p className={`text-xs mt-0.5 ${daysUntilArchive <= 3 ? 'text-amber-500' : 'text-gray-300'}`}>
+              Auto-archives in {daysUntilArchive <= 1 ? '1 day' : `${daysUntilArchive} days`} of inactivity
+            </p>
           )}
         </div>
 
         <span className="text-xs bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded-full font-medium shrink-0">
           Support
         </span>
+
+        <ArchiveSupportButton customerId={customerId} archived={isArchived} />
       </div>
 
       {/* Chat */}

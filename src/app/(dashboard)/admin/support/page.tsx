@@ -3,6 +3,9 @@ import { notFound } from 'next/navigation'
 import { createClient, createAdminClient } from '@/utils/supabase/server'
 import { getBasePath } from '@/utils/base-path'
 import { SortSelect } from '@/components/dashboard/sort-select'
+import { isSupportConversationArchived, daysUntilSupportAutoArchive } from '@/utils/chat-helpers'
+import NewChatButton from './new-chat-button'
+import SupportConversationRow from './conversation-row'
 
 function formatRelativeTime(iso: string) {
   const diff  = Date.now() - new Date(iso).getTime()
@@ -38,9 +41,10 @@ const SORT_OPTIONS = [
 export default async function AdminSupportPage({
   searchParams,
 }: {
-  searchParams: Promise<{ sort?: string }>
+  searchParams: Promise<{ sort?: string; view?: string }>
 }) {
-  const { sort } = await searchParams
+  const { sort, view } = await searchParams
+  const showArchived = view === 'archived'
   const supabase = await createClient()
   const adminDb  = createAdminClient()
 
@@ -51,19 +55,30 @@ export default async function AdminSupportPage({
 
   const basePath = await getBasePath()
 
-  // Fetch only customer messages (direct_messages are sent by customers)
-  const { data: msgRows } = await supabase
-    .from('direct_messages')
-    .select('customer_id, message, created_at')
-    .order('created_at', { ascending: false })
+  // A conversation can have messages from the customer (direct_messages),
+  // staff (admin_messages), or both — a staff-initiated chat has no
+  // direct_messages row until the customer replies, so both tables must be
+  // read to know which customers have an active thread.
+  const [{ data: customerMsgRows }, { data: staffMsgRows }] = await Promise.all([
+    adminDb
+      .from('direct_messages')
+      .select('customer_id, message, created_at')
+      .order('created_at', { ascending: false }),
+    adminDb
+      .from('admin_messages')
+      .select('customer_id, message, created_at')
+      .order('created_at', { ascending: false }),
+  ])
 
-  // Build last-message map: customerId → most recent message
+  // Build last-message map: customerId → most recent message across both tables.
   const lastMsg = new Map<string, { message: string; created_at: string }>()
-  for (const row of msgRows ?? []) {
-    if (!lastMsg.has(row.customer_id)) lastMsg.set(row.customer_id, row)
+  for (const row of [...(customerMsgRows ?? []), ...(staffMsgRows ?? [])]) {
+    const existing = lastMsg.get(row.customer_id)
+    if (!existing || new Date(row.created_at) > new Date(existing.created_at)) {
+      lastMsg.set(row.customer_id, row)
+    }
   }
 
-  // Only fetch customers who have actually sent messages
   const customerIds = [...lastMsg.keys()]
 
   if (customerIds.length === 0) {
@@ -89,14 +104,39 @@ export default async function AdminSupportPage({
     )
   }
 
-  const { data: customers } = await adminDb
-    .from('profiles')
-    .select('id, full_name, phone')
-    .in('id', customerIds)
+  const [{ data: customers }, archiveResult] = await Promise.all([
+    adminDb
+      .from('profiles')
+      .select('id, full_name, phone')
+      .in('id', customerIds),
+    // Degrades gracefully to "nothing manually archived" if the archive
+    // migration hasn't been applied yet.
+    adminDb
+      .from('support_conversations')
+      .select('customer_id, archived_at, restored_at')
+      .in('customer_id', customerIds),
+  ])
+
+  const archiveState = new Map<string, { archived_at: string | null; restored_at: string | null }>()
+  for (const row of archiveResult.data ?? []) archiveState.set(row.customer_id, row)
+
+  const withArchiveFlag = (customers ?? []).map((c) => {
+    const a = archiveState.get(c.id)
+    const archivedAt    = a?.archived_at ?? null
+    const restoredAt    = a?.restored_at ?? null
+    const lastActivityAt = lastMsg.get(c.id)!.created_at
+    const archived = isSupportConversationArchived({ archivedAt, restoredAt, lastActivityAt })
+    const daysUntilArchive = daysUntilSupportAutoArchive({ archivedAt, restoredAt, lastActivityAt })
+    return { ...c, archived, daysUntilArchive }
+  })
+
+  const active   = withArchiveFlag.filter((c) => !c.archived)
+  const archived = withArchiveFlag.filter((c) => c.archived)
+  const scoped   = showArchived ? archived : active
 
   // Sort based on selected option
   const sortKey = sort ?? 'recent'
-  const sorted = [...(customers ?? [])].sort((a, b) => {
+  const sorted = [...scoped].sort((a, b) => {
     const aMsg = lastMsg.get(a.id)
     const bMsg = lastMsg.get(b.id)
     switch (sortKey) {
@@ -111,51 +151,65 @@ export default async function AdminSupportPage({
     }
   })
 
+  const tabClass = (isActive: boolean) =>
+    `text-sm font-medium pb-2 -mb-px border-b-2 transition-colors ${
+      isActive
+        ? 'border-pink-500 text-gray-900'
+        : 'border-transparent text-gray-400 hover:text-gray-600'
+    }`
+
   return (
     <div className="max-w-2xl space-y-6">
-      <div className="flex items-end justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
         <div>
           <h1 className="text-xl font-bold text-gray-900">Support Chat</h1>
           <p className="text-sm text-gray-500 mt-0.5">
-            {sorted.length} active {sorted.length === 1 ? 'conversation' : 'conversations'}
+            {active.length} active {active.length === 1 ? 'conversation' : 'conversations'}
           </p>
         </div>
-        <SortSelect options={SORT_OPTIONS} />
+        <div className='flex items-center gap-4'>
+          <NewChatButton />
+          <SortSelect options={SORT_OPTIONS} />
+        </div>
+      </div>
+
+      {/* Active / Archived tabs */}
+      <div className="flex items-center gap-6 border-b border-gray-200">
+        <Link href={`${basePath}/support`} className={tabClass(!showArchived)}>
+          Active <span className="text-gray-300">({active.length})</span>
+        </Link>
+        <Link href={`${basePath}/support?view=archived`} className={tabClass(showArchived)}>
+          Archived <span className="text-gray-300">({archived.length})</span>
+        </Link>
       </div>
 
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
-        <div className="divide-y divide-gray-100">
-          {sorted.map((c) => {
-            const msg = lastMsg.get(c.id)!
-            return (
-              <Link
-                key={c.id}
-                href={`${basePath}/support/${c.id}`}
-                className="flex items-center gap-3 px-4 py-3.5 hover:bg-gray-50 transition-colors group"
-              >
-                <div className={`w-9 h-9 rounded-full ${avatarColor(c.id)} text-white flex items-center justify-center text-xs font-bold shrink-0 select-none`}>
-                  {getInitials(c.full_name)}
-                </div>
-
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-gray-900">{c.full_name}</p>
-                  <p className="text-xs text-gray-400 truncate mt-0.5">{msg.message}</p>
-                </div>
-
-                <div className="text-right shrink-0 ml-2 flex flex-col items-end gap-1">
-                  <p className="text-xs text-gray-400">{formatRelativeTime(msg.created_at)}</p>
-                  <svg
-                    width="13" height="13" viewBox="0 0 16 16" fill="none"
-                    stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"
-                    className="text-gray-300 group-hover:text-pink-500 transition-colors"
-                  >
-                    <path d="M6 3l5 5-5 5" />
-                  </svg>
-                </div>
-              </Link>
-            )
-          })}
-        </div>
+        {sorted.length === 0 ? (
+          <div className="text-center py-16">
+            <p className="text-sm text-gray-400 font-medium">
+              {showArchived ? 'No archived conversations.' : 'No active conversations.'}
+            </p>
+          </div>
+        ) : (
+          <div className="divide-y divide-gray-100">
+            {sorted.map((c) => {
+              const msg = lastMsg.get(c.id)!
+              return (
+                <SupportConversationRow
+                  key={c.id}
+                  customerId={c.id}
+                  customerName={c.full_name}
+                  avatarColorClass={avatarColor(c.id)}
+                  initials={getInitials(c.full_name)}
+                  lastMessage={msg.message}
+                  relativeTime={formatRelativeTime(msg.created_at)}
+                  daysUntilArchive={c.daysUntilArchive}
+                  archived={c.archived}
+                />
+              )
+            })}
+          </div>
+        )}
       </div>
     </div>
   )
