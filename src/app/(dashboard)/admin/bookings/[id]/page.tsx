@@ -7,6 +7,7 @@ import PaymentForm from './payment-form'
 import AdjustForm from './adjust-form'
 import DispatchPanel from './dispatch-panel'
 import PaymentVerificationCard from './payment-verification'
+import PayMongoCheckout from './paymongo-checkout'
 import CleanersForm from './cleaners-form'
 import FurniturePhotoGrid from './furniture-photo-grid'
 
@@ -127,6 +128,17 @@ export default async function AdminBookingDetailPage({
     .eq('id', id)
     .maybeSingle()
   const cleanerEnRouteAt: string | null = (enRouteRow as { cleaner_en_route_at?: string | null } | null)?.cleaner_en_route_at ?? null
+
+  // Same graceful pattern for the PayMongo columns — degrades to null if the
+  // migration_paymongo.sql migration has not been applied yet.
+  const { data: paymongoRow } = await adminClient
+    .from('bookings')
+    .select('paymongo_checkout_url, paymongo_payment_id')
+    .eq('id', id)
+    .maybeSingle()
+  const paymongoData = (paymongoRow as { paymongo_checkout_url?: string | null; paymongo_payment_id?: string | null } | null)
+  const paymongoCheckoutUrl: string | null = paymongoData?.paymongo_checkout_url ?? null
+  const paymongoPaymentId: string | null = paymongoData?.paymongo_payment_id ?? null
 
   const b = booking as unknown as Booking
   const assignmentList = (assignments ?? []) as unknown as Assignment[]
@@ -332,6 +344,16 @@ export default async function AdminBookingDetailPage({
                     paymentStatus={b.payment_status}
                     paymentReference={b.payment_reference}
                     paymentProofUrl={b.payment_proof_url}
+                  />
+                </div>
+
+                <div className="pt-4 border-t border-gray-100">
+                  <PayMongoCheckout
+                    bookingId={b.id}
+                    paymentMethod={b.payment_method}
+                    paymentStatus={b.payment_status}
+                    checkoutUrl={paymongoCheckoutUrl}
+                    paymentId={paymongoPaymentId}
                   />
                 </div>
               </div>

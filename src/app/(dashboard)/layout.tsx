@@ -39,7 +39,7 @@ function getAdminNav(basePath: string): NavSection[] {
       label: 'Admin',
       links: [
         { href: `${basePath}/reports`,   label: 'Reports',          icon: <IconChart /> },
-        { href: `${basePath}/settings`,  label: 'Payment Settings', icon: <IconSettings /> },
+        { href: `${basePath}/settings`,  label: 'Bank Check Settings', icon: <IconSettings /> },
       ],
     },
   ]

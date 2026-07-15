@@ -192,14 +192,19 @@ export default function PaymentVerificationCard({
           </div>
         )}
         {!isPaid && !isCash && (
-          <button
-            type="button"
-            onClick={handleMarkAsPaid}
-            disabled={isPending}
-            className="w-full py-2.5 bg-emerald-600 text-white rounded-xl text-sm font-semibold hover:bg-emerald-700 disabled:opacity-50 transition-colors"
-          >
-            {isPending ? 'Updating...' : 'Mark as Paid'}
-          </button>
+          <div className="space-y-1.5">
+            <button
+              type="button"
+              onClick={handleMarkAsPaid}
+              disabled={isPending}
+              className="w-full py-2.5 bg-emerald-600 text-white rounded-xl text-sm font-semibold hover:bg-emerald-700 disabled:opacity-50 transition-colors"
+            >
+              {isPending ? 'Updating...' : 'Mark as Paid (manual override)'}
+            </button>
+            <p className="text-[11px] text-gray-400 leading-snug">
+              Digital payments settle automatically via PayMongo. Use this only to reconcile a payment confirmed outside the checkout link.
+            </p>
+          </div>
         )}
 
         {error && (
