@@ -1,7 +1,9 @@
-﻿import Link from 'next/link'
+import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { createClient, createAdminClient } from '@/utils/supabase/server'
 import { getBasePath } from '@/utils/base-path'
+import ComplaintRow from './complaint-row'
+import NewChatButton from './new-chat-button'
 
 const STATUS_STYLES: Record<string, string> = {
   open: 'bg-yellow-50 text-yellow-700 border-yellow-200',
@@ -12,7 +14,20 @@ const STATUS_LABELS: Record<string, string> = {
   open: 'Open', in_progress: 'In Progress', resolved: 'Resolved',
 }
 
-export default async function AdminComplaintsPage() {
+type ComplaintRecord = {
+  id: string
+  subject: string
+  status: string
+  created_at: string
+  archived_at: string | null
+  profiles: { full_name: string } | { full_name: string }[] | null
+}
+
+export default async function AdminComplaintsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ view?: string }>
+}) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) notFound()
@@ -20,46 +35,81 @@ export default async function AdminComplaintsPage() {
   if (profile?.role !== 'super_admin') notFound()
 
   const basePath = await getBasePath()
+  const { view } = await searchParams
+  const showArchived = view === 'archived'
+
   const adminDb = createAdminClient()
-  const { data: complaints } = await adminDb
+
+  // Try selecting archived_at; if the migration has not been applied yet, fall
+  // back to a query without it and treat every complaint as active.
+  const primary = await adminDb
     .from('complaints')
-    .select('id, subject, status, created_at, profiles!customer_id (full_name)')
+    .select('id, subject, status, created_at, archived_at, profiles!customer_id (full_name)')
     .order('created_at', { ascending: false })
 
-  const open = (complaints ?? []).filter((c) => c.status !== 'resolved').length
+  let rows: ComplaintRecord[]
+  if (primary.error) {
+    const fb = await adminDb
+      .from('complaints')
+      .select('id, subject, status, created_at, profiles!customer_id (full_name)')
+      .order('created_at', { ascending: false })
+    rows = (fb.data ?? []).map((r) => ({ ...r, archived_at: null })) as ComplaintRecord[]
+  } else {
+    rows = (primary.data ?? []) as ComplaintRecord[]
+  }
+
+  const active = rows.filter((c) => !c.archived_at)
+  const archived = rows.filter((c) => c.archived_at)
+  const list = showArchived ? archived : active
+  const openCount = active.filter((c) => c.status !== 'resolved').length
+
+  const tabClass = (isActive: boolean) =>
+    `text-sm font-medium pb-2 -mb-px border-b-2 transition-colors ${
+      isActive
+        ? 'border-pink-500 text-gray-900'
+        : 'border-transparent text-gray-400 hover:text-gray-600'
+    }`
 
   return (
     <div className="max-w-3xl space-y-6">
-      <div>
-        <h1 className="text-xl font-bold text-gray-900">Complaints</h1>
-        <p className="text-sm text-gray-500 mt-0.5">
-          {open} open · {(complaints ?? []).length} total
-        </p>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h1 className="text-xl font-bold text-gray-900">Complaints</h1>
+          <p className="text-sm text-gray-500 mt-0.5">
+            {openCount} open · {active.length} active
+          </p>
+        </div>
+      </div>
+
+      {/* Active / Archived tabs */}
+      <div className="flex items-center gap-6 border-b border-gray-200">
+        <Link href={`${basePath}/complaints`} className={tabClass(!showArchived)}>
+          Active <span className="text-gray-300">({active.length})</span>
+        </Link>
+        <Link href={`${basePath}/complaints?view=archived`} className={tabClass(showArchived)}>
+          Archived <span className="text-gray-300">({archived.length})</span>
+        </Link>
       </div>
 
       <div className="bg-white rounded-xl border border-gray-200 divide-y divide-gray-100">
-        {!complaints || complaints.length === 0 ? (
+        {list.length === 0 ? (
           <div className="text-center py-12">
-            <p className="text-sm text-gray-400">No complaints yet.</p>
+            <p className="text-sm text-gray-400">
+              {showArchived ? 'No archived complaints.' : 'No active complaints.'}
+            </p>
           </div>
         ) : (
-          complaints.map((c) => (
-            <Link
+          list.map((c) => (
+            <ComplaintRow
               key={c.id}
-              href={`${basePath}/complaints/${c.id}`}
-              className="flex items-center justify-between px-5 py-4 hover:bg-gray-50 transition-colors"
-            >
-              <div>
-                <p className="text-sm font-medium text-gray-900">{c.subject}</p>
-                <p className="text-xs text-gray-400 mt-0.5">
-                  {((Array.isArray(c.profiles) ? c.profiles[0] : c.profiles) as { full_name: string } | null)?.full_name ?? 'Customer'} ·{' '}
-                  {new Date(c.created_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'Asia/Manila' })}
-                </p>
-              </div>
-              <span className={`text-xs px-2 py-0.5 rounded-full border font-medium shrink-0 ${STATUS_STYLES[c.status] ?? ''}`}>
-                {STATUS_LABELS[c.status] ?? c.status}
-              </span>
-            </Link>
+              complaintId={c.id}
+              subject={c.subject}
+              customerName={((Array.isArray(c.profiles) ? c.profiles[0] : c.profiles) as { full_name: string } | null)?.full_name ?? 'Customer'}
+              dateLabel={new Date(c.created_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'Asia/Manila' })}
+              statusLabel={STATUS_LABELS[c.status] ?? c.status}
+              statusClass={STATUS_STYLES[c.status] ?? ''}
+              archived={Boolean(c.archived_at)}
+            />
           ))
         )}
       </div>

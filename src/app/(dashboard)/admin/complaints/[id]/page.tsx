@@ -3,13 +3,9 @@ import { notFound } from 'next/navigation'
 import { createClient, createAdminClient } from '@/utils/supabase/server'
 import { getBasePath } from '@/utils/base-path'
 import ComplaintThread from '@/components/dashboard/complaint-thread'
-import { updateComplaintStatus } from '@/app/actions/complaints'
+import ArchiveComplaintButton from './archive-button'
+import ComplaintStatusControls from './status-controls'
 
-const STATUS_OPTIONS = [
-  { value: 'open',        label: 'Open' },
-  { value: 'in_progress', label: 'In Progress' },
-  { value: 'resolved',    label: 'Resolved' },
-]
 const STATUS_STYLES: Record<string, string> = {
   open:        'bg-yellow-50 text-yellow-700 border-yellow-200',
   in_progress: 'bg-pink-50 text-pink-700 border-pink-200',
@@ -47,6 +43,15 @@ export default async function AdminComplaintDetailPage({
 
   if (!complaint) notFound()
 
+  // Fetched separately so a missing column (migration not yet applied) degrades
+  // gracefully to null instead of 404ing the page.
+  const { data: archiveRow } = await adminDb
+    .from('complaints')
+    .select('archived_at')
+    .eq('id', id)
+    .maybeSingle()
+  const isArchived = Boolean((archiveRow as { archived_at?: string | null } | null)?.archived_at)
+
   const { data: staffMsgs } = await adminDb
     .from('staff_complaint_messages')
     .select('id, message, created_at, sender_id')
@@ -57,6 +62,9 @@ export default async function AdminComplaintDetailPage({
     ...(customerMsgs ?? []),
     ...(staffMsgs   ?? []),
   ].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+
+  // A complaint may only be resolved once staff has actually replied.
+  const hasStaffReply = (staffMsgs?.length ?? 0) > 0
 
   const profileData = Array.isArray(complaint.profiles) ? complaint.profiles[0] : complaint.profiles
   const customer    = profileData as { full_name: string; phone: string | null } | null
@@ -87,6 +95,11 @@ export default async function AdminComplaintDetailPage({
             <span className={`text-xs px-2 py-0.5 rounded-full border font-medium shrink-0 ${STATUS_STYLES[complaint.status] ?? ''}`}>
               {complaint.status.replace('_', ' ')}
             </span>
+            {isArchived && (
+              <span className="text-xs px-2 py-0.5 rounded-full border font-medium shrink-0 bg-gray-100 text-gray-500 border-gray-200">
+                Archived
+              </span>
+            )}
           </div>
           <p className="text-xs text-gray-400 mt-0.5">
             {customer?.full_name ?? 'Unknown Customer'}
@@ -96,21 +109,14 @@ export default async function AdminComplaintDetailPage({
 
         {/* Status controls */}
         <div className="flex items-center gap-1 shrink-0">
-          {STATUS_OPTIONS.map((opt) => (
-            <form key={opt.value} action={async () => { 'use server'; await updateComplaintStatus(id, opt.value) }}>
-              <button
-                type="submit"
-                disabled={complaint.status === opt.value}
-                className={`text-xs px-2.5 py-1.5 rounded-lg font-medium border transition-colors disabled:cursor-default whitespace-nowrap ${
-                  complaint.status === opt.value
-                    ? STATUS_STYLES[opt.value]
-                    : 'bg-white text-gray-500 border-gray-200 hover:border-gray-300 hover:text-gray-700'
-                }`}
-              >
-                {opt.label}
-              </button>
-            </form>
-          ))}
+          <ComplaintStatusControls
+            complaintId={id}
+            currentStatus={complaint.status}
+            hasStaffReply={hasStaffReply}
+          />
+
+          <div className="w-px h-5 bg-gray-200 mx-1" />
+          <ArchiveComplaintButton complaintId={id} archived={isArchived} />
         </div>
       </div>
 

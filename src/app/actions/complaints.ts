@@ -129,10 +129,108 @@ export async function updateComplaintStatus(
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Unauthorized.' }
 
+  const { data: profile } = await supabase
+    .from('profiles').select('role').eq('id', user.id).single()
+  if (profile?.role !== 'super_admin') return { error: 'Unauthorized.' }
+
   const admin = createAdminClient()
+
+  // A complaint can only be resolved once the customer has actually received a
+  // reply — otherwise it would be closed with no action taken.
+  if (status === 'resolved') {
+    const { count } = await admin
+      .from('staff_complaint_messages')
+      .select('id', { count: 'exact', head: true })
+      .eq('complaint_id', complaintId)
+    if (!count) {
+      return { error: 'Reply to the customer before marking this complaint as resolved.' }
+    }
+  }
+
   const { error } = await admin
     .from('complaints')
     .update({ status })
+    .eq('id', complaintId)
+
+  if (error) return { error: error.message }
+
+  revalidatePath('/admin/complaints')
+  revalidatePath(`/admin/complaints/${complaintId}`)
+}
+
+// Admin-initiated chat: start a new complaint thread with a chosen customer and
+// send the first message (as staff). Used by the "New chat" button on the admin
+// complaints list. Super-admin only.
+export async function startCustomerChat(
+  formData: FormData
+): Promise<{ error?: string; complaintId?: string }> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Unauthorized.' }
+
+  const { data: profile } = await supabase
+    .from('profiles').select('role').eq('id', user.id).single()
+  if (profile?.role !== 'super_admin') return { error: 'Unauthorized.' }
+
+  const customer_id = (formData.get('customer_id') as string ?? '').trim()
+  const subject     = (formData.get('subject') as string ?? '').trim()
+  const message     = (formData.get('message') as string ?? '').trim()
+
+  if (!customer_id) return { error: 'Please select a customer.' }
+  if (!subject)     return { error: 'Subject is required.' }
+  if (!message)     return { error: 'Please enter a message.' }
+
+  const admin = createAdminClient()
+
+  const { data: target } = await admin
+    .from('profiles').select('id, role').eq('id', customer_id).single()
+  if (!target || target.role !== 'customer') return { error: 'Selected customer not found.' }
+
+  // Opened by staff and already actioned (first message is a staff reply), so it
+  // starts in_progress rather than open.
+  const { data: complaint, error: cErr } = await admin
+    .from('complaints')
+    .insert({ customer_id, subject, status: 'in_progress' })
+    .select('id')
+    .single()
+  if (cErr || !complaint) return { error: 'Failed to start the chat. Please try again.' }
+
+  const { error: mErr } = await admin
+    .from('staff_complaint_messages')
+    .insert({ complaint_id: complaint.id, sender_id: user.id, message })
+  if (mErr) return { error: mErr.message }
+
+  await createNotification({
+    userId: customer_id,
+    title: 'Message from Support',
+    body: subject,
+    type: 'complaint_reply',
+    complaintId: complaint.id,
+  })
+
+  revalidatePath('/admin/complaints')
+  return { complaintId: complaint.id }
+}
+
+// Archive (or restore) a complaint. This never deletes data — it only sets/clears
+// `archived_at` so admins can keep the active list tidy while preserving the full
+// history. Super-admin only.
+export async function setComplaintArchived(
+  complaintId: string,
+  archived: boolean
+): Promise<{ error?: string } | undefined> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Unauthorized.' }
+
+  const { data: profile } = await supabase
+    .from('profiles').select('role').eq('id', user.id).single()
+  if (profile?.role !== 'super_admin') return { error: 'Unauthorized.' }
+
+  const admin = createAdminClient()
+  const { error } = await admin
+    .from('complaints')
+    .update({ archived_at: archived ? new Date().toISOString() : null })
     .eq('id', complaintId)
 
   if (error) return { error: error.message }
