@@ -12,18 +12,24 @@ export function SortSelect({ options, paramName = 'sort' }: { options: Option[];
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
 
+  const [closing, setClosing] = useState(false)
   const activeLabel = options.find(o => o.value === current)?.label ?? options[0]?.label
 
+  function closeDropdown() {
+    setClosing(true)
+  }
+
   useEffect(() => {
+    if (!open && !closing) return
     function onClickOutside(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+      if (ref.current && !ref.current.contains(e.target as Node)) closeDropdown()
     }
-    if (open) document.addEventListener('mousedown', onClickOutside)
+    document.addEventListener('mousedown', onClickOutside)
     return () => document.removeEventListener('mousedown', onClickOutside)
-  }, [open])
+  }, [open, closing])
 
   function select(value: string) {
-    setOpen(false)
+    closeDropdown()
     const params = new URLSearchParams(searchParams.toString())
     if (value === options[0]?.value) {
       params.delete(paramName)
@@ -37,8 +43,8 @@ export function SortSelect({ options, paramName = 'sort' }: { options: Option[];
     <div ref={ref} className="relative">
       <button
         type="button"
-        onClick={() => setOpen(v => !v)}
-        className={`inline-flex items-center gap-1.5 text-xs font-medium border rounded-lg px-3 py-2 transition-all ${
+        onClick={() => (open ? closeDropdown() : setOpen(true))}
+        className={`inline-flex items-center gap-1.5 text-xs font-medium border rounded-lg px-3 py-2 active:scale-95 transition-all ${
           open
             ? 'border-pink-300 bg-pink-50 text-pink-700 ring-2 ring-pink-500/20'
             : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300 hover:text-gray-900'
@@ -53,8 +59,11 @@ export function SortSelect({ options, paramName = 'sort' }: { options: Option[];
         </svg>
       </button>
 
-      {open && (
-        <div className="absolute right-0 top-full mt-1.5 z-50 min-w-[200px] bg-white border border-gray-200 rounded-xl shadow-lg shadow-gray-200/60 py-1.5 animate-in fade-in slide-in-from-top-1 duration-150">
+      {(open || closing) && (
+        <div
+          className={`absolute right-0 top-full mt-1.5 z-50 min-w-[200px] bg-white border border-gray-200 rounded-xl shadow-lg shadow-gray-200/60 py-1.5 ${closing ? 'animate-dropdown-out' : 'animate-dropdown-in'}`}
+          onAnimationEnd={() => { if (closing) { setClosing(false); setOpen(false) } }}
+        >
           <p className="px-3 py-1.5 text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Sort by</p>
           {options.map((o) => {
             const isActive = o.value === current

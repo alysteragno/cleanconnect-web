@@ -2,6 +2,7 @@
 import { notFound } from 'next/navigation'
 import { createClient, createAdminClient } from '@/utils/supabase/server'
 import { getBasePath } from '@/utils/base-path'
+import { SortSelect } from '@/components/dashboard/sort-select'
 
 type Cleaner = {
   id: string
@@ -12,7 +13,19 @@ type Cleaner = {
   photo_url: string | null
 }
 
-export default async function AdminCleanersPage() {
+const SORT_OPTIONS = [
+  { value: 'name_asc',  label: 'Name (A → Z)' },
+  { value: 'name_desc', label: 'Name (Z → A)' },
+  { value: 'newest',    label: 'Newest First' },
+  { value: 'oldest',    label: 'Oldest First' },
+]
+
+export default async function AdminCleanersPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ sort?: string }>
+}) {
+  const { sort } = await searchParams
   const authClient = await createClient()
   const { data: { user } } = await authClient.auth.getUser()
   if (!user) notFound()
@@ -28,7 +41,15 @@ export default async function AdminCleanersPage() {
     .eq('role', 'cleaner')
     .order('full_name')
 
-  const list = (cleaners ?? []) as unknown as Cleaner[]
+  const sortKey = sort ?? 'name_asc'
+  const list = [...((cleaners ?? []) as unknown as Cleaner[])].sort((a, b) => {
+    switch (sortKey) {
+      case 'name_desc': return b.full_name.localeCompare(a.full_name)
+      case 'newest':    return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      case 'oldest':    return new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+      default:          return a.full_name.localeCompare(b.full_name)
+    }
+  })
   const active = list.filter((c) => c.is_active)
   const inactive = list.filter((c) => !c.is_active)
 
@@ -36,14 +57,17 @@ export default async function AdminCleanersPage() {
     <div className="max-w-3xl space-y-5">
       <div>
         <Link href={basePath || '/'} className="text-sm text-gray-400 hover:text-gray-600 transition-colors">← Dashboard</Link>
-        <div className="flex items-baseline justify-between mt-2">
+        <div className="flex items-center justify-between mt-2">
           <h1 className="text-xl font-bold text-gray-900">Cleaners</h1>
-          <Link
-            href={`${basePath}/cleaners/new`}
-            className="text-sm px-4 py-2 bg-pink-600 text-white rounded-lg font-medium hover:bg-pink-700 transition-colors"
-          >
-            + Add Cleaner
-          </Link>
+          <div className="flex items-center gap-3">
+            <SortSelect options={SORT_OPTIONS} />
+            <Link
+              href={`${basePath}/cleaners/new`}
+              className="text-sm px-4 py-2 bg-pink-600 text-white rounded-lg font-medium hover:bg-pink-700 transition-colors"
+            >
+              + Add Cleaner
+            </Link>
+          </div>
         </div>
       </div>
 

@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { createClient, createAdminClient } from '@/utils/supabase/server'
 import { getBasePath } from '@/utils/base-path'
+import { SortSelect } from '@/components/dashboard/sort-select'
 
 type Customer = {
   id: string
@@ -11,7 +12,19 @@ type Customer = {
   created_at: string
 }
 
-export default async function AdminCustomersPage() {
+const SORT_OPTIONS = [
+  { value: 'name_asc',  label: 'Name (A → Z)' },
+  { value: 'name_desc', label: 'Name (Z → A)' },
+  { value: 'newest',    label: 'Newest First' },
+  { value: 'oldest',    label: 'Oldest First' },
+]
+
+export default async function AdminCustomersPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ sort?: string }>
+}) {
+  const { sort } = await searchParams
   const authClient = await createClient()
   const { data: { user } } = await authClient.auth.getUser()
   if (!user) notFound()
@@ -27,7 +40,15 @@ export default async function AdminCustomersPage() {
     .eq('role', 'customer')
     .order('full_name')
 
-  const list = (customers ?? []) as unknown as Customer[]
+  const sortKey = sort ?? 'name_asc'
+  const list = [...((customers ?? []) as unknown as Customer[])].sort((a, b) => {
+    switch (sortKey) {
+      case 'name_desc': return b.full_name.localeCompare(a.full_name)
+      case 'newest':    return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      case 'oldest':    return new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+      default:          return a.full_name.localeCompare(b.full_name)
+    }
+  })
   const active = list.filter((c) => c.is_active)
   const inactive = list.filter((c) => !c.is_active)
 
@@ -35,9 +56,12 @@ export default async function AdminCustomersPage() {
     <div className="max-w-3xl space-y-5">
       <div>
         <Link href={basePath || '/'} className="text-sm text-gray-400 hover:text-gray-600 transition-colors">← Dashboard</Link>
-        <div className="flex items-baseline justify-between mt-2">
+        <div className="flex items-center justify-between mt-2">
           <h1 className="text-xl font-bold text-gray-900">Customers</h1>
-          <span className="text-sm text-gray-400">{list.length} total</span>
+          <div className="flex items-center gap-3">
+            <SortSelect options={SORT_OPTIONS} />
+            <span className="text-sm text-gray-400">{list.length} total</span>
+          </div>
         </div>
       </div>
 

@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { createClient, createAdminClient } from '@/utils/supabase/server'
 import { getBasePath } from '@/utils/base-path'
+import { CustomRangeTab } from './date-range-picker'
 
 type CompletedBooking = {
   id: string
@@ -74,19 +75,19 @@ const PAYMENT_STYLES: Record<string, string> = {
 }
 
 const PERIODS = [
-  { value: 'day',   label: 'Today'      },
-  { value: 'week',  label: 'This Week'  },
-  { value: 'month', label: 'This Month' },
-  { value: 'all',   label: 'All Time'   },
+  { value: 'day',    label: 'Today'      },
+  { value: 'week',   label: 'This Week'  },
+  { value: 'month',  label: 'This Month' },
+  { value: 'custom', label: 'Custom Range' },
 ] as const
 type Period = (typeof PERIODS)[number]['value']
 
 type DateRange = { start: string; end: string }
 
-function getDateRange(period: string): DateRange | null {
+function getDateRange(period: string, custom?: { start?: string; end?: string }): DateRange {
   // Always derive dates in Philippines time (UTC+8)
   const phToday = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' }) // 'YYYY-MM-DD'
-  const [y, mo, d] = phToday.split('-').map(Number) // mo is 1-indexed
+  const [y, mo] = phToday.split('-').map(Number) // mo is 1-indexed
   const pad = (n: number) => String(n).padStart(2, '0')
 
   if (period === 'day') {
@@ -103,23 +104,32 @@ function getDateRange(period: string): DateRange | null {
       end:   sun.toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' }),
     }
   }
-  if (period === 'month') {
-    const lastDay = new Date(y, mo, 0).getDate() // mo is 1-indexed so this gives last day of that month
-    return { start: `${y}-${pad(mo)}-01`, end: `${y}-${pad(mo)}-${pad(lastDay)}` }
+  if (period === 'custom') {
+    if (custom?.start && custom?.end) {
+      return custom.start <= custom.end
+        ? { start: custom.start, end: custom.end }
+        : { start: custom.end, end: custom.start }
+    }
+    // No range chosen yet — default to the last 30 days until the user picks one.
+    const start = new Date(`${phToday}T12:00:00+08:00`)
+    start.setDate(start.getDate() - 29)
+    return { start: start.toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' }), end: phToday }
   }
-  return null
+  // month (default)
+  const lastDay = new Date(y, mo, 0).getDate() // mo is 1-indexed so this gives last day of that month
+  return { start: `${y}-${pad(mo)}-01`, end: `${y}-${pad(mo)}-${pad(lastDay)}` }
 }
 
-function periodSubtitle(period: string, range: DateRange | null): string {
+function periodSubtitle(period: string, range: DateRange): string {
   const fmt = (d: string, opts: Intl.DateTimeFormatOptions) =>
     new Date(`${d}T12:00:00+08:00`).toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', ...opts })
-  if (period === 'day' && range)
+  if (period === 'day')
     return fmt(range.start, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })
-  if (period === 'week' && range)
+  if (period === 'week')
     return `${fmt(range.start, { month: 'short', day: 'numeric' })} – ${fmt(range.end, { month: 'short', day: 'numeric', year: 'numeric' })}`
-  if (period === 'month')
-    return new Date().toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', month: 'long', year: 'numeric' })
-  return 'All time'
+  if (period === 'custom')
+    return `${fmt(range.start, { month: 'short', day: 'numeric', year: 'numeric' })} – ${fmt(range.end, { month: 'short', day: 'numeric', year: 'numeric' })}`
+  return new Date().toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', month: 'long', year: 'numeric' })
 }
 
 function formatDate(d: string) {
@@ -134,14 +144,14 @@ function formatTime(t: string) {
 export default async function ReportsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ period?: string }>
+  searchParams: Promise<{ period?: string; start?: string; end?: string }>
 }) {
-  const { period: rawPeriod = 'month' } = await searchParams
+  const { period: rawPeriod = 'month', start: rawStart, end: rawEnd } = await searchParams
   const period: Period = PERIODS.some((p) => p.value === rawPeriod)
     ? (rawPeriod as Period)
     : 'month'
 
-  const range    = getDateRange(period)
+  const range    = getDateRange(period, { start: rawStart, end: rawEnd })
   const subtitle = periodSubtitle(period, range)
 
   const supabase = await createClient()
@@ -164,35 +174,22 @@ export default async function ReportsPage({
   const weekEnd   = sunPH.toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' })
 
   // Period-filtered queries — filter by created_at (Philippines time) so bookings appear in the period they were made
-  const allBookingsQ = range
-    ? adminDb.from('bookings').select('status, base_price, payment_status, service_name, space_type, property_sqm')
-        .gte('created_at', `${range.start}T00:00:00+08:00`).lte('created_at', `${range.end}T23:59:59+08:00`)
-    : adminDb.from('bookings').select('status, base_price, payment_status, service_name, space_type, property_sqm')
+  const allBookingsQ = adminDb.from('bookings').select('status, base_price, payment_status, service_name, space_type, property_sqm')
+    .gte('created_at', `${range.start}T00:00:00+08:00`).lte('created_at', `${range.end}T23:59:59+08:00`)
 
-  const completedQ = range
-    ? adminDb.from('bookings')
-        .select('id, service_date, service_name, property_sqm, base_price, payment_status, payment_method, profiles!customer_id(full_name)')
-        .eq('status', 'completed')
-        .gte('created_at', `${range.start}T00:00:00+08:00`).lte('created_at', `${range.end}T23:59:59+08:00`)
-        .order('service_date', { ascending: false })
-    : adminDb.from('bookings')
-        .select('id, service_date, service_name, property_sqm, base_price, payment_status, payment_method, profiles!customer_id(full_name)')
-        .eq('status', 'completed')
-        .order('service_date', { ascending: false })
-        .limit(100)
+  const completedQ = adminDb.from('bookings')
+    .select('id, service_date, service_name, property_sqm, base_price, payment_status, payment_method, profiles!customer_id(full_name)')
+    .eq('status', 'completed')
+    .gte('created_at', `${range.start}T00:00:00+08:00`).lte('created_at', `${range.end}T23:59:59+08:00`)
+    .order('service_date', { ascending: false })
 
   // Period-filtered recent feedback (by created_at)
-  const recentFeedbackQ = range
-    ? adminDb.from('feedback')
-        .select('id, rating, comment, created_at, bookings(service_name), profiles!customer_id(full_name)')
-        .gte('created_at', `${range.start}T00:00:00+08:00`)
-        .lte('created_at', `${range.end}T23:59:59+08:00`)
-        .order('created_at', { ascending: false })
-        .limit(5)
-    : adminDb.from('feedback')
-        .select('id, rating, comment, created_at, bookings(service_name), profiles!customer_id(full_name)')
-        .order('created_at', { ascending: false })
-        .limit(5)
+  const recentFeedbackQ = adminDb.from('feedback')
+    .select('id, rating, comment, created_at, bookings(service_name), profiles!customer_id(full_name)')
+    .gte('created_at', `${range.start}T00:00:00+08:00`)
+    .lte('created_at', `${range.end}T23:59:59+08:00`)
+    .order('created_at', { ascending: false })
+    .limit(5)
 
   const [
     { data: allBookings },
@@ -326,7 +323,7 @@ export default async function ReportsPage({
 
       {/* Period tabs */}
       <div className="flex items-center gap-1 bg-gray-100 rounded-xl p-1 w-fit">
-        {PERIODS.map((p) => (
+        {PERIODS.filter((p) => p.value !== 'custom').map((p) => (
           <Link
             key={p.value}
             href={`${basePath}/reports?period=${p.value}`}
@@ -339,6 +336,7 @@ export default async function ReportsPage({
             {p.label}
           </Link>
         ))}
+        <CustomRangeTab active={period === 'custom'} start={range.start} end={range.end} />
       </div>
 
       {/* Financial Summary */}
@@ -709,9 +707,7 @@ export default async function ReportsPage({
         <div className="flex items-baseline justify-between gap-2 mb-4">
           <div className="flex items-baseline gap-2">
             <h2 className="text-sm font-semibold text-gray-900 uppercase tracking-wide">Customer Feedback</h2>
-            <span className="text-xs text-gray-400">
-              {period === 'all' ? 'Recent reviews' : `Reviews · ${subtitle}`}
-            </span>
+            <span className="text-xs text-gray-400">Reviews · {subtitle}</span>
           </div>
           <Link href={`${basePath}/feedback`} className="text-xs text-pink-600 hover:text-pink-800 transition-colors">
             See all →
@@ -844,9 +840,7 @@ export default async function ReportsPage({
       <section>
         <div className="flex items-baseline gap-2 mb-4">
           <h2 className="text-sm font-semibold text-gray-900 uppercase tracking-wide">Service History</h2>
-          <span className="text-xs text-gray-400">
-            {period === 'all' ? 'Last 100 completed' : `Completed · ${subtitle}`}
-          </span>
+          <span className="text-xs text-gray-400">Completed · {subtitle}</span>
         </div>
         <div className="bg-white rounded-xl border border-gray-200">
           <div className="hidden sm:grid grid-cols-[100px_1fr_1fr_100px_80px] gap-4 px-5 py-3 border-b border-gray-100 bg-gray-50/60 rounded-t-xl">

@@ -139,7 +139,7 @@ export default async function AdminBookingsPage({
   return (
     <div className="max-w-5xl space-y-6">
       {/* Header */}
-      <div className="flex items-end justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
         <div>
           <p className="text-xs text-gray-400 mb-1">Admin</p>
           <h1 className="text-2xl font-bold text-gray-900">Bookings</h1>
