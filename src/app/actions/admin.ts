@@ -792,35 +792,6 @@ export async function getCleanerWeekScheduleData(
   return { dayOffs: dayOffs ?? [], assignments }
 }
 
-// ── Branch management ──────────────────────────────────────────────────────
-// Single-branch only — createBranch is intentionally removed per client policy.
-
-export async function updateBranch(
-  state: AdminActionState,
-  formData: FormData
-): Promise<AdminActionState> {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user || !(await assertSuperAdmin(supabase, user.id))) return { error: 'Unauthorized.' }
-
-  const branch_id = formData.get('branch_id') as string
-  const name = (formData.get('name') as string).trim()
-  const region = (formData.get('region') as string).trim()
-  const contact_number = (formData.get('contact_number') as string).trim() || null
-
-  if (!name || !region) return { error: 'Branch name and region are required.' }
-
-  const { error } = await supabase
-    .from('branches')
-    .update({ name, region, contact_number })
-    .eq('id', branch_id)
-
-  if (error) return { error: error.message }
-
-  revalidatePath('/admin/branches')
-  return { success: 'Branch updated.' }
-}
-
 // ── Customer search (for manual booking) ──────────────────────────────────
 
 export async function searchCustomers(
@@ -857,11 +828,11 @@ export async function createCustomerAccount(
 
   const full_name = (formData.get('full_name') as string ?? '').trim().slice(0, 100)
   const email     = (formData.get('email') as string ?? '').trim().toLowerCase()
-  const phone     = (formData.get('phone') as string ?? '').trim() || null
+  const phone     = (formData.get('phone') as string ?? '').trim()
 
   if (!full_name || full_name.length < 2) return { error: 'Full name is required (at least 2 characters).' }
   if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { error: 'A valid email is required.' }
-  if (phone && !/^09\d{9}$/.test(phone)) return { error: 'Phone must be a valid PH number (09XXXXXXXXX).' }
+  if (!phone || !/^09\d{9}$/.test(phone)) return { error: 'A valid PH phone number is required (09XXXXXXXXX).' }
 
   // Generate a random temporary password — customer will reset via forgot-password
   const tempPassword = `Tmp${crypto.randomUUID().slice(0, 12)}!`
@@ -887,6 +858,13 @@ export async function createCustomerAccount(
 
   if (profileError) return { error: profileError.message }
 
+  // Send the customer a "set your password" email so they can log in themselves —
+  // the tempPassword above is never shown or handed to anyone.
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000'
+  await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: `${siteUrl}/auth/callback?next=/reset-password`,
+  })
+
   revalidatePath('/admin/customers')
   return { customer: { id: signUpData.user.id, full_name, phone } }
 }
@@ -895,8 +873,8 @@ export async function createCustomerAccount(
 
 // Unit-based services use per-unit pricing (not area-based sqm pricing)
 const UNIT_BASED_SLUGS = new Set([
-  'grease_trap', 'aircon_cleaning', 'sofa_cleaning', 'aircon_repair',
-  'mattress_cleaning', 'grease_trap_installation', 'carpet_cleaning', 'curtain_dry_cleaning',
+  'aircon_cleaning', 'aircon_repair',
+  'grease_trap_installation', 'carpet_cleaning', 'curtain_dry_cleaning',
 ])
 
 export async function createManualBooking(
@@ -970,14 +948,6 @@ export async function createManualBooking(
     .single()
   if (!customer) return { error: 'Selected customer not found.' }
 
-  // Get branch
-  const { data: branch } = await adminClient
-    .from('branches')
-    .select('id')
-    .limit(1)
-    .single()
-  if (!branch) return { error: 'No branch configured. Please set up a branch first.' }
-
   // Insert booking
   // For area-based: DB trigger auto-calculates duration, price, required_cleaners from property_sqm
   // For unit-based: we insert with property_sqm=0, trigger sets ₱1000 default, then we override
@@ -985,7 +955,6 @@ export async function createManualBooking(
     .from('bookings')
     .insert({
       customer_id,
-      branch_id: branch.id,
       service_name,
       service_date,
       service_time,

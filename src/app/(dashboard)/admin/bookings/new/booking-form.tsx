@@ -58,8 +58,8 @@ const PAYMENT_METHODS = [
 
 // Services that use per-unit pricing (not area-based sqm pricing)
 const UNIT_BASED_SLUGS = new Set([
-  'grease_trap', 'aircon_cleaning', 'sofa_cleaning', 'aircon_repair',
-  'mattress_cleaning', 'grease_trap_installation', 'carpet_cleaning', 'curtain_dry_cleaning',
+  'aircon_cleaning', 'aircon_repair',
+  'grease_trap_installation', 'carpet_cleaning', 'curtain_dry_cleaning',
 ])
 
 // ── Component ──────────────────────────────────────────────────────────────
@@ -208,7 +208,7 @@ export default function BookingForm({ services }: { services: Service[] }) {
                 )}
 
                 {showDropdown && (
-                  <div className="absolute left-0 right-0 top-full mt-1 z-50 bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden">
+                  <div className="absolute left-0 right-0 top-full mt-1 z-50 bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden animate-dropdown-in">
                     {results.map(c => (
                       <button
                         key={c.id}
@@ -243,8 +243,8 @@ export default function BookingForm({ services }: { services: Service[] }) {
                   <input name="new_email" type="email" required className={`${inputClass} bg-white`} placeholder="customer@email.com" />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Phone<span className="text-gray-400 font-normal text-xs ml-1">(optional)</span></label>
-                  <input name="new_phone" type="tel" maxLength={11} pattern="09[0-9]{9}" className={`${inputClass} bg-white`} placeholder="09XX XXX XXXX" />
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Phone<span className="text-red-400 ml-0.5">*</span></label>
+                  <input name="new_phone" type="tel" required maxLength={11} pattern="09[0-9]{9}" className={`${inputClass} bg-white`} placeholder="09XX XXX XXXX" />
                 </div>
 
                 {createError && (
@@ -268,7 +268,7 @@ export default function BookingForm({ services }: { services: Service[] }) {
                 </button>
 
                 <p className="text-[11px] text-gray-400 text-center">
-                  A temporary password will be generated. The customer can reset it via forgot password.
+                  We&apos;ll email the customer a link to set their own password.
                 </p>
               </div>
             )}
@@ -292,8 +292,14 @@ export default function BookingForm({ services }: { services: Service[] }) {
             className={`${inputClass} bg-white`}
           >
             <option value="" disabled>Select a service...</option>
+            {services.length === 0 && (
+              <option value="" disabled>No active services found</option>
+            )}
             {services.map(s => (
-              <option key={s.id} value={s.name}>{s.name}</option>
+              <option key={s.id} value={s.name}>
+                {s.name} — ₱{Number(s.price_from).toLocaleString('en-PH')}
+                {UNIT_BASED_SLUGS.has(s.slug) ? ' / unit' : ''}
+              </option>
             ))}
           </select>
         </Field>
