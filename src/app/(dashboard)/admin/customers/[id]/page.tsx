@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { createClient, createAdminClient } from '@/utils/supabase/server'
+import { getBasePath } from '@/utils/base-path'
 import CustomerToggleForm from './customer-toggle-form'
 import ConvertToCleanerForm from './convert-to-cleaner-form'
 import { IconHeadset } from '@/components/icons'
@@ -55,6 +56,7 @@ export default async function CustomerDetailPage({
   const { data: userProfile } = await authClient.from('profiles').select('role').eq('id', user.id).single()
   if (userProfile?.role !== 'super_admin') notFound()
 
+  const basePath = await getBasePath()
   const supabase = createAdminClient()
 
   const [{ data: customer }, { data: bookings }] = await Promise.all([
@@ -83,7 +85,7 @@ export default async function CustomerDetailPage({
   return (
     <div className="max-w-2xl space-y-6">
       <div>
-        <Link href="/admin/customers" className="text-sm text-gray-400 hover:text-gray-600 transition-colors">
+        <Link href={`${basePath}/customers`} className="text-sm text-gray-400 hover:text-gray-600 transition-colors">
           ← Customers
         </Link>
         <h1 className="text-xl font-bold text-gray-900 mt-2">Customer Profile</h1>
@@ -100,7 +102,7 @@ export default async function CustomerDetailPage({
             <p className="text-xs text-gray-500">{c.phone ?? 'No phone on file'}</p>
           </div>
           <Link
-            href={`/admin/support/${c.id}`}
+            href={`${basePath}/support/${c.id}`}
             className="flex items-center gap-1.5 px-3 py-2 bg-pink-600 text-white rounded-lg text-sm font-medium hover:bg-pink-700 transition-colors shrink-0"
           >
             <IconHeadset />
@@ -141,7 +143,7 @@ export default async function CustomerDetailPage({
             {bookingList.map((b) => (
               <Link
                 key={b.id}
-                href={`/admin/bookings/${b.id}`}
+                href={`${basePath}/bookings/${b.id}`}
                 className="flex items-center justify-between p-4 hover:bg-gray-50 transition-colors group"
               >
                 <div>

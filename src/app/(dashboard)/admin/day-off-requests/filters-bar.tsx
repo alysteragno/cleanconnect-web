@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation'
 import { useState, useRef } from 'react'
+import { useBasePath } from '@/components/dashboard/base-path-context'
 
 const MONTH_LABELS = [
   'January', 'February', 'March', 'April', 'May', 'June',
@@ -40,6 +41,7 @@ export default function FiltersBar({
   month: string
 }) {
   const router = useRouter()
+  const basePath = useBasePath()
   const { year: initYear, mo: initMo } = parseMonth(initMonth)
 
   const [status, setStatus]   = useState(initStatus || 'pending')
@@ -56,7 +58,7 @@ export default function FiltersBar({
     const p  = new URLSearchParams()
     p.set('status', s)
     if (m && y) p.set('month', `${y}-${m}`)
-    return `/admin/day-off-requests?${p.toString()}`
+    return `${basePath}/day-off-requests?${p.toString()}`
   }
 
   function apply() {

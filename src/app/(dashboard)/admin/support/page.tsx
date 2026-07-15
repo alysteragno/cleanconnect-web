@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { createClient, createAdminClient } from '@/utils/supabase/server'
+import { getBasePath } from '@/utils/base-path'
 import { SortSelect } from '@/components/dashboard/sort-select'
 
 function formatRelativeTime(iso: string) {
@@ -47,6 +48,8 @@ export default async function AdminSupportPage({
   if (!user) notFound()
   const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
   if (profile?.role !== 'super_admin') notFound()
+
+  const basePath = await getBasePath()
 
   // Fetch only customer messages (direct_messages are sent by customers)
   const { data: msgRows } = await supabase
@@ -127,7 +130,7 @@ export default async function AdminSupportPage({
             return (
               <Link
                 key={c.id}
-                href={`/admin/support/${c.id}`}
+                href={`${basePath}/support/${c.id}`}
                 className="flex items-center gap-3 px-4 py-3.5 hover:bg-gray-50 transition-colors group"
               >
                 <div className={`w-9 h-9 rounded-full ${avatarColor(c.id)} text-white flex items-center justify-center text-xs font-bold shrink-0 select-none`}>

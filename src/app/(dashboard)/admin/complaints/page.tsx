@@ -1,6 +1,7 @@
 ﻿import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { createClient, createAdminClient } from '@/utils/supabase/server'
+import { getBasePath } from '@/utils/base-path'
 
 const STATUS_STYLES: Record<string, string> = {
   open: 'bg-yellow-50 text-yellow-700 border-yellow-200',
@@ -18,6 +19,7 @@ export default async function AdminComplaintsPage() {
   const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
   if (profile?.role !== 'super_admin') notFound()
 
+  const basePath = await getBasePath()
   const adminDb = createAdminClient()
   const { data: complaints } = await adminDb
     .from('complaints')
@@ -44,7 +46,7 @@ export default async function AdminComplaintsPage() {
           complaints.map((c) => (
             <Link
               key={c.id}
-              href={`/admin/complaints/${c.id}`}
+              href={`${basePath}/complaints/${c.id}`}
               className="flex items-center justify-between px-5 py-4 hover:bg-gray-50 transition-colors"
             >
               <div>

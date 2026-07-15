@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { createClient, createAdminClient } from '@/utils/supabase/server'
+import { getBasePath } from '@/utils/base-path'
 
 type CompletedBooking = {
   id: string
@@ -149,6 +150,7 @@ export default async function ReportsPage({
   const { data: authProfile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
   if (authProfile?.role !== 'super_admin') notFound()
 
+  const basePath = await getBasePath()
   const adminDb = createAdminClient()
   const now = new Date()
 
@@ -314,7 +316,7 @@ export default async function ReportsPage({
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
         <div>
-          <Link href="/admin" className="text-xs text-gray-400 hover:text-gray-600 transition-colors">
+          <Link href={basePath || '/'} className="text-xs text-gray-400 hover:text-gray-600 transition-colors">
             ← Dashboard
           </Link>
           <h1 className="text-xl font-bold text-gray-900 tracking-tight mt-2">Reports & Analytics</h1>
@@ -327,7 +329,7 @@ export default async function ReportsPage({
         {PERIODS.map((p) => (
           <Link
             key={p.value}
-            href={`/admin/reports?period=${p.value}`}
+            href={`${basePath}/reports?period=${p.value}`}
             className={`px-4 py-2 rounded-lg text-xs font-semibold transition-all ${
               period === p.value
                 ? 'bg-white text-gray-900 shadow-sm'
@@ -617,7 +619,7 @@ export default async function ReportsPage({
               {cleanerStats.sort((a, b) => b.jobs - a.jobs).map((c) => (
                 <Link
                   key={c.id}
-                  href={`/admin/cleaners/${c.id}`}
+                  href={`${basePath}/cleaners/${c.id}`}
                   className="flex sm:grid sm:grid-cols-[1fr_100px_100px_80px] gap-3 sm:gap-4 items-center px-5 py-3.5 hover:bg-gray-50 transition-colors group"
                 >
                   <div className="flex items-center gap-3 min-w-0">
@@ -677,7 +679,7 @@ export default async function ReportsPage({
             {topCleaners.map((c, i) => (
               <Link
                 key={c.id}
-                href={`/admin/cleaners/${c.id}`}
+                href={`${basePath}/cleaners/${c.id}`}
                 className="flex items-center gap-4 px-5 py-3.5 hover:bg-amber-50/40 transition-colors group"
               >
                 <span className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${
@@ -711,7 +713,7 @@ export default async function ReportsPage({
               {period === 'all' ? 'Recent reviews' : `Reviews · ${subtitle}`}
             </span>
           </div>
-          <Link href="/admin/feedback" className="text-xs text-pink-600 hover:text-pink-800 transition-colors">
+          <Link href={`${basePath}/feedback`} className="text-xs text-pink-600 hover:text-pink-800 transition-colors">
             See all →
           </Link>
         </div>
@@ -806,7 +808,7 @@ export default async function ReportsPage({
                     {dayBookings.map((b) => (
                       <Link
                         key={b.id}
-                        href={`/admin/bookings/${b.id}`}
+                        href={`${basePath}/bookings/${b.id}`}
                         className="flex items-center justify-between px-5 py-3 hover:bg-gray-50 transition-colors group"
                       >
                         <div className="min-w-0">

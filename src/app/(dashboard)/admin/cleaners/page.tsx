@@ -1,6 +1,7 @@
 ﻿import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { createClient, createAdminClient } from '@/utils/supabase/server'
+import { getBasePath } from '@/utils/base-path'
 
 type Cleaner = {
   id: string
@@ -18,6 +19,7 @@ export default async function AdminCleanersPage() {
   const { data: profile } = await authClient.from('profiles').select('role').eq('id', user.id).single()
   if (profile?.role !== 'super_admin') notFound()
 
+  const basePath = await getBasePath()
   const supabase = createAdminClient()
 
   const { data: cleaners } = await supabase
@@ -33,11 +35,11 @@ export default async function AdminCleanersPage() {
   return (
     <div className="max-w-3xl space-y-5">
       <div>
-        <Link href="/admin" className="text-sm text-gray-400 hover:text-gray-600 transition-colors">← Dashboard</Link>
+        <Link href={basePath || '/'} className="text-sm text-gray-400 hover:text-gray-600 transition-colors">← Dashboard</Link>
         <div className="flex items-baseline justify-between mt-2">
           <h1 className="text-xl font-bold text-gray-900">Cleaners</h1>
           <Link
-            href="/admin/cleaners/new"
+            href={`${basePath}/cleaners/new`}
             className="text-sm px-4 py-2 bg-pink-600 text-white rounded-lg font-medium hover:bg-pink-700 transition-colors"
           >
             + Add Cleaner
@@ -45,13 +47,13 @@ export default async function AdminCleanersPage() {
         </div>
       </div>
 
-      <CleanerSection title="Active" cleaners={active} />
-      {inactive.length > 0 && <CleanerSection title="Deactivated" cleaners={inactive} dimmed />}
+      <CleanerSection title="Active" cleaners={active} basePath={basePath} />
+      {inactive.length > 0 && <CleanerSection title="Deactivated" cleaners={inactive} basePath={basePath} dimmed />}
     </div>
   )
 }
 
-function CleanerSection({ title, cleaners, dimmed = false }: { title: string; cleaners: Cleaner[]; dimmed?: boolean }) {
+function CleanerSection({ title, cleaners, basePath, dimmed = false }: { title: string; cleaners: Cleaner[]; basePath: string; dimmed?: boolean }) {
   return (
     <section className="bg-white rounded-xl border border-gray-200">
       <div className="p-5 border-b border-gray-100 flex items-center justify-between">
@@ -65,7 +67,7 @@ function CleanerSection({ title, cleaners, dimmed = false }: { title: string; cl
           {cleaners.map((c) => (
             <Link
               key={c.id}
-              href={`/admin/cleaners/${c.id}`}
+              href={`${basePath}/cleaners/${c.id}`}
               className={`flex items-center justify-between p-4 hover:bg-gray-50 transition-colors group ${dimmed ? 'opacity-60' : ''}`}
             >
               <div className="flex items-center gap-3">

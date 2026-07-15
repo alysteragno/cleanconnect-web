@@ -2,6 +2,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { notFound } from 'next/navigation'
 import { createClient, createAdminClient } from '@/utils/supabase/server'
+import { getBasePath } from '@/utils/base-path'
 import PaymentForm from './payment-form'
 import AdjustForm from './adjust-form'
 import DispatchPanel from './dispatch-panel'
@@ -86,6 +87,7 @@ export default async function AdminBookingDetailPage({
   const { data: profile } = await authClient.from('profiles').select('role').eq('id', user.id).single()
   if (profile?.role !== 'super_admin') notFound()
 
+  const basePath = await getBasePath()
   const adminClient = createAdminClient()
 
   const [{ data: booking }, { data: assignments }, { data: cleaners }] = await Promise.all([
@@ -151,7 +153,7 @@ export default async function AdminBookingDetailPage({
       {/* ── Header ─────────────────────────────────────────────────── */}
       <div className="mb-7">
         <Link
-          href="/admin/bookings"
+          href={`${basePath}/bookings`}
           className="inline-flex items-center gap-1.5 text-xs text-gray-400 hover:text-gray-600 transition-colors mb-5"
         >
           <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

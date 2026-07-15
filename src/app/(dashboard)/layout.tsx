@@ -4,42 +4,46 @@ import { redirect } from 'next/navigation'
 import { cookies, headers } from 'next/headers'
 import { createClient, createAdminClient } from '@/utils/supabase/server'
 import { logout } from '@/app/actions/auth'
+import { getBasePath } from '@/utils/base-path'
+import { BasePathProvider } from '@/components/dashboard/base-path-context'
 import NotificationBell from '@/components/dashboard/notification-bell'
-import { SidebarNav } from '@/components/dashboard/sidebar-nav'
+import { SidebarNav, type NavSection } from '@/components/dashboard/sidebar-nav'
 import { DashboardShell } from '@/components/dashboard/dashboard-shell'
 import {
   IconDashboard, IconCalendar, IconUsers, IconChat, IconStar,
   IconChart, IconSettings, IconSignOut, IconChevronRight, IconMegaphone, IconHeadset,
 } from '@/components/icons'
 
-const ADMIN_NAV = [
-  {
-    label: 'Overview',
-    links: [
-      { href: '/admin', label: 'Dashboard', icon: <IconDashboard /> },
-    ],
-  },
-  {
-    label: 'Operations',
-    links: [
-      { href: '/admin/bookings',      label: 'Bookings',      icon: <IconCalendar /> },
-      { href: '/admin/cleaners',      label: 'Cleaners',      icon: <IconUsers /> },
-      { href: '/admin/customers',     label: 'Customers',     icon: <IconUsers /> },
-      { href: '/admin/day-off-requests', label: 'Day-Off Requests', icon: <IconCalendar /> },
-      { href: '/admin/complaints',    label: 'Complaints',    icon: <IconChat /> },
-      { href: '/admin/support',       label: 'Support Chat',  icon: <IconHeadset /> },
-      { href: '/admin/feedback',      label: 'Feedback',      icon: <IconStar /> },
-      { href: '/admin/announcements', label: 'Announcements', icon: <IconMegaphone /> },
-    ],
-  },
-  {
-    label: 'Admin',
-    links: [
-      { href: '/admin/reports',   label: 'Reports',          icon: <IconChart /> },
-      { href: '/admin/settings',  label: 'Payment Settings', icon: <IconSettings /> },
-    ],
-  },
-]
+function getAdminNav(basePath: string): NavSection[] {
+  return [
+    {
+      label: 'Overview',
+      links: [
+        { href: basePath || '/', label: 'Dashboard', icon: <IconDashboard />, exact: true },
+      ],
+    },
+    {
+      label: 'Operations',
+      links: [
+        { href: `${basePath}/bookings`,      label: 'Bookings',      icon: <IconCalendar /> },
+        { href: `${basePath}/cleaners`,      label: 'Cleaners',      icon: <IconUsers /> },
+        { href: `${basePath}/customers`,     label: 'Customers',     icon: <IconUsers /> },
+        { href: `${basePath}/day-off-requests`, label: 'Day-Off Requests', icon: <IconCalendar /> },
+        { href: `${basePath}/complaints`,    label: 'Complaints',    icon: <IconChat /> },
+        { href: `${basePath}/support`,       label: 'Support Chat',  icon: <IconHeadset /> },
+        { href: `${basePath}/feedback`,      label: 'Feedback',      icon: <IconStar /> },
+        { href: `${basePath}/announcements`, label: 'Announcements', icon: <IconMegaphone /> },
+      ],
+    },
+    {
+      label: 'Admin',
+      links: [
+        { href: `${basePath}/reports`,   label: 'Reports',          icon: <IconChart /> },
+        { href: `${basePath}/settings`,  label: 'Payment Settings', icon: <IconSettings /> },
+      ],
+    },
+  ]
+}
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient()
@@ -75,6 +79,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
   }
 
   const adminDb = createAdminClient()
+  const basePath = await getBasePath()
 
   const [{ data: notifData }, { data: announcementRows }] = await Promise.all([
     supabase
@@ -120,7 +125,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
       {/* Nav */}
       <nav className="flex-1 px-3 py-3 overflow-y-auto">
-        <SidebarNav sections={ADMIN_NAV} />
+        <SidebarNav sections={getAdminNav(basePath)} />
       </nav>
 
       {/* User footer */}
@@ -152,6 +157,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
       <NotificationBell
         userId={user.id}
         role={role}
+        basePath={basePath}
         initialNotifications={notifData ?? []}
         initialAnnouncements={(announcementData ?? []) as any[]}
       />
@@ -161,8 +167,10 @@ export default async function DashboardLayout({ children }: { children: React.Re
   )
 
   return (
-    <DashboardShell sidebarContent={sidebarContent} topBarContent={topBarContent}>
-      {children}
-    </DashboardShell>
+    <BasePathProvider basePath={basePath}>
+      <DashboardShell sidebarContent={sidebarContent} topBarContent={topBarContent}>
+        {children}
+      </DashboardShell>
+    </BasePathProvider>
   )
 }

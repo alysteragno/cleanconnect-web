@@ -25,17 +25,17 @@ type Announcement = {
   poster_name: string
 }
 
-function getHref(n: Notification, role: string): string {
+function getHref(n: Notification, role: string, basePath: string): string {
   if (n.customer_id && n.type === 'direct_message') {
-    if (role === 'super_admin') return `/admin/support/${n.customer_id}`
+    if (role === 'super_admin') return `${basePath}/support/${n.customer_id}`
   }
   if (n.booking_id) {
-    if (role === 'super_admin') return `/admin/bookings/${n.booking_id}`
+    if (role === 'super_admin') return `${basePath}/bookings/${n.booking_id}`
     if (role === 'cleaner') return `/cleaner/jobs`
     return `/customer/bookings/${n.booking_id}`
   }
   if (n.complaint_id) {
-    if (role === 'super_admin') return `/admin/complaints/${n.complaint_id}`
+    if (role === 'super_admin') return `${basePath}/complaints/${n.complaint_id}`
     return `/customer/complaints/${n.complaint_id}`
   }
   return '#'
@@ -44,11 +44,13 @@ function getHref(n: Notification, role: string): string {
 export default function NotificationBell({
   userId,
   role,
+  basePath = '/admin',
   initialNotifications,
   initialAnnouncements = [],
 }: {
   userId: string
   role: string
+  basePath?: string
   initialNotifications: Notification[]
   initialAnnouncements?: Announcement[]
 }) {
@@ -138,7 +140,7 @@ export default function NotificationBell({
                 notifications.slice(0, 10).map((n) => (
                   <Link
                     key={n.id}
-                    href={getHref(n, role)}
+                    href={getHref(n, role, basePath)}
                     onClick={() => {
                       if (!n.is_read) {
                         void markNotificationRead(n.id)

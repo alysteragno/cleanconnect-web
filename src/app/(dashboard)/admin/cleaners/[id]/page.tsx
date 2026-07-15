@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { createClient, createAdminClient } from '@/utils/supabase/server'
+import { getBasePath } from '@/utils/base-path'
 import CleanerEditForm, { type Cleaner } from './cleaner-edit-form'
 import AvailabilityPanel from './availability-panel'
 
@@ -12,6 +13,7 @@ export default async function CleanerDetailPage({ params }: { params: Promise<{ 
   const { data: profile } = await authClient.from('profiles').select('role').eq('id', user.id).single()
   if (profile?.role !== 'super_admin') notFound()
 
+  const basePath = await getBasePath()
   const adminDb = createAdminClient()
 
   const [
@@ -32,7 +34,7 @@ export default async function CleanerDetailPage({ params }: { params: Promise<{ 
   return (
     <div className="max-w-2xl space-y-6">
       <div>
-        <Link href="/admin/cleaners" className="text-sm text-gray-400 hover:text-gray-600 transition-colors">← Cleaners</Link>
+        <Link href={`${basePath}/cleaners`} className="text-sm text-gray-400 hover:text-gray-600 transition-colors">← Cleaners</Link>
         <h1 className="text-xl font-bold text-gray-900 mt-2">Edit Cleaner</h1>
       </div>
 

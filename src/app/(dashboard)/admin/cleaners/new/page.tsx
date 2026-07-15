@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useActionState, useState } from 'react'
 import { createCleanerAccount } from '@/app/actions/admin'
 import CleanerPhotoField from '../cleaner-photo-field'
+import { useBasePath } from '@/components/dashboard/base-path-context'
 
 const PASSWORD_REQUIREMENTS = [
   { label: 'Minimum 8 characters',           test: (p: string) => p.length >= 8 },
@@ -103,6 +104,7 @@ function Field({
 
 export default function NewCleanerPage() {
   const [state, action, pending] = useActionState(createCleanerAccount, undefined)
+  const basePath = useBasePath()
   const [password, setPassword] = useState('')
   const typed = password.length > 0
 
@@ -116,7 +118,7 @@ export default function NewCleanerPage() {
   return (
     <div className="max-w-2xl space-y-6">
       <div>
-        <Link href="/admin/cleaners" className="text-sm text-gray-400 hover:text-gray-600 transition-colors">
+        <Link href={`${basePath}/cleaners`} className="text-sm text-gray-400 hover:text-gray-600 transition-colors">
           ← Cleaners
         </Link>
         <h1 className="text-xl font-bold text-gray-900 mt-2">Add Cleaner</h1>

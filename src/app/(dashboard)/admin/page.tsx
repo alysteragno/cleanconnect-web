@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { createClient, createAdminClient } from '@/utils/supabase/server'
+import { getBasePath } from '@/utils/base-path'
 import { StatCard } from '@/components/ui/stat-card'
 import {
   IconCalendar, IconClock, IconCheck, IconUsers, IconChart,
@@ -100,6 +101,7 @@ export default async function AdminPage() {
   const { data: profile } = await authClient.from('profiles').select('role').eq('id', user.id).single()
   if (profile?.role !== 'super_admin') notFound()
 
+  const basePath = await getBasePath()
   const supabase = createAdminClient()
   const today   = new Date().toISOString().split('T')[0]
   const hour    = new Date().getHours()
@@ -178,9 +180,9 @@ export default async function AdminPage() {
       <div>
         <SectionLabel>Quick Actions</SectionLabel>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-2.5">
-          <QuickActionCard href="/admin/bookings?status=pending" icon={<IconClock />}  label="Dispatch Pending"  sub={`${pendingCount ?? 0} bookings awaiting`} tone="amber"  />
-          <QuickActionCard href="/admin/cleaners"                icon={<IconUsers />}  label="Manage Cleaners"   sub={`${totalCleaners ?? 0} active cleaners`}   tone="pink"   />
-          <QuickActionCard href="/admin/reports"                 icon={<IconChart />}  label="View Reports"      sub="Analytics &amp; exports"                   tone="violet" />
+          <QuickActionCard href={`${basePath}/bookings?status=pending`} icon={<IconClock />}  label="Dispatch Pending"  sub={`${pendingCount ?? 0} bookings awaiting`} tone="amber"  />
+          <QuickActionCard href={`${basePath}/cleaners`}                icon={<IconUsers />}  label="Manage Cleaners"   sub={`${totalCleaners ?? 0} active cleaners`}   tone="pink"   />
+          <QuickActionCard href={`${basePath}/reports`}                 icon={<IconChart />}  label="View Reports"      sub="Analytics &amp; exports"                   tone="violet" />
         </div>
       </div>
 
@@ -189,7 +191,7 @@ export default async function AdminPage() {
         <div className="flex items-center justify-between mb-2.5">
           <SectionLabel>Recent Bookings</SectionLabel>
           <Link
-            href="/admin/bookings"
+            href={`${basePath}/bookings`}
             className="text-xs text-pink-600 hover:text-pink-700 font-semibold flex items-center gap-1 transition-colors"
           >
             View all <IconArrowUpRight />
@@ -214,7 +216,7 @@ export default async function AdminPage() {
                 return (
                   <Link
                     key={b.id}
-                    href={`/admin/bookings/${b.id}`}
+                    href={`${basePath}/bookings/${b.id}`}
                     className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50/80 transition-colors group"
                   >
                     <div className={`w-8 h-8 rounded-full ${avatarColor(customerName)} text-white flex items-center justify-center text-xs font-bold shrink-0 select-none`}>

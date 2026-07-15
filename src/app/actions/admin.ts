@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { createClient, createAdminClient } from '@/utils/supabase/server'
+import { getBasePath } from '@/utils/base-path'
 import { createNotification } from './notifications'
 
 export type AdminActionState = { error?: string; success?: string } | undefined
@@ -210,7 +211,7 @@ export async function createCleanerAccount(
   }
 
   revalidatePath('/admin/cleaners')
-  redirect('/admin/cleaners')
+  redirect(`${await getBasePath()}/cleaners`)
 }
 
 // ── Convert an existing customer into a cleaner ────────────────────────────
@@ -268,7 +269,7 @@ export async function convertCustomerToCleaner(
   revalidatePath('/admin/customers')
   revalidatePath(`/admin/customers/${customer_id}`)
   revalidatePath('/admin/cleaners')
-  redirect(`/admin/cleaners/${customer_id}`)
+  redirect(`${await getBasePath()}/cleaners/${customer_id}`)
 }
 
 export async function updateCleanerProfile(
@@ -537,7 +538,7 @@ export async function forceAssignCleaner(
   revalidatePath('/admin/bookings')
   revalidatePath(`/admin/bookings/${bookingId}`)
   revalidatePath('/admin')
-  redirect(`/admin/bookings/${bookingId}`)
+  redirect(`${await getBasePath()}/bookings/${bookingId}`)
 }
 
 export async function cancelBooking(
@@ -578,7 +579,7 @@ export async function cancelBooking(
 
   revalidatePath('/admin/bookings')
   revalidatePath(`/admin/bookings/${bookingId}`)
-  redirect('/admin/bookings')
+  redirect(`${await getBasePath()}/bookings`)
 }
 
 // ── Booking deletion ─────────────────────────────────────────────────────
@@ -606,7 +607,7 @@ export async function deleteBooking(
 
   revalidatePath('/admin/bookings')
   revalidatePath('/admin')
-  redirect('/admin/bookings')
+  redirect(`${await getBasePath()}/bookings`)
 }
 
 // ── Billing adjustment ────────────────────────────────────────────────────
@@ -1039,5 +1040,5 @@ export async function createManualBooking(
 
   revalidatePath('/admin/bookings')
   revalidatePath('/admin')
-  redirect(`/admin/bookings/${newBooking.id}`)
+  redirect(`${await getBasePath()}/bookings/${newBooking.id}`)
 }

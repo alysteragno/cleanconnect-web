@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { createClient, createAdminClient } from '@/utils/supabase/server'
+import { getBasePath } from '@/utils/base-path'
 import BookingForm from './booking-form'
 
 export default async function AdminNewBookingPage() {
@@ -10,6 +11,7 @@ export default async function AdminNewBookingPage() {
   const { data: profile } = await authClient.from('profiles').select('role').eq('id', user.id).single()
   if (profile?.role !== 'super_admin') notFound()
 
+  const basePath = await getBasePath()
   const adminClient = createAdminClient()
   const { data: services } = await adminClient
     .from('services')
@@ -21,7 +23,7 @@ export default async function AdminNewBookingPage() {
     <div className="max-w-2xl space-y-6">
       <div>
         <Link
-          href="/admin/bookings"
+          href={`${basePath}/bookings`}
           className="inline-flex items-center gap-1 text-sm text-gray-400 hover:text-gray-600 transition-colors"
         >
           <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">

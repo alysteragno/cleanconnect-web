@@ -4,6 +4,8 @@ import { redirect } from 'next/navigation'
 import { cookies, headers } from 'next/headers'
 import { createClient, createAdminClient } from '@/utils/supabase/server'
 import { getRateLimitBlock, recordLoginFailure, clearLoginFailures } from '@/utils/rate-limit'
+import { isAdminHost } from '@/utils/base-path'
+import { resolveRoleHome } from '@/utils/hosts'
 
 export type AuthState = {
   error?: string
@@ -21,11 +23,6 @@ async function getClientIp(): Promise<string> {
     h.get('x-real-ip') ??
     'unknown'
   )
-}
-
-const ROLE_ROUTES: Record<string, string> = {
-  super_admin: '/admin',
-  customer: '/customer',
 }
 
 const MOBILE_ONLY_ROLES = new Set(['cleaner'])
@@ -100,7 +97,7 @@ export async function login(state: AuthState, formData: FormData): Promise<AuthS
     maxAge: 60 * 60 * 24 * 7,
   })
 
-  redirect(ROLE_ROUTES[role] ?? '/customer')
+  redirect(resolveRoleHome(role, await isAdminHost()))
 }
 
 export async function register(state: AuthState, formData: FormData): Promise<AuthState> {

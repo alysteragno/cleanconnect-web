@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { createClient, createAdminClient } from '@/utils/supabase/server'
+import { getBasePath } from '@/utils/base-path'
 
 type Customer = {
   id: string
@@ -17,6 +18,7 @@ export default async function AdminCustomersPage() {
   const { data: profile } = await authClient.from('profiles').select('role').eq('id', user.id).single()
   if (profile?.role !== 'super_admin') notFound()
 
+  const basePath = await getBasePath()
   const supabase = createAdminClient()
 
   const { data: customers } = await supabase
@@ -32,15 +34,15 @@ export default async function AdminCustomersPage() {
   return (
     <div className="max-w-3xl space-y-5">
       <div>
-        <Link href="/admin" className="text-sm text-gray-400 hover:text-gray-600 transition-colors">← Dashboard</Link>
+        <Link href={basePath || '/'} className="text-sm text-gray-400 hover:text-gray-600 transition-colors">← Dashboard</Link>
         <div className="flex items-baseline justify-between mt-2">
           <h1 className="text-xl font-bold text-gray-900">Customers</h1>
           <span className="text-sm text-gray-400">{list.length} total</span>
         </div>
       </div>
 
-      <CustomerSection title="Active" customers={active} />
-      {inactive.length > 0 && <CustomerSection title="Deactivated" customers={inactive} dimmed />}
+      <CustomerSection title="Active" customers={active} basePath={basePath} />
+      {inactive.length > 0 && <CustomerSection title="Deactivated" customers={inactive} basePath={basePath} dimmed />}
     </div>
   )
 }
@@ -48,10 +50,12 @@ export default async function AdminCustomersPage() {
 function CustomerSection({
   title,
   customers,
+  basePath,
   dimmed = false,
 }: {
   title: string
   customers: Customer[]
+  basePath: string
   dimmed?: boolean
 }) {
   return (
@@ -67,7 +71,7 @@ function CustomerSection({
           {customers.map((c) => (
             <Link
               key={c.id}
-              href={`/admin/customers/${c.id}`}
+              href={`${basePath}/customers/${c.id}`}
               className={`flex items-center justify-between p-4 hover:bg-gray-50 transition-colors group ${dimmed ? 'opacity-60' : ''}`}
             >
               <div className="flex items-center gap-3">

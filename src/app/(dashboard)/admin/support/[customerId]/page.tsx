@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { createClient, createAdminClient } from '@/utils/supabase/server'
+import { getBasePath } from '@/utils/base-path'
 import SupportThread from '@/components/dashboard/support-thread'
 import { type ChatMessage } from '@/utils/chat-helpers'
 
@@ -18,6 +19,8 @@ export default async function AdminSupportThreadPage({
 
   const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
   if (profile?.role !== 'super_admin') notFound()
+
+  const basePath = await getBasePath()
 
   const [{ data: customerProfile }, { data: customerMsgs }, { data: adminMsgs }] = await Promise.all([
     adminDb
@@ -54,7 +57,7 @@ export default async function AdminSupportThreadPage({
       {/* Thread header */}
       <div className="shrink-0 bg-white border-b border-gray-200 px-4 py-3 flex items-center gap-3">
         <Link
-          href="/admin/support"
+          href={`${basePath}/support`}
           className="flex items-center gap-1 text-sm text-gray-400 hover:text-gray-600 transition-colors shrink-0"
         >
           <svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round">

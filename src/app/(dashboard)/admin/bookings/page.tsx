@@ -2,6 +2,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { notFound } from 'next/navigation'
 import { createClient, createAdminClient } from '@/utils/supabase/server'
+import { getBasePath } from '@/utils/base-path'
 import { SortSelect } from '@/components/dashboard/sort-select'
 function getServiceImage(name: string | null): string | null {
   if (!name) return null
@@ -108,6 +109,7 @@ export default async function AdminBookingsPage({
   const { data: profile } = await authClient.from('profiles').select('role').eq('id', user.id).single()
   if (profile?.role !== 'super_admin') notFound()
 
+  const basePath = await getBasePath()
   const supabase = createAdminClient()
 
   const { data: bookings } = await supabase
@@ -144,7 +146,7 @@ export default async function AdminBookingsPage({
         </div>
         <div className="flex items-center gap-3">
           <Link
-            href="/admin/bookings/new"
+            href={`${basePath}/bookings/new`}
             className="px-4 py-2 bg-pink-600 text-white rounded-lg text-sm font-semibold hover:bg-pink-700 transition-colors shadow-sm"
           >
             + New Booking
@@ -163,7 +165,7 @@ export default async function AdminBookingsPage({
           return (
             <Link
               key={opt.value}
-              href={opt.value ? `/admin/bookings?status=${opt.value}` : '/admin/bookings'}
+              href={opt.value ? `${basePath}/bookings?status=${opt.value}` : `${basePath}/bookings`}
               className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold border transition-all ${
                 isActive
                   ? 'bg-gray-900 text-white border-gray-900 shadow-sm'
@@ -216,7 +218,7 @@ export default async function AdminBookingsPage({
                 return (
                   <Link
                     key={b.id}
-                    href={`/admin/bookings/${b.id}`}
+                    href={`${basePath}/bookings/${b.id}`}
                     className="flex items-center gap-4 px-5 py-3.5 hover:bg-gray-50/70 transition-colors group"
                   >
                     {/* Service thumbnail with status dot */}

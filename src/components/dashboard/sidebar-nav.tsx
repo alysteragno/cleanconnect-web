@@ -3,18 +3,14 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 
-export type NavLink = { href: string; label: string; icon: React.ReactNode }
+export type NavLink = { href: string; label: string; icon: React.ReactNode; exact?: boolean }
 export type NavSection = { label: string; links: NavLink[] }
 
 function NavItem({ link }: { link: NavLink }) {
   const pathname = usePathname()
-  const active =
-    pathname === link.href ||
-    (link.href !== '/admin' &&
-      link.href !== '/customer' &&
-      link.href !== '/cleaner' &&
-      link.href !== '/manager' &&
-      pathname.startsWith(link.href))
+  const active = link.exact
+    ? pathname === link.href
+    : pathname === link.href || pathname.startsWith(`${link.href}/`)
 
   return (
     <li>

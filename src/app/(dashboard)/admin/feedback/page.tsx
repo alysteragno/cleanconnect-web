@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { createClient } from '@/utils/supabase/server'
+import { getBasePath } from '@/utils/base-path'
 
 type Feedback = {
   id: string
@@ -25,6 +26,7 @@ function Stars({ rating }: { rating: number }) {
 
 export default async function AdminFeedbackPage() {
   const supabase = await createClient()
+  const basePath = await getBasePath()
 
   const [{ data: feedbackRows }, { data: avgData }] = await Promise.all([
     supabase
@@ -43,7 +45,7 @@ export default async function AdminFeedbackPage() {
   return (
     <div className="max-w-3xl space-y-5">
       <div>
-        <Link href="/admin" className="text-sm text-gray-400 hover:text-gray-600 transition-colors">← Dashboard</Link>
+        <Link href={basePath || '/'} className="text-sm text-gray-400 hover:text-gray-600 transition-colors">← Dashboard</Link>
         <div className="flex items-baseline justify-between mt-2">
           <h1 className="text-xl font-bold text-gray-900">Customer Feedback</h1>
           <div className="flex items-center gap-2">

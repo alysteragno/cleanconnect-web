@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { createClient, createAdminClient } from '@/utils/supabase/server'
+import { getBasePath } from '@/utils/base-path'
 import { toggleAnnouncement, deleteAnnouncement } from '@/app/actions/announcements'
 import AnnouncementCreateForm from './create-form'
 
@@ -21,6 +22,7 @@ export default async function AdminAnnouncementsPage() {
   const { data: profile } = await authClient.from('profiles').select('role').eq('id', user.id).single()
   if (profile?.role !== 'super_admin') notFound()
 
+  const basePath = await getBasePath()
   const admin = createAdminClient()
 
   const { data: rows } = await admin
@@ -48,7 +50,7 @@ export default async function AdminAnnouncementsPage() {
   return (
     <div className="max-w-2xl space-y-6">
       <div>
-        <Link href="/admin" className="text-sm text-gray-400 hover:text-gray-600 transition-colors">← Dashboard</Link>
+        <Link href={basePath || '/'} className="text-sm text-gray-400 hover:text-gray-600 transition-colors">← Dashboard</Link>
         <div className="flex items-baseline justify-between mt-2">
           <h1 className="text-xl font-bold text-gray-900">Announcements</h1>
           <span className="text-sm text-gray-400">{activeCount} active</span>
