@@ -2,7 +2,6 @@
 
 -- 1. Enable RLS on all core tables
 ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
-ALTER TABLE branches ENABLE ROW LEVEL SECURITY;
 ALTER TABLE bookings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE cleaner_assignments ENABLE ROW LEVEL SECURITY;
 
@@ -28,21 +27,6 @@ CREATE POLICY "Users can update own profile"
 ON profiles FOR UPDATE
 USING (auth.uid() = id);
 
--- 3. BRANCHES POLICIES
--- Anyone can view branches (e.g. for registration or viewing available branches)
-CREATE POLICY "Branches are viewable by everyone"
-ON branches FOR SELECT
-USING (true);
-
--- Only super admins can insert/update/delete branches
-CREATE POLICY "Super admins can manage branches"
-ON branches FOR ALL
-USING (
-  EXISTS (
-    SELECT 1 FROM profiles 
-    WHERE id = auth.uid() AND role = 'super_admin'
-  )
-);
 
 -- 4. BOOKINGS POLICIES
 -- Super Admin Global Access

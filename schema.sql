@@ -21,20 +21,11 @@ CREATE TYPE assignment_status AS ENUM ('assigned', 'declined', 'completed');
 -- 2. TABLES  (in foreign-key dependency order)
 -- ─────────────────────────────────────────────────────────────────────────────
 
-CREATE TABLE branches (
-    id              UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
-    name            TEXT        NOT NULL,
-    region          TEXT        NOT NULL,
-    contact_number  TEXT,
-    created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
 CREATE TABLE profiles (
     id          UUID        PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
     role        user_role   NOT NULL DEFAULT 'customer',
     full_name   TEXT        NOT NULL,
     phone       TEXT,
-    branch_id   UUID        REFERENCES branches(id) ON DELETE SET NULL,
     is_active   BOOLEAN     NOT NULL DEFAULT true,
     home_lat    NUMERIC,
     home_lng    NUMERIC,
@@ -44,7 +35,6 @@ CREATE TABLE profiles (
 CREATE TABLE bookings (
     id                  UUID            PRIMARY KEY DEFAULT gen_random_uuid(),
     customer_id         UUID            NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
-    branch_id           UUID            NOT NULL REFERENCES branches(id) ON DELETE RESTRICT,
     service_type        TEXT            NOT NULL DEFAULT 'general',
     space_type          TEXT            NOT NULL DEFAULT 'residential',
     service_date        DATE            NOT NULL,
@@ -174,7 +164,6 @@ FOR EACH ROW EXECUTE FUNCTION apply_cleanconnect_operational_rules();
 -- 4. ROW LEVEL SECURITY
 -- ─────────────────────────────────────────────────────────────────────────────
 
-ALTER TABLE branches            ENABLE ROW LEVEL SECURITY;
 ALTER TABLE settings            ENABLE ROW LEVEL SECURITY;
 ALTER TABLE profiles            ENABLE ROW LEVEL SECURITY;
 ALTER TABLE bookings            ENABLE ROW LEVEL SECURITY;
@@ -184,15 +173,6 @@ ALTER TABLE feedback            ENABLE ROW LEVEL SECURITY;
 ALTER TABLE complaints          ENABLE ROW LEVEL SECURITY;
 ALTER TABLE notifications       ENABLE ROW LEVEL SECURITY;
 ALTER TABLE complaint_messages  ENABLE ROW LEVEL SECURITY;
-
--- branches
-CREATE POLICY "Anyone can read branches"
-    ON branches FOR SELECT USING (true);
-
-CREATE POLICY "Super admins manage branches"
-    ON branches FOR ALL USING (
-        EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'super_admin')
-    );
 
 -- profiles
 CREATE POLICY "Users can read own profile"

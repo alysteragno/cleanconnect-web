@@ -5,16 +5,7 @@
 
 
 -- ─────────────────────────────────────────────────────────────────────────────
--- 1. BRANCHES
--- ─────────────────────────────────────────────────────────────────────────────
-
--- Single branch only — service area is strictly NCR (Metro Manila).
-INSERT INTO branches (name, region, contact_number) VALUES
-    ('Maid For You Cleaning Services', 'NCR', '+63 2 8XXX XXXX');
-
-
--- ─────────────────────────────────────────────────────────────────────────────
--- 2. PAYMENT SETTINGS  (update with real details before go-live)
+-- 1. PAYMENT SETTINGS  (update with real details before go-live)
 -- ─────────────────────────────────────────────────────────────────────────────
 
 INSERT INTO settings (key, value) VALUES

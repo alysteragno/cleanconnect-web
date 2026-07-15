@@ -67,11 +67,37 @@ body {
   animation: dropdownOut 0.15s ease-in both;
 }
 
+/* Support conversation row: collapses out of the list when archived/restored,
+   and gives a subtle press-down feedback when tapped/clicked. */
+@keyframes rowCollapse {
+  from { opacity: 1; transform: scale(1);    max-height: 200px; }
+  to   { opacity: 0; transform: scale(0.97); max-height: 0px; }
+}
+.animate-row-collapse {
+  overflow: hidden;
+  animation: rowCollapse 0.22s ease-in forwards;
+}
+
+.press-row { transition: transform 0.15s ease-out; }
+.group:active .press-row { transform: scale(0.98); }
+
+@keyframes modalIn {
+  from { opacity: 0; transform: scale(0.95); }
+  to   { opacity: 1; transform: scale(1); }
+}
+.animate-modal-in {
+  animation: modalIn 0.16s ease-out both;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .animate-fade-in-up,
   .animate-bell-ring,
   .animate-dropdown-in,
-  .animate-dropdown-out { animation: none; }
+  .animate-dropdown-out,
+  .animate-row-collapse,
+  .animate-modal-in { animation: none; }
+  .press-row,
+  .group:active .press-row { transition: none; transform: none; }
 }
 
 /* Scrollbar */

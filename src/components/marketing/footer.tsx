@@ -118,8 +118,14 @@ export default function MarketingFooter() {
         <div className="border-t border-gray-100 mt-8 pt-6 text-center">
           <p className="text-xs text-gray-400">
             &copy; {new Date().getFullYear()} Maid For You Cleaning Services. All rights reserved.
-          </p> 
+          </p>
           <p className="text-xs text-gray-400">Developed by SyncLab <span className="text-gray-300">|</span> v{pkg.version}</p>
+          <Link
+            href="/privacy-policy"
+            className="text-xs text-gray-400 hover:text-pink-600 transition-colors underline underline-offset-2 inline-block mt-1"
+          >
+            Privacy Policy
+          </Link>
         </div>
       </div>
     </footer>
