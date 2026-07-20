@@ -70,10 +70,7 @@ export default function LoginForm() {
 
       <AuthButton pending={pending} label="Sign in" pendingLabel="Signing in..." />
 
-      <AuthFooter>
-        Don&apos;t have an account?{' '}
-        <a href="/register" className={authLinkClass}>Register</a>
-      </AuthFooter>
+
     </form>
   )
 }
