@@ -43,7 +43,7 @@ export default async function PaymentSuccessPage({
         )}
 
         <p className="text-xs text-gray-400 mt-6 leading-relaxed">
-          You can safely close this window and return to the CleanConnect app.
+          You can safely close this window and return to the Maid For You Cleaning Services app.
         </p>
 
         <Link

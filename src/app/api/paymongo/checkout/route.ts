@@ -78,7 +78,7 @@ export async function POST(req: NextRequest) {
 
     const session = await createCheckoutSession({
       amount,
-      description: `${serviceLabel} — CleanConnect booking #${booking.id.slice(0, 8).toUpperCase()}`,
+      description: `${serviceLabel} — Maid For You Cleaning Services booking #${booking.id.slice(0, 8).toUpperCase()}`,
       lineItems: [{ name: serviceLabel, amount, quantity: 1 }],
       referenceNumber: booking.id,
       successUrl: `${webUrl}/payment/success?booking=${booking.id}`,

@@ -35,7 +35,7 @@ export default async function PaymentCancelledPage({
         )}
 
         <p className="text-xs text-gray-400 mt-6 leading-relaxed">
-          Return to the CleanConnect app to retry your payment or contact support if you need help.
+          Return to the Maid For You Cleaning Services app to retry your payment or contact support if you need help.
         </p>
 
         <Link

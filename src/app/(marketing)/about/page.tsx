@@ -2,7 +2,7 @@
 import SectionHeader from '@/components/marketing/section-header'
 import { SERVICES, BRANCH } from '@/lib/marketing-data'
 
-export const metadata = { title: 'About — CleanConnect' }
+export const metadata = { title: 'About — Maid For You Cleaning Services' }
 
 export default function AboutPage() {
   return (

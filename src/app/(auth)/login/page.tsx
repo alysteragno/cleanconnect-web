@@ -70,7 +70,7 @@ export default async function LoginPage({
 
           {resetMobile && (
             <div className="mb-5 px-4 py-3 bg-emerald-50 border border-emerald-200 rounded-lg text-sm text-emerald-700">
-              Password updated successfully. Return to the CleanConnect app on your phone to sign in.
+              Password updated successfully. Return to the Maid For You Cleaning Services app on your phone to sign in.
             </div>
           )}
 

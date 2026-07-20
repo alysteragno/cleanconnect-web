@@ -9,6 +9,7 @@ import { CustomRangeTab } from '@/components/dashboard/custom-range-tab'
 import { Pagination } from '@/components/dashboard/pagination'
 import { resolvePage } from '@/utils/pagination'
 import { paymentStatusLabel } from '@/lib/booking-pricing'
+import { PAYMENT_METHOD_META } from '@/components/payment-icons'
 
 const PAGE_SIZE = 10
 function getServiceImage(name: string | null): string | null {
@@ -434,7 +435,9 @@ export default async function AdminBookingsPage({
                       <span className={`text-[11px] px-2 py-0.5 rounded-full border font-semibold mt-0.5 inline-block ${pm}`}>
                         {paymentStatusLabel(b.payment_status, b.payment_method)}
                       </span>
-                      <p className="text-[11px] text-gray-400 mt-0.5 capitalize">{b.payment_method}</p>
+                      <p className="text-[11px] text-gray-400 mt-0.5">
+                        {PAYMENT_METHOD_META[b.payment_method]?.label ?? b.payment_method}
+                      </p>
                     </div>
                   </Link>
                 )

@@ -1,17 +1,47 @@
 'use client'
 
-import { useActionState, useState } from 'react'
+import { useActionState, useEffect, useState } from 'react'
 import { login } from '@/app/actions/auth'
-import { AuthField, AuthButton, AuthError, AuthFooter, authLinkClass } from '@/components/auth/auth-ui'
+import { AuthField, AuthButton, AuthError, AuthSuccess, AuthFooter, authLinkClass } from '@/components/auth/auth-ui'
+
+// The mobile app confirms new signups through Supabase's classic implicit
+// flow: after confirming server-side, Supabase redirects here with
+// `#access_token=...&type=signup` in the URL hash, which a server component
+// can never see. We only need to notice it to show a confirmation banner —
+// no session is established and the user still logs in normally below.
+function useSignupConfirmedFromHash() {
+  const [confirmed, setConfirmed] = useState(false)
+
+  useEffect(() => {
+    const hash = window.location.hash.startsWith('#') ? window.location.hash.slice(1) : window.location.hash
+    if (!hash) return
+
+    const params = new URLSearchParams(hash)
+    if (params.get('type') === 'signup') {
+      setConfirmed(true)
+    }
+
+    if (params.has('type') || params.has('access_token')) {
+      history.replaceState(null, '', window.location.pathname + window.location.search)
+    }
+  }, [])
+
+  return confirmed
+}
 
 export default function LoginForm() {
   const [state, action, pending] = useActionState(login, undefined)
   const [showPassword, setShowPassword] = useState(false)
+  const signupConfirmed = useSignupConfirmedFromHash()
 
   const fe = state?.fieldErrors
 
   return (
     <form action={action} className="space-y-4 mb-[7rem]">
+      {signupConfirmed && (
+        <AuthSuccess>Email confirmed! You can now log in below.</AuthSuccess>
+      )}
+
       <AuthField
         id="email"
         name="email"
