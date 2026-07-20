@@ -1,5 +1,5 @@
 import Image from 'next/image'
-import Link from 'next/link'
+import MobileAppPlaceholder from '@/components/mobile-placeholder'
 import { BRANCH, CONTACT } from '@/lib/marketing-data'
 
 export const metadata = { title: 'Contact — Maid For You Cleaning Services' }
@@ -198,19 +198,10 @@ export default function ContactPage() {
         </div>
       </section>
 
-      {/* CTA */}
+      {/* CTA — mobile app */}
       <section className="py-14">
-        <div className="max-w-xl mx-auto px-4 sm:px-6 text-center">
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">Ready to book?</h2>
-          <p className="text-gray-500 text-sm mb-6">
-            Download our app and book our cleaning services!
-          </p>
-          <Link
-            href="/download"
-            className="inline-block px-8 py-3 bg-pink-600 text-white rounded-lg font-semibold text-sm hover:bg-pink-700 transition-colors"
-          >
-            Download our app
-          </Link>
+        <div className="px-4 sm:px-6">
+          <MobileAppPlaceholder role="customer" showSignOut={false} fullPage={false} />
         </div>
       </section>
     </div>

@@ -66,7 +66,11 @@ export default function ComplaintRow({
         <svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
           {archived
             ? <path d="M10 5V2L6 6l4 4V7a4 4 0 11-4 4" />
-            : <path d="M3 6h14M4 6l1 10a1 1 0 001 1h8a1 1 0 001-1l1-10M8 9v5M12 9v5M2.5 6l1.2-2.4A1 1 0 014.6 3h10.8a1 1 0 01.9.6L17.5 6" />}
+            : <>
+                <rect x="1" y="3" width="18" height="4" rx="0.5" />
+                <path d="M2.5 7v9.5a1 1 0 001 1h13a1 1 0 001-1V7" />
+                <line x1="8" y1="10.5" x2="12" y2="10.5" />
+              </>}
         </svg>
         {archived ? 'Restore' : 'Archive'}
       </button>
@@ -111,7 +115,9 @@ export default function ComplaintRow({
               className="p-1.5 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 active:scale-90 transition-all opacity-70 sm:opacity-0 sm:group-hover:opacity-100 focus:opacity-100"
             >
               <svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M3 6h14M4 6l1 10a1 1 0 001 1h8a1 1 0 001-1l1-10M8 9v5M12 9v5M2.5 6l1.2-2.4A1 1 0 014.6 3h10.8a1 1 0 01.9.6L17.5 6" />
+                <rect x="1" y="3" width="18" height="4" rx="0.5" />
+                <path d="M2.5 7v9.5a1 1 0 001 1h13a1 1 0 001-1V7" />
+                <line x1="8" y1="10.5" x2="12" y2="10.5" />
               </svg>
             </button>
           )}

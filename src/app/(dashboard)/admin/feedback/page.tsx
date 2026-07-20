@@ -1,6 +1,11 @@
 import Link from 'next/link'
 import { createClient } from '@/utils/supabase/server'
 import { getBasePath } from '@/utils/base-path'
+import { SortSelect } from '@/components/dashboard/sort-select'
+import { Pagination } from '@/components/dashboard/pagination'
+import { paginate, resolvePage } from '@/utils/pagination'
+
+const PAGE_SIZE = 10
 
 type Feedback = {
   id: string
@@ -24,7 +29,19 @@ function Stars({ rating }: { rating: number }) {
   )
 }
 
-export default async function AdminFeedbackPage() {
+const SORT_OPTIONS = [
+  { value: 'date_desc',   label: 'Newest First' },
+  { value: 'date_asc',    label: 'Oldest First' },
+  { value: 'rating_desc', label: 'Rating (High → Low)' },
+  { value: 'rating_asc',  label: 'Rating (Low → High)' },
+]
+
+export default async function AdminFeedbackPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ sort?: string; page?: string }>
+}) {
+  const { sort, page: rawPage } = await searchParams
   const supabase = await createClient()
   const basePath = await getBasePath()
 
@@ -36,11 +53,24 @@ export default async function AdminFeedbackPage() {
     supabase.from('feedback').select('rating'),
   ])
 
-  const list = (feedbackRows ?? []) as unknown as Feedback[]
+  const unsorted = (feedbackRows ?? []) as unknown as Feedback[]
   const ratings = (avgData ?? []) as { rating: number }[]
   const avg = ratings.length > 0
     ? (ratings.reduce((s, r) => s + r.rating, 0) / ratings.length).toFixed(1)
     : '—'
+
+  const sortKey = sort ?? 'date_desc'
+  const list = [...unsorted].sort((a, b) => {
+    switch (sortKey) {
+      case 'date_asc':    return new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+      case 'rating_desc': return b.rating - a.rating
+      case 'rating_asc':  return a.rating - b.rating
+      default:            return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    }
+  })
+
+  const page = resolvePage(rawPage, list.length, PAGE_SIZE)
+  const pageItems = paginate(list, page, PAGE_SIZE)
 
   return (
     <div className="max-w-3xl space-y-5">
@@ -78,14 +108,15 @@ export default async function AdminFeedbackPage() {
 
       {/* Reviews list */}
       <div className="bg-white rounded-xl border border-gray-200">
-        <div className="p-5 border-b border-gray-100">
+        <div className="p-5 border-b border-gray-100 flex items-center justify-between gap-3">
           <p className="text-sm font-semibold text-gray-900">All Reviews</p>
+          {list.length > 0 && <SortSelect options={SORT_OPTIONS} />}
         </div>
         {list.length === 0 ? (
           <p className="text-sm text-gray-400 text-center py-12">No feedback yet.</p>
         ) : (
           <div className="divide-y divide-gray-100">
-            {list.map((f) => (
+            {pageItems.map((f) => (
               <div key={f.id} className="p-4">
                 <div className="flex items-start justify-between gap-3 mb-1.5">
                   <div>
@@ -106,6 +137,7 @@ export default async function AdminFeedbackPage() {
             ))}
           </div>
         )}
+        {list.length > 0 && <Pagination totalItems={list.length} pageSize={PAGE_SIZE} />}
       </div>
     </div>
   )

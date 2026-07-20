@@ -68,7 +68,7 @@ export async function sendSupportMessage(
 // button on the admin support list. Super-admin only.
 export async function startSupportChat(
   formData: FormData
-): Promise<{ error?: string; customerId?: string }> {
+): Promise<{ error?: string; customerId?: string; existingCustomerId?: string; existingArchived?: boolean }> {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Unauthorized.' }
@@ -88,6 +88,30 @@ export async function startSupportChat(
   const { data: target } = await admin
     .from('profiles').select('id, role').eq('id', customer_id).single()
   if (!target || target.role !== 'customer') return { error: 'Selected customer not found.' }
+
+  // A support "conversation" isn't its own row — it's just every
+  // direct_messages/admin_messages row for this customer_id — so there's no
+  // way to create a conflicting record. But silently appending a "new chat"
+  // message into an existing thread is confusing, especially if that thread
+  // is archived: the message would land invisibly under the Archived tab
+  // with no signal to the admin that anything happened. Block and point them
+  // at the existing thread instead of guessing what they meant.
+  const [{ count: directCount }, { count: adminCount }, { data: convoRow }] = await Promise.all([
+    admin.from('direct_messages').select('id', { count: 'exact', head: true }).eq('customer_id', customer_id),
+    admin.from('admin_messages').select('id', { count: 'exact', head: true }).eq('customer_id', customer_id),
+    admin.from('support_conversations').select('archived_at').eq('customer_id', customer_id).maybeSingle(),
+  ])
+
+  if ((directCount ?? 0) > 0 || (adminCount ?? 0) > 0) {
+    const isArchived = !!convoRow?.archived_at
+    return {
+      error: isArchived
+        ? 'This customer already has a chat, and it’s archived. Open it below to restore and continue the conversation.'
+        : 'This customer already has an active chat. Open it below to continue the conversation instead of starting a new one.',
+      existingCustomerId: customer_id,
+      existingArchived: isArchived,
+    }
+  }
 
   const { error } = await admin
     .from('admin_messages')

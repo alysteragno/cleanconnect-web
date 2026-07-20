@@ -3,6 +3,7 @@ import Image from 'next/image'
 import MarketingHeader from '@/components/marketing/header'
 import MarketingFooter from '@/components/marketing/footer'
 import AnnouncementCarousel from '@/components/marketing/announcement-carousel'
+import MobileAppPlaceholder from '@/components/mobile-placeholder'
 import { SERVICES, BRANCH, STEPS } from '@/lib/marketing-data'
 import { createClient } from '@/utils/supabase/server'
 
@@ -188,20 +189,10 @@ export default async function HomePage() {
   </div>
 </section>
 
-      {/* CTA */}
+      {/* CTA — mobile app */}
       <section className="py-16 sm:py-20">
-        <div className="max-w-2xl mx-auto px-4 sm:px-6 text-center">
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">Ready for a cleaner home?</h2>
-          <p className="text-gray-500 text-sm mb-2">
-            Book through our mobile app &mdash; available soon on iOS and Android.
-          </p>
-          <p className="text-gray-400 text-xs mb-8">Create a free account now to be ready when the app launches.</p>
-          <Link
-            href="/download"
-            className="inline-block px-8 py-3 bg-pink-600 text-white rounded-lg font-semibold text-sm hover:bg-pink-700 transition-colors"
-          >
-            Book through our app
-          </Link>
+        <div className="px-4 sm:px-6">
+          <MobileAppPlaceholder role="customer" showSignOut={false} fullPage={false} />
         </div>
       </section>
 

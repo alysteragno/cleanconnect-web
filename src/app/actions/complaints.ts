@@ -147,9 +147,15 @@ export async function updateComplaintStatus(
     }
   }
 
+  // Resolving a complaint also archives its chat — a resolved thread is done and
+  // shouldn't clutter the active list. Reopening it (moving off "resolved") does
+  // not auto-restore; use the archive button if it should reappear as active.
   const { error } = await admin
     .from('complaints')
-    .update({ status })
+    .update({
+      status,
+      ...(status === 'resolved' ? { archived_at: new Date().toISOString() } : {}),
+    })
     .eq('id', complaintId)
 
   if (error) return { error: error.message }

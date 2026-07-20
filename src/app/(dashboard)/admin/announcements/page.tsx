@@ -4,6 +4,7 @@ import { createClient, createAdminClient } from '@/utils/supabase/server'
 import { getBasePath } from '@/utils/base-path'
 import { toggleAnnouncement, deleteAnnouncement } from '@/app/actions/announcements'
 import AnnouncementCreateForm from './create-form'
+import { SortSelect } from '@/components/dashboard/sort-select'
 
 type Announcement = {
   id: string
@@ -15,7 +16,19 @@ type Announcement = {
   poster_name: string
 }
 
-export default async function AdminAnnouncementsPage() {
+const SORT_OPTIONS = [
+  { value: 'newest',    label: 'Newest First' },
+  { value: 'oldest',    label: 'Oldest First' },
+  { value: 'title_asc', label: 'Title A–Z' },
+  { value: 'title_desc',label: 'Title Z–A' },
+]
+
+export default async function AdminAnnouncementsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ sort?: string }>
+}) {
+  const { sort } = await searchParams
   const authClient = await createClient()
   const { data: { user } } = await authClient.auth.getUser()
   if (!user) notFound()
@@ -40,10 +53,20 @@ export default async function AdminAnnouncementsPage() {
     posterMap = Object.fromEntries((profiles ?? []).map((p) => [p.id, p.full_name]))
   }
 
-  const list: Announcement[] = (rows ?? []).map((r) => ({
+  const unsorted: Announcement[] = (rows ?? []).map((r) => ({
     ...r,
     poster_name: r.created_by ? (posterMap[r.created_by] ?? 'Admin') : 'Admin',
   }))
+
+  const sortKey = sort ?? 'newest'
+  const list = [...unsorted].sort((a, b) => {
+    switch (sortKey) {
+      case 'oldest':     return new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+      case 'title_asc':  return a.title.localeCompare(b.title)
+      case 'title_desc': return b.title.localeCompare(a.title)
+      default:           return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    }
+  })
 
   const activeCount = list.filter((a) => a.is_active).length
 
@@ -62,8 +85,9 @@ export default async function AdminAnnouncementsPage() {
 
       {/* List */}
       <div className="bg-white rounded-xl border border-gray-200">
-        <div className="p-5 border-b border-gray-100">
+        <div className="p-5 border-b border-gray-100 flex items-center justify-between gap-3">
           <p className="text-sm font-semibold text-gray-900">All Announcements</p>
+          {list.length > 0 && <SortSelect options={SORT_OPTIONS} />}
         </div>
         {list.length === 0 ? (
           <p className="text-sm text-gray-400 text-center py-12">No announcements yet.</p>

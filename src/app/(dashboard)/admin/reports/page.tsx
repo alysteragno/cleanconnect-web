@@ -2,7 +2,7 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { createClient, createAdminClient } from '@/utils/supabase/server'
 import { getBasePath } from '@/utils/base-path'
-import { CustomRangeTab } from './date-range-picker'
+import { CustomRangeTab } from '@/components/dashboard/custom-range-tab'
 
 type CompletedBooking = {
   id: string
@@ -336,7 +336,7 @@ export default async function ReportsPage({
             {p.label}
           </Link>
         ))}
-        <CustomRangeTab active={period === 'custom'} start={range.start} end={range.end} />
+        <CustomRangeTab active={period === 'custom'} start={range.start} end={range.end} path="/reports" />
       </div>
 
       {/* Financial Summary */}

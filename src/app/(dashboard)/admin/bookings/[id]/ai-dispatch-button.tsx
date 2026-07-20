@@ -65,7 +65,7 @@ function PreviewPanel({
       {/* Header */}
       <div className="flex items-center gap-2">
         <NetworkIcon className="w-4 h-4 text-gray-500 shrink-0" />
-        <p className="text-sm font-semibold text-gray-900">AI Recommendation</p>
+        <p className="text-sm font-semibold text-gray-900">Recommendation</p>
         <span className="ml-auto text-[11px] bg-gray-100 text-gray-600 px-2.5 py-0.5 rounded-full font-semibold shrink-0">
           {toDispatch.length} cleaner{toDispatch.length !== 1 ? 's' : ''} proposed
         </span>
@@ -105,7 +105,7 @@ function PreviewPanel({
                   </span>
                   {c.distanceKm != null && (
                     <span className="text-[11px] text-gray-400">
-                      · {c.distanceKm.toFixed(1)} km away
+                      · {c.distanceKm.toFixed(1)} km by road
                     </span>
                   )}
                 </div>

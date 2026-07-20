@@ -14,11 +14,39 @@ const PATH_ROLES: Record<string, string> = {
   '/customer': 'customer',
 }
 
+function isAdminPath(pathname: string): boolean {
+  return pathname === '/admin' || pathname.startsWith('/admin/')
+}
+
 export async function proxy(request: NextRequest) {
-  const hostname = (request.headers.get('host') ?? request.nextUrl.hostname).split(':')[0]
+  const fullHost = request.headers.get('host') ?? request.nextUrl.host
+  const hostname = fullHost.split(':')[0]
   const onAdminHost = hostname === ADMIN_HOST
 
+  // Built from the real Host header, not request.url — in `next dev`, request.url
+  // always reports the server's own bind address (localhost:PORT) regardless of
+  // the Host header, which is unreliable for constructing cross-host redirect
+  // targets (see resolveRoleHome's docstring in utils/hosts.ts for the full story).
+  const protocol = process.env.NODE_ENV === 'production' ? 'https' : 'http'
+
   const rawPathname = request.nextUrl.pathname
+
+  // /admin must never resolve on any host other than the admin subdomain — bounce it
+  // there unconditionally (auth is checked again once the request lands on that host).
+  if (!onAdminHost && isAdminPath(rawPathname)) {
+    const rest = rawPathname.slice('/admin'.length) || '/'
+    const dest = new URL(rest + request.nextUrl.search, `${protocol}://${ADMIN_HOST}`)
+    return NextResponse.redirect(dest)
+  }
+
+  // On the admin subdomain the /admin segment is meant to be invisible (see the
+  // rewrite below). If someone types it explicitly, normalize the address bar back
+  // to the hidden form instead of silently rendering at the literal /admin URL.
+  if (onAdminHost && isAdminPath(rawPathname)) {
+    const rest = rawPathname.slice('/admin'.length) || '/'
+    const dest = new URL(rest + request.nextUrl.search, request.url)
+    return NextResponse.redirect(dest)
+  }
 
   // Canonical (backing) path this request maps to. On the admin subdomain, every
   // path except the shared auth pages is transparently prefixed with /admin so the
@@ -77,6 +105,22 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(new URL(dest, request.url))
   }
 
+  // Signs a non-admin role out and sends them to this (admin) host's own
+  // /login, instead of attempting a cross-host redirect to the main site.
+  // Cross-host redirects issued from middleware are unreliable in `next
+  // dev` — its router can collapse an absolute redirect back to a relative,
+  // same-host one whenever the target hostname happens to match its own
+  // bind address (which MAIN_HOST does, locally), causing an infinite
+  // redirect loop back onto this same host. Never leaving the admin host
+  // sidesteps that regardless of environment.
+  async function denyAdminHost() {
+    await supabase.auth.signOut()
+    const dest = redirectTo('/login?error=' + encodeURIComponent("That account isn't an admin account."))
+    response.cookies.getAll().forEach((c) => dest.cookies.set(c))
+    dest.cookies.delete('cleanconnect-role')
+    return dest
+  }
+
   // Unauthenticated users cannot access dashboard routes
   if (isProtected && !session) {
     return redirectTo('/login')
@@ -88,7 +132,10 @@ export async function proxy(request: NextRequest) {
   if (isAuthPath && session) {
     const role = request.cookies.get('cleanconnect-role')?.value
     if (role) {
-      return redirectTo(resolveRoleHome(role, onAdminHost))
+      if (onAdminHost && role !== 'super_admin') {
+        return denyAdminHost()
+      }
+      return redirectTo(resolveRoleHome(role, onAdminHost, request.url))
     }
   }
 
@@ -106,7 +153,7 @@ export async function proxy(request: NextRequest) {
     if (matchedBase && role && PATH_ROLES[matchedBase] !== role) {
       if (onAdminHost) {
         // This host only ever serves /admin — any other role has no business here.
-        return redirectTo(resolveRoleHome(role, true))
+        return denyAdminHost()
       }
       const correctDest = ROLE_ROUTES[role] ?? '/customer'
       if (correctDest !== matchedBase) {

@@ -2,7 +2,8 @@
 
 import { useState, useTransition } from 'react'
 import { updatePaymentStatus } from '@/app/actions/admin'
-import { PAYMENT_METHOD_META } from '@/components/payment-icons'
+import { PAYMENT_METHOD_META, PaymentMethodIcon } from '@/components/payment-icons'
+import { paymentStatusLabel } from '@/lib/booking-pricing'
 
 const STATUS_META: Record<string, { pill: string; dot: string; label: string }> = {
   unpaid:   { pill: 'bg-red-50 text-red-700 border-red-200',               dot: 'bg-red-500',     label: 'Unpaid' },
@@ -37,9 +38,7 @@ export default function PaymentVerificationCard({
   const isCash = paymentMethod === 'cash'
   const isPaid = paymentStatus === 'paid'
   const statusStyle = STATUS_META[paymentStatus] ?? STATUS_META.unpaid
-  const statusLabel = paymentStatus === 'unpaid'
-    ? isCash ? 'Awaiting Cash' : 'Pending'
-    : statusStyle.label
+  const statusLabel = paymentStatusLabel(paymentStatus, paymentMethod)
 
   function handleCopy() {
     if (!paymentReference) return
@@ -74,9 +73,8 @@ export default function PaymentVerificationCard({
           <div className="flex items-center gap-3">
             {/* Logo display */}
             {paymentMethod === 'gcash' && (
-              <div className="flex items-center justify-center h-11 px-3 rounded-xl border border-gray-100 bg-gray-50">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src="/GCash_logo.svg" alt="GCash" className="h-6 w-auto object-contain" />
+              <div className="flex items-center justify-center w-11 h-11 rounded-xl border border-gray-100 bg-gray-50 overflow-hidden shrink-0">
+                <PaymentMethodIcon method="gcash" size={26} />
               </div>
             )}
             {paymentMethod === 'maya' && (
@@ -175,7 +173,7 @@ export default function PaymentVerificationCard({
             )}
 
             {!paymentReference && !paymentProofUrl && (
-              <p className="text-xs text-gray-400 italic">No reference number or proof uploaded yet.</p>
+              <p className="text-xs text-gray-400 italic">No reference number or proof on file — paid through the PayMongo checkout link below.</p>
             )}
           </div>
         )}

@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { createClient, createAdminClient } from '@/utils/supabase/server'
 import { getBasePath } from '@/utils/base-path'
+import { listCustomers } from '@/app/actions/admin'
 import BookingForm from './booking-form'
 
 export default async function AdminNewBookingPage() {
@@ -15,9 +16,10 @@ export default async function AdminNewBookingPage() {
   const adminClient = createAdminClient()
   const { data: services } = await adminClient
     .from('services')
-    .select('id, name, slug, price_from')
+    .select('id, name, slug, starting_price, price_note, duration')
     .eq('is_active', true)
     .order('sort_order')
+  const customers = await listCustomers()
 
   return (
     <div className="max-w-2xl space-y-6">
@@ -35,7 +37,13 @@ export default async function AdminNewBookingPage() {
         <p className="text-sm text-gray-500 mt-0.5">Create a booking on behalf of a customer.</p>
       </div>
 
-      <BookingForm services={(services ?? []) as { id: string; name: string; slug: string; price_from: number }[]} />
+      <BookingForm
+        services={(services ?? []) as {
+          id: string; name: string; slug: string
+          starting_price: number; price_note: string | null; duration: string | null
+        }[]}
+        customers={customers}
+      />
     </div>
   )
 }

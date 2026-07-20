@@ -3,6 +3,12 @@ import { notFound } from 'next/navigation'
 import { createClient, createAdminClient } from '@/utils/supabase/server'
 import { getBasePath } from '@/utils/base-path'
 import { SortSelect } from '@/components/dashboard/sort-select'
+import { SearchBox } from '@/components/dashboard/search-box'
+import { Pagination } from '@/components/dashboard/pagination'
+import { paginate, resolvePage } from '@/utils/pagination'
+import { escapeLikeTerm } from '@/utils/search'
+
+const PAGE_SIZE = 10
 
 type Cleaner = {
   id: string
@@ -23,9 +29,9 @@ const SORT_OPTIONS = [
 export default async function AdminCleanersPage({
   searchParams,
 }: {
-  searchParams: Promise<{ sort?: string }>
+  searchParams: Promise<{ sort?: string; page?: string; inactive_page?: string; q?: string }>
 }) {
-  const { sort } = await searchParams
+  const { sort, page: rawPage, inactive_page: rawInactivePage, q } = await searchParams
   const authClient = await createClient()
   const { data: { user } } = await authClient.auth.getUser()
   if (!user) notFound()
@@ -35,11 +41,14 @@ export default async function AdminCleanersPage({
   const basePath = await getBasePath()
   const supabase = createAdminClient()
 
-  const { data: cleaners } = await supabase
+  let cleanersQuery = supabase
     .from('profiles')
     .select('id, full_name, phone, is_active, created_at, photo_url')
     .eq('role', 'cleaner')
     .order('full_name')
+  const search = q?.trim()
+  if (search) cleanersQuery = cleanersQuery.ilike('full_name', `%${escapeLikeTerm(search)}%`)
+  const { data: cleaners } = await cleanersQuery
 
   const sortKey = sort ?? 'name_asc'
   const list = [...((cleaners ?? []) as unknown as Cleaner[])].sort((a, b) => {
@@ -53,17 +62,23 @@ export default async function AdminCleanersPage({
   const active = list.filter((c) => c.is_active)
   const inactive = list.filter((c) => !c.is_active)
 
+  const activePage = resolvePage(rawPage, active.length, PAGE_SIZE)
+  const inactivePage = resolvePage(rawInactivePage, inactive.length, PAGE_SIZE)
+  const activePageItems = paginate(active, activePage, PAGE_SIZE)
+  const inactivePageItems = paginate(inactive, inactivePage, PAGE_SIZE)
+
   return (
     <div className="max-w-3xl space-y-5">
       <div>
         <Link href={basePath || '/'} className="text-sm text-gray-400 hover:text-gray-600 transition-colors">← Dashboard</Link>
-        <div className="flex items-center justify-between mt-2">
+        <div className="flex flex-wrap items-center justify-between gap-2 mt-2">
           <h1 className="text-xl font-bold text-gray-900">Cleaners</h1>
           <div className="flex items-center gap-3">
+            <SearchBox placeholder="Search cleaners…" resetParams={['page', 'inactive_page']} />
             <SortSelect options={SORT_OPTIONS} />
             <Link
               href={`${basePath}/cleaners/new`}
-              className="text-sm px-4 py-2 bg-pink-600 text-white rounded-lg font-medium hover:bg-pink-700 transition-colors"
+              className="text-sm px-4 py-2 bg-pink-600 text-white rounded-lg font-medium hover:bg-pink-700 transition-colors whitespace-nowrap"
             >
               + Add Cleaner
             </Link>
@@ -71,21 +86,47 @@ export default async function AdminCleanersPage({
         </div>
       </div>
 
-      <CleanerSection title="Active" cleaners={active} basePath={basePath} />
-      {inactive.length > 0 && <CleanerSection title="Deactivated" cleaners={inactive} basePath={basePath} dimmed />}
+      <CleanerSection title="Active" cleaners={activePageItems} totalItems={active.length} basePath={basePath} emptyLabel={search ? 'No matches.' : 'None.'} />
+      {inactive.length > 0 && (
+        <CleanerSection
+          title="Deactivated"
+          cleaners={inactivePageItems}
+          totalItems={inactive.length}
+          basePath={basePath}
+          paramName="inactive_page"
+          emptyLabel={search ? 'No matches.' : 'None.'}
+          dimmed
+        />
+      )}
     </div>
   )
 }
 
-function CleanerSection({ title, cleaners, basePath, dimmed = false }: { title: string; cleaners: Cleaner[]; basePath: string; dimmed?: boolean }) {
+function CleanerSection({
+  title,
+  cleaners,
+  totalItems,
+  basePath,
+  paramName = 'page',
+  dimmed = false,
+  emptyLabel = 'None.',
+}: {
+  title: string
+  cleaners: Cleaner[]
+  totalItems: number
+  basePath: string
+  paramName?: string
+  dimmed?: boolean
+  emptyLabel?: string
+}) {
   return (
     <section className="bg-white rounded-xl border border-gray-200">
       <div className="p-5 border-b border-gray-100 flex items-center justify-between">
         <h2 className="text-sm font-semibold text-gray-900">{title}</h2>
-        <span className="text-xs text-gray-400">{cleaners.length}</span>
+        <span className="text-xs text-gray-400">{totalItems}</span>
       </div>
       {cleaners.length === 0 ? (
-        <p className="text-sm text-gray-400 text-center py-8">None.</p>
+        <p className="text-sm text-gray-400 text-center py-8">{emptyLabel}</p>
       ) : (
         <div className="divide-y divide-gray-100">
           {cleaners.map((c) => (
@@ -116,6 +157,7 @@ function CleanerSection({ title, cleaners, basePath, dimmed = false }: { title: 
           ))}
         </div>
       )}
+      <Pagination totalItems={totalItems} pageSize={PAGE_SIZE} paramName={paramName} />
     </section>
   )
 }

@@ -5,6 +5,7 @@ import { redirect } from 'next/navigation'
 import { createClient, createAdminClient } from '@/utils/supabase/server'
 import { getBasePath } from '@/utils/base-path'
 import { createNotification } from './notifications'
+import { estimateBookingPrice, estimateDurationHours, serviceNeedsSqm } from '@/lib/booking-pricing'
 
 export type AdminActionState = { error?: string; success?: string } | undefined
 
@@ -189,7 +190,10 @@ export async function createCleanerAccount(
   if (signUpError) return { error: signUpError.message }
   if (!signUpData.user) return { error: 'Failed to create user account.' }
 
-  const { error: profileError } = await adminClient.from('profiles').insert({
+  // A DB trigger auto-provisions a bare profiles row (empty full_name, role
+  // 'customer') the instant auth.users gets the new row — upsert so this
+  // real data overwrites that stub instead of colliding with it.
+  const { error: profileError } = await adminClient.from('profiles').upsert({
     id: signUpData.user.id,
     full_name: f.full_name,
     phone: f.phone,
@@ -817,6 +821,23 @@ export async function searchCustomers(
   return (data ?? []) as { id: string; full_name: string; phone: string | null }[]
 }
 
+/** Full list of active customers, for the "browse all" dropdown on manual booking. */
+export async function listCustomers(): Promise<{ id: string; full_name: string; phone: string | null }[]> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user || !(await assertSuperAdmin(supabase, user.id))) return []
+
+  const adminClient = createAdminClient()
+  const { data } = await adminClient
+    .from('profiles')
+    .select('id, full_name, phone')
+    .eq('role', 'customer')
+    .eq('is_active', true)
+    .order('full_name')
+
+  return (data ?? []) as { id: string; full_name: string; phone: string | null }[]
+}
+
 // ── Create customer account (for manual booking) ──────────────────────────
 
 export async function createCustomerAccount(
@@ -848,7 +869,10 @@ export async function createCustomerAccount(
   if (signUpError) return { error: signUpError.message }
   if (!signUpData.user) return { error: 'Failed to create user account.' }
 
-  const { error: profileError } = await adminClient.from('profiles').insert({
+  // A DB trigger auto-provisions a bare profiles row (empty full_name, role
+  // 'customer') the instant auth.users gets the new row — upsert so this
+  // real data overwrites that stub instead of colliding with it.
+  const { error: profileError } = await adminClient.from('profiles').upsert({
     id: signUpData.user.id,
     full_name,
     phone,
@@ -871,11 +895,25 @@ export async function createCustomerAccount(
 
 // ── Manual booking creation ───────────────────────────────────────────────
 
-// Unit-based services use per-unit pricing (not area-based sqm pricing)
-const UNIT_BASED_SLUGS = new Set([
-  'aircon_cleaning', 'aircon_repair',
-  'grease_trap_installation', 'carpet_cleaning', 'curtain_dry_cleaning',
-])
+async function uploadBookingFile(
+  bucket: 'furniture-photos',
+  file: File,
+  prefix: string
+): Promise<{ url: string | null; error?: string }> {
+  const admin = createAdminClient()
+  const ext = file.name.split('.').pop()?.toLowerCase() || 'jpg'
+  const path = `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
+  const buffer = Buffer.from(await file.arrayBuffer())
+
+  const { error } = await admin.storage.from(bucket).upload(path, buffer, {
+    contentType: file.type || 'image/jpeg',
+    upsert: false,
+  })
+  if (error) return { url: null, error: error.message }
+
+  const { data: { publicUrl } } = admin.storage.from(bucket).getPublicUrl(path)
+  return { url: publicUrl }
+}
 
 export async function createManualBooking(
   state: AdminActionState,
@@ -886,51 +924,44 @@ export async function createManualBooking(
   if (!user || !(await assertSuperAdmin(supabase, user.id))) return { error: 'Unauthorized.' }
 
   const customer_id      = (formData.get('customer_id') as string ?? '').trim()
-  const service_name     = (formData.get('service_name') as string ?? '').trim()
-  const service_slug     = (formData.get('service_slug') as string ?? '').trim()
+  const service_id       = (formData.get('service_id') as string ?? '').trim()
   const service_date     = (formData.get('service_date') as string ?? '').trim()
   const service_time     = (formData.get('service_time') as string ?? '').trim()
   const space_type       = (formData.get('space_type') as string ?? '').trim() || 'residential'
-  const address_unit     = (formData.get('address_unit') as string ?? '').trim() || null
+  const address_unit     = (formData.get('address_unit') as string ?? '').trim()
   const address_street   = (formData.get('address_street') as string ?? '').trim()
+  const address_barangay = (formData.get('address_barangay') as string ?? '').trim()
   const address_city     = (formData.get('address_city') as string ?? '').trim()
   const address_province = (formData.get('address_province') as string ?? '').trim()
   const special_notes    = (formData.get('special_notes') as string ?? '').trim() || null
-  const payment_method   = (formData.get('payment_method') as string ?? '').trim() || 'cash'
-  const couch_quantity     = parseInt(formData.get('couch_quantity') as string) || 0
-  const mattress_quantity  = parseInt(formData.get('mattress_quantity') as string) || 0
-  const furniture_quantity = parseInt(formData.get('furniture_quantity') as string) || 0
+  const other_furniture  = (formData.get('other_furniture') as string ?? '').trim() || null
+  const payment_method    = (formData.get('payment_method') as string ?? '').trim() || 'cash'
 
-  const isUnitBased = UNIT_BASED_SLUGS.has(service_slug)
-  const unit_quantity = parseInt(formData.get('unit_quantity') as string) || 1
-  const property_sqm_raw = formData.get('property_sqm') as string ?? ''
-  const property_sqm = isUnitBased ? 0 : parseFloat(property_sqm_raw)
+  const service_lat_raw = (formData.get('service_lat') as string ?? '').trim()
+  const service_lng_raw = (formData.get('service_lng') as string ?? '').trim()
+  const service_lat = service_lat_raw ? parseFloat(service_lat_raw) : null
+  const service_lng = service_lng_raw ? parseFloat(service_lng_raw) : null
+
+  const sqm_raw          = (formData.get('property_sqm') as string ?? '').trim()
+  const sofa_seaters_raw = (formData.get('sofa_seaters') as string ?? '').trim()
 
   // Validation
-  if (!customer_id)   return { error: 'Please select or create a customer.' }
-  if (!service_name)  return { error: 'Please select a service.' }
-  if (!service_date)  return { error: 'Service date is required.' }
-  if (!service_time)  return { error: 'Service time is required.' }
-  if (!address_street)  return { error: 'Street address is required.' }
-  if (!address_city)    return { error: 'City is required.' }
+  if (!customer_id)      return { error: 'Please select or create a customer.' }
+  if (!service_id)       return { error: 'Please select a service.' }
+  if (!service_date)     return { error: 'Service date is required.' }
+  if (!service_time)     return { error: 'Service time is required.' }
+  if (!address_unit)     return { error: 'Unit / suite is required.' }
+  if (!address_street)   return { error: 'Street address is required.' }
+  if (!address_barangay) return { error: 'Barangay is required.' }
+  if (!address_city)     return { error: 'City is required.' }
   if (!address_province) return { error: 'Province is required.' }
-
-  // Validate sqm for area-based services
-  if (!isUnitBased && (isNaN(property_sqm) || property_sqm <= 0)) {
-    return { error: 'Enter a valid property size in sqm.' }
-  }
-
-  // Validate unit quantity for unit-based services
-  if (isUnitBased && unit_quantity < 1) {
-    return { error: 'Quantity must be at least 1.' }
-  }
 
   // Service hours: 8:00 AM – 5:00 PM
   if (service_time < '08:00' || service_time > '17:00') {
     return { error: 'Service time must be between 8:00 AM and 5:00 PM.' }
   }
 
-  const validPayments = ['cash', 'gcash', 'maya', 'bank_transfer', 'bank_check']
+  const validPayments = ['cash', 'gcash', 'bank_check']
   if (!validPayments.includes(payment_method)) return { error: 'Invalid payment method.' }
 
   const today = new Date()
@@ -939,7 +970,6 @@ export async function createManualBooking(
 
   const adminClient = createAdminClient()
 
-  // Verify customer exists
   const { data: customer } = await adminClient
     .from('profiles')
     .select('id')
@@ -948,27 +978,72 @@ export async function createManualBooking(
     .single()
   if (!customer) return { error: 'Selected customer not found.' }
 
-  // Insert booking
-  // For area-based: DB trigger auto-calculates duration, price, required_cleaners from property_sqm
-  // For unit-based: we insert with property_sqm=0, trigger sets ₱1000 default, then we override
+  const { data: service } = await adminClient
+    .from('services')
+    .select('slug, name, starting_price, image_url')
+    .eq('id', service_id)
+    .eq('is_active', true)
+    .single()
+  if (!service) return { error: 'Selected service not found.' }
+
+  // Only the 5 general/area-priced services need a property size; everyone else
+  // is flat/unit-priced. bookings.property_sqm is NOT NULL with no default on
+  // the live schema, so non-sqm services still insert 0 (matches prior convention).
+  const needsSqm = serviceNeedsSqm(service.slug)
+  const property_sqm = needsSqm ? parseFloat(sqm_raw) : 0
+  if (needsSqm && (isNaN(property_sqm) || property_sqm <= 0)) {
+    return { error: 'Enter a valid property size in sqm.' }
+  }
+
+  const isSofa = service.slug === 'sofa_couch_deep_cleaning'
+  const sofa_seaters = isSofa && sofa_seaters_raw ? (parseInt(sofa_seaters_raw) || null) : null
+
+  // Furniture photos are optional for a phone-in/walk-in booking
+  const furnitureFiles = formData.getAll('furniture_images').filter(
+    (f): f is File => f instanceof File && f.size > 0
+  )
+  const furniture_images: string[] = []
+  for (const file of furnitureFiles) {
+    const result = await uploadBookingFile('furniture-photos', file, 'furniture')
+    if (result.url) furniture_images.push(result.url)
+  }
+
+  const base_price     = estimateBookingPrice(service.slug, needsSqm ? property_sqm : 0, Number(service.starting_price))
+  const duration_hours = estimateDurationHours(service.slug, needsSqm ? property_sqm : 0)
+
+  // Insert booking. The apply_cleanconnect_operational_rules() trigger fires
+  // BEFORE INSERT and overwrites base_price/duration_hours/required_cleaners
+  // from the raw property_sqm tiering — we correct them with a follow-up
+  // UPDATE that doesn't touch property_sqm, so the trigger's UPDATE-OF-sqm
+  // condition never re-fires and our service-catalog pricing sticks.
   const { data: newBooking, error: insertError } = await adminClient
     .from('bookings')
     .insert({
       customer_id,
-      service_name,
-      service_date,
-      service_time,
+      service_slug: service.slug,
+      service_name: service.name,
+      service_image: service.image_url,
       space_type,
-      property_sqm: isUnitBased ? 0 : property_sqm,
+      property_sqm: needsSqm ? property_sqm : 0,
+      sofa_seaters,
+      other_furniture,
+      furniture_images: furniture_images.length > 0 ? furniture_images : null,
       address_unit,
       address_street,
+      address_barangay,
       address_city,
       address_province,
-      special_notes,
+      service_lat,
+      service_lng,
+      service_date,
+      service_time,
       payment_method,
-      couch_quantity,
-      mattress_quantity,
-      furniture_quantity,
+      special_notes,
+      status: 'pending',
+      payment_status: 'unpaid',
+      base_price,
+      required_cleaners: 1,
+      duration_hours,
     })
     .select('id')
     .single()
@@ -976,24 +1051,10 @@ export async function createManualBooking(
   if (insertError) return { error: insertError.message }
   if (!newBooking) return { error: 'Booking created but failed to retrieve ID.' }
 
-  // For unit-based services: override the trigger-set price with correct per-unit pricing
-  if (isUnitBased) {
-    const { data: svc } = await adminClient
-      .from('services')
-      .select('price_from')
-      .eq('slug', service_slug)
-      .single()
-
-    const unitPrice = svc?.price_from ?? 0
-    await adminClient
-      .from('bookings')
-      .update({
-        base_price: unitPrice * unit_quantity,
-        required_cleaners: 1,
-        duration_hours: unit_quantity <= 2 ? 1 : Math.ceil(unit_quantity * 0.5),
-      })
-      .eq('id', newBooking.id)
-  }
+  await adminClient
+    .from('bookings')
+    .update({ base_price, duration_hours, required_cleaners: 1 })
+    .eq('id', newBooking.id)
 
   // Notify customer
   const dateStr = new Date(service_date + 'T00:00:00')
@@ -1002,10 +1063,23 @@ export async function createManualBooking(
   await createNotification({
     userId: customer_id,
     title: 'Booking Created',
-    body: `A ${service_name} booking has been created for you on ${dateStr}.`,
+    body: `A ${service.name} booking has been created for you on ${dateStr}.`,
     type: 'booking_confirmed',
     bookingId: newBooking.id,
   })
+
+  // Phone-in/walk-in bookings are created from a typed address only — ask the
+  // customer to pin their exact GPS location in the app for accuracy, since a
+  // geocoded address is far less precise than a device-pinned location.
+  if (service_lat == null || service_lng == null) {
+    await createNotification({
+      userId: customer_id,
+      title: 'Pin Your Service Location',
+      body: 'For a faster, more accurate arrival, please open this booking in the app and pin your exact service location on the map.',
+      type: 'info',
+      bookingId: newBooking.id,
+    })
+  }
 
   revalidatePath('/admin/bookings')
   revalidatePath('/admin')

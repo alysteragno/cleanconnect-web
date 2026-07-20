@@ -3,10 +3,21 @@ import { notFound } from 'next/navigation'
 import { createClient, createAdminClient } from '@/utils/supabase/server'
 import { getBasePath } from '@/utils/base-path'
 import { StatCard } from '@/components/ui/stat-card'
+import { SortSelect } from '@/components/dashboard/sort-select'
 import {
   IconCalendar, IconClock, IconCheck, IconUsers, IconChart,
   IconArrowUpRight, IconZap,
 } from '@/components/icons'
+
+const RECENT_SORT_OPTIONS = [
+  { value: 'booked_desc', label: 'Booked (Newest)' },
+  { value: 'booked_asc',  label: 'Booked (Oldest)' },
+  { value: 'date_desc',   label: 'Service Date (Newest)' },
+  { value: 'date_asc',    label: 'Service Date (Oldest)' },
+  { value: 'price_desc',  label: 'Price (High → Low)' },
+  { value: 'price_asc',   label: 'Price (Low → High)' },
+]
+const RECENT_LIMIT = 8
 
 const STATUS_STYLES: Record<string, string> = {
   pending:     'bg-yellow-50 text-yellow-700 border-yellow-200',
@@ -94,7 +105,12 @@ function QuickActionCard({
 
 // ─── Page ────────────────────────────────────────────────────────────────────
 
-export default async function AdminPage() {
+export default async function AdminPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ sort?: string }>
+}) {
+  const { sort } = await searchParams
   const authClient = await createClient()
   const { data: { user } } = await authClient.auth.getUser()
   if (!user) notFound()
@@ -122,13 +138,14 @@ export default async function AdminPage() {
     supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('role', 'cleaner').eq('is_active', true),
     supabase
       .from('bookings')
-      .select('id, service_date, service_time, service_name, property_sqm, base_price, status, payment_status, profiles!customer_id (full_name)')
+      .select('id, created_at, service_date, service_time, service_name, property_sqm, base_price, status, payment_status, profiles!customer_id (full_name)')
       .order('created_at', { ascending: false })
-      .limit(8),
+      .limit(30),
   ])
 
   type RecentBooking = {
     id: string
+    created_at: string
     service_date: string
     service_time: string
     service_name: string | null
@@ -138,7 +155,19 @@ export default async function AdminPage() {
     payment_status: string
     profiles: { full_name: string } | null
   }
-  const bookingList = (recentBookings ?? []) as unknown as RecentBooking[]
+  const recentPool = (recentBookings ?? []) as unknown as RecentBooking[]
+
+  const recentSortKey = sort ?? 'booked_desc'
+  const bookingList = [...recentPool].sort((a, b) => {
+    switch (recentSortKey) {
+      case 'date_desc':   return b.service_date.localeCompare(a.service_date)
+      case 'date_asc':    return a.service_date.localeCompare(b.service_date)
+      case 'booked_asc':  return new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+      case 'price_desc':  return Number(b.base_price) - Number(a.base_price)
+      case 'price_asc':   return Number(a.base_price) - Number(b.base_price)
+      default:            return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    }
+  }).slice(0, RECENT_LIMIT)
 
   return (
     <div className="space-y-7">
@@ -190,12 +219,15 @@ export default async function AdminPage() {
       <div>
         <div className="flex items-center justify-between mb-2.5">
           <SectionLabel>Recent Bookings</SectionLabel>
-          <Link
-            href={`${basePath}/bookings`}
-            className="text-xs text-pink-600 hover:text-pink-700 font-semibold flex items-center gap-1 transition-colors"
-          >
-            View all <IconArrowUpRight />
-          </Link>
+          <div className="flex items-center gap-3">
+            <SortSelect options={RECENT_SORT_OPTIONS} />
+            <Link
+              href={`${basePath}/bookings`}
+              className="text-xs text-pink-600 hover:text-pink-700 font-semibold flex items-center gap-1 transition-colors"
+            >
+              View all <IconArrowUpRight />
+            </Link>
+          </div>
         </div>
 
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">

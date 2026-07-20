@@ -1,5 +1,7 @@
 import 'server-only'
 import crypto from 'crypto'
+import { createAdminClient } from '@/utils/supabase/server'
+import { createNotification } from '@/app/actions/notifications'
 
 // ── PayMongo server client ──────────────────────────────────────────────────
 // Thin wrapper over the PayMongo REST API used for hosted Checkout Sessions.
@@ -94,6 +96,75 @@ export async function createCheckoutSession(opts: {
     id: json.data.id as string,
     checkoutUrl: attrs.checkout_url as string,
     paymentIntentId: (attrs.payment_intent?.id as string) ?? null,
+  }
+}
+
+/** Looks up a Checkout Session directly on PayMongo and reports whether it has a settled payment. */
+async function retrieveCheckoutSession(sessionId: string): Promise<{ paid: boolean; paymentId: string | null }> {
+  const res = await fetch(`${PAYMONGO_API}/checkout_sessions/${sessionId}`, {
+    headers: { Authorization: authHeader() },
+  })
+  if (!res.ok) return { paid: false, paymentId: null }
+
+  const json = await res.json()
+  const payments = json?.data?.attributes?.payments as
+    | Array<{ id: string; attributes?: { status?: string } }>
+    | undefined
+  const paidPayment = payments?.find((p) => p.attributes?.status === 'paid')
+  return { paid: !!paidPayment, paymentId: paidPayment?.id ?? null }
+}
+
+/**
+ * Fallback confirmation used by the payment success page. The webhook is the
+ * source of truth for marking a booking paid, but webhook delivery can be
+ * delayed, misconfigured, or missed entirely — so the return page also asks
+ * PayMongo directly, right when the customer is looking at the screen,
+ * instead of leaving them staring at "confirming..." indefinitely if the
+ * webhook never arrives. Safe to call repeatedly: idempotent like the webhook.
+ */
+export async function confirmCheckoutPayment(bookingId: string): Promise<{ paid: boolean }> {
+  try {
+    const admin = createAdminClient()
+    const { data: booking } = await admin
+      .from('bookings')
+      .select('id, customer_id, service_date, payment_status, paymongo_checkout_id')
+      .eq('id', bookingId)
+      .maybeSingle()
+
+    if (!booking) return { paid: false }
+    if (booking.payment_status === 'paid') return { paid: true }
+    if (!booking.paymongo_checkout_id) return { paid: false }
+
+    const { paid, paymentId } = await retrieveCheckoutSession(booking.paymongo_checkout_id)
+    if (!paid) return { paid: false }
+
+    const { error: updateErr } = await admin
+      .from('bookings')
+      .update({
+        payment_status: 'paid',
+        paid_at: new Date().toISOString(),
+        paymongo_payment_id: paymentId,
+      })
+      .eq('id', booking.id)
+    if (updateErr) return { paid: false }
+
+    const dateStr = new Date(booking.service_date).toLocaleDateString('en-PH', {
+      month: 'short', day: 'numeric',
+    })
+    await createNotification({
+      userId: booking.customer_id,
+      title: 'Payment Confirmed',
+      body: `Your payment for the appointment on ${dateStr} has been received. Thank you!`,
+      type: 'payment_confirmed',
+      bookingId: booking.id,
+    })
+
+    return { paid: true }
+  } catch {
+    // Best-effort fallback — the webhook remains the source of truth, so any
+    // failure here (PayMongo unreachable, misconfigured keys, etc.) just means
+    // the success page shows the "still confirming" copy instead of crashing.
+    return { paid: false }
   }
 }
 

@@ -1,9 +1,12 @@
 import Link from 'next/link'
+import { confirmCheckoutPayment } from '@/lib/paymongo'
 
 // Public landing page the customer is redirected to after a successful PayMongo
-// checkout (success_url in src/app/api/paymongo/checkout/route.ts). The booking's
-// Paid status is set by the webhook — the source of truth — so this page is a
-// friendly confirmation and does not itself change any state.
+// checkout (success_url in src/app/api/paymongo/checkout/route.ts). The webhook
+// is the source of truth for marking the booking paid, but webhook delivery can
+// be delayed or missed — so this page also asks PayMongo directly, right here,
+// as a fallback instead of leaving the customer staring at "confirming..."
+// indefinitely if the webhook never arrives.
 export default async function PaymentSuccessPage({
   searchParams,
 }: {
@@ -11,6 +14,7 @@ export default async function PaymentSuccessPage({
 }) {
   const { booking } = await searchParams
   const ref = booking ? booking.slice(0, 8).toUpperCase() : null
+  const { paid } = booking ? await confirmCheckoutPayment(booking) : { paid: false }
 
   return (
     <main className="flex-1 flex items-center justify-center bg-gray-50 px-4 py-16">
@@ -23,8 +27,12 @@ export default async function PaymentSuccessPage({
 
         <h1 className="text-xl font-bold text-gray-900">Payment received</h1>
         <p className="text-sm text-gray-500 mt-2 leading-relaxed">
-          Thank you! Your payment is being confirmed. Your booking status will update to
-          <span className="font-semibold text-gray-700"> Paid</span> automatically within a few moments.
+          {paid ? (
+            <>Thank you! Your booking has been marked <span className="font-semibold text-gray-700">Paid</span>.</>
+          ) : (
+            <>Thank you! Your payment is being confirmed. Your booking status will update to
+              <span className="font-semibold text-gray-700"> Paid</span> automatically within a few moments.</>
+          )}
         </p>
 
         {ref && (

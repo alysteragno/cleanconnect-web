@@ -38,8 +38,11 @@ function CashSVG({ size }: { size: number }) {
   )
 }
 
+// 'gcash' is a legacy DB enum value reused as the umbrella label for the collapsed
+// "Online Payment" option — it settles via a PayMongo QRPh checkout, which the
+// customer can scan with GCash, Maya, or any participating bank app, not just GCash.
 export const PAYMENT_METHOD_META: Record<string, { label: string; isDigital: boolean; hasLogo: boolean }> = {
-  gcash:         { label: 'GCash',         isDigital: true,  hasLogo: true  },
+  gcash:         { label: 'Online Payment (QRPh)', isDigital: true,  hasLogo: true  },
   maya:          { label: 'Maya',          isDigital: true,  hasLogo: true  },
   bank_transfer: { label: 'Bank Transfer', isDigital: true,  hasLogo: false },
   bank_check:    { label: 'Bank Check',    isDigital: false, hasLogo: false },
@@ -49,7 +52,7 @@ export const PAYMENT_METHOD_META: Record<string, { label: string; isDigital: boo
 export function PaymentMethodIcon({ method, size = 32 }: { method: string; size?: number }) {
   if (method === 'gcash') {
     // eslint-disable-next-line @next/next/no-img-element
-    return <img src="/GCash_logo.svg" alt="GCash" width={size} height={size} className="object-contain" />
+    return <img src="/QR_PH.svg" alt="QR Ph" width={size} height={size} className="object-contain" />
   }
   if (method === 'maya') {
     // eslint-disable-next-line @next/next/no-img-element

@@ -56,6 +56,7 @@ function NewChatDialog({
   const [isSearching, setIsSearching] = useState(false)
   const [message, setMessage] = useState('')
   const [error, setError] = useState<string | null>(null)
+  const [existing, setExisting] = useState<{ customerId: string; archived: boolean } | null>(null)
   const [pending, startTransition] = useTransition()
 
   const searchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -88,6 +89,7 @@ function NewChatDialog({
 
   function submit() {
     setError(null)
+    setExisting(null)
     if (!selected) { setError('Please select a customer.'); return }
     if (!message.trim()) { setError('Please enter a message.'); return }
 
@@ -97,8 +99,12 @@ function NewChatDialog({
 
     startTransition(async () => {
       const res = await startSupportChat(fd)
-      if (res?.error) setError(res.error)
-      else if (res?.customerId) onCreated(res.customerId)
+      if (res?.error) {
+        setError(res.error)
+        if (res.existingCustomerId) setExisting({ customerId: res.existingCustomerId, archived: !!res.existingArchived })
+      } else if (res?.customerId) {
+        onCreated(res.customerId)
+      }
     })
   }
 
@@ -196,7 +202,18 @@ function NewChatDialog({
         </div>
 
         {error && (
-          <p className="text-xs text-red-600 bg-red-50 border border-red-100 px-3 py-2 rounded-lg">{error}</p>
+          <div className="text-xs text-red-600 bg-red-50 border border-red-100 px-3 py-2 rounded-lg space-y-1.5">
+            <p>{error}</p>
+            {existing && (
+              <button
+                type="button"
+                onClick={() => onCreated(existing.customerId)}
+                className="font-semibold underline underline-offset-2 hover:text-red-700"
+              >
+                {existing.archived ? 'Open archived chat →' : 'Go to existing chat →'}
+              </button>
+            )}
+          </div>
         )}
 
         <div className="flex justify-end gap-2 pt-1">

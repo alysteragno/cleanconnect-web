@@ -4,25 +4,29 @@ import { logout } from '@/app/actions/auth'
 export default function MobileAppPlaceholder({
   role,
   showSignOut = true,
+  fullPage = true,
 }: {
   role: 'customer' | 'cleaner'
   showSignOut?: boolean
+  /** false to render just the card, for embedding inside another page's layout instead of owning the full viewport. */
+  fullPage?: boolean
 }) {
 
-  return (
-    <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center px-4">
-      <div className="bg-white rounded-2xl border border-gray-200 p-10 max-w-sm w-full text-center space-y-6">
+  const card = (
+      <div className="bg-white rounded-2xl border border-gray-200 p-10 max-w-sm w-full text-center space-y-6 mx-auto">
 
-        <div className="flex justify-center">
-          <Image
-            src="/Logo.webp"
-            alt="Maid For You Cleaning Services"
-            width={150}
-            height={46}
-            className="h-12 w-auto object-contain"
-            priority
-          />
-        </div>
+        {fullPage && (
+          <div className="flex justify-center">
+            <Image
+              src="/Logo.webp"
+              alt="Maid For You Cleaning Services"
+              width={150}
+              height={46}
+              className="h-12 w-auto object-contain"
+              priority
+            />
+          </div>
+        )}
 
         <div className="w-12 h-12 rounded-xl bg-pink-50 border border-pink-100 flex items-center justify-center mx-auto">
           <svg width="20" height="20" viewBox="0 0 20 20" fill="none" className="text-pink-600 stroke-current" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
@@ -77,7 +81,13 @@ export default function MobileAppPlaceholder({
           </div>
         )}
       </div>
+  )
 
+  if (!fullPage) return card
+
+  return (
+    <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center px-4">
+      {card}
     </div>
   )
 }

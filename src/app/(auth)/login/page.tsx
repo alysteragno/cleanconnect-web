@@ -1,13 +1,15 @@
 ﻿import Image from 'next/image'
 import LoginForm from './login-form'
 import Link from 'next/link'
+import { getMarketingHomeHref } from '@/utils/base-path'
 
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ registered?: string; reset?: string; error?: string }>
+  searchParams: Promise<{ registered?: string; reset?: string; resetMobile?: string; error?: string }>
 }) {
-  const { registered, reset, error } = await searchParams
+  const { registered, reset, resetMobile, error } = await searchParams
+  const homeHref = await getMarketingHomeHref()
 
   return (
     <div className="min-h-screen bg-gray-50 flex">
@@ -38,7 +40,7 @@ export default async function LoginPage({
           <div className="flex justify-center mb-8 lg:hidden">
           </div>
   <div className='flex justify-center'>
-            <Link href="/">  
+            <Link href={homeHref}>
               <Image
                 src="/Logo.webp"
                 alt="Maid For You Cleaning Services"
@@ -63,6 +65,12 @@ export default async function LoginPage({
           {reset && (
             <div className="mb-5 px-4 py-3 bg-emerald-50 border border-emerald-200 rounded-lg text-sm text-emerald-700">
               Password updated successfully. Sign in with your new password.
+            </div>
+          )}
+
+          {resetMobile && (
+            <div className="mb-5 px-4 py-3 bg-emerald-50 border border-emerald-200 rounded-lg text-sm text-emerald-700">
+              Password updated successfully. Return to the CleanConnect app on your phone to sign in.
             </div>
           )}
 

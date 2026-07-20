@@ -52,7 +52,13 @@ export default function ComplaintStatusControls({
             type="button"
             onClick={() => setStatus(opt.value)}
             disabled={disabled}
-            title={blockResolve ? 'Reply to the customer before resolving' : undefined}
+            title={
+              blockResolve
+                ? 'Reply to the customer before resolving'
+                : opt.value === 'resolved'
+                  ? 'Also archives this chat'
+                  : undefined
+            }
             className={`text-xs px-2.5 py-1.5 rounded-lg font-medium border transition-colors whitespace-nowrap ${
               isActive
                 ? STATUS_STYLES[opt.value]

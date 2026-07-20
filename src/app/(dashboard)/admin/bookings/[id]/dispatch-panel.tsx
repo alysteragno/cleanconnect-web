@@ -4,9 +4,20 @@ import { useActionState, useEffect, useRef, useState } from 'react'
 import { dispatchCleaners, forceAssignCleaner, cancelBooking, getCleanerWeekScheduleData } from '@/app/actions/admin'
 import AIDispatchButton from './ai-dispatch-button'
 import DeleteBookingButton from './delete-booking-button'
+import { haversineKm } from '@/lib/geo'
 
 type Cleaner    = { id: string; full_name: string; phone: string | null; photo_url: string | null }
-type Assignment = { cleaner_id: string; status: string; profiles: { full_name: string; photo_url: string | null } | null }
+type Assignment = {
+  cleaner_id: string
+  status: string
+  en_route_at: string | null
+  en_route_lat: number | null
+  en_route_lng: number | null
+  arrived_at: string | null
+  arrived_lat: number | null
+  arrived_lng: number | null
+  profiles: { full_name: string; photo_url: string | null } | null
+}
 type State      = { error?: string; success?: string } | undefined
 
 const ASSIGNMENT_META: Record<string, { badge: string; dot: string; label: string }> = {
@@ -44,6 +55,24 @@ function fmtShort(dateStr: string, includeYear = false) {
 }
 
 const DAY_ABBR = ['M', 'T', 'W', 'T', 'F', 'S', 'S']
+
+function fmtGeotagTime(iso: string) {
+  return new Date(iso).toLocaleTimeString('en-PH', { hour: 'numeric', minute: '2-digit', hour12: true, timeZone: 'Asia/Manila' })
+}
+
+// One-line summary of a cleaner's most recent geotag checkpoint (from the
+// mobile "Start Trip" / "I've Arrived" taps — there's no continuous
+// tracking, so this is only ever as fresh as the last checkpoint).
+function geotagSummary(a: Assignment, serviceLat: number | null, serviceLng: number | null): string | null {
+  if (a.arrived_at) {
+    const distM = a.arrived_lat != null && a.arrived_lng != null && serviceLat != null && serviceLng != null
+      ? Math.round(haversineKm(a.arrived_lat, a.arrived_lng, serviceLat, serviceLng) * 1000)
+      : null
+    return `Arrived ${fmtGeotagTime(a.arrived_at)}${distM != null ? ` · ${distM}m from address` : ''}`
+  }
+  if (a.en_route_at) return `En route since ${fmtGeotagTime(a.en_route_at)}`
+  return null
+}
 
 // ── Schedule data type ───────────────────────────────────────────────────────
 
@@ -408,6 +437,8 @@ export default function DispatchPanel({
   paymentStatus,
   paymentMethod,
   serviceDate,
+  serviceLat,
+  serviceLng,
   cleaners,
   assignments,
 }: {
@@ -416,6 +447,8 @@ export default function DispatchPanel({
   paymentStatus: string
   paymentMethod: string
   serviceDate: string
+  serviceLat: number | null
+  serviceLng: number | null
   cleaners: Cleaner[]
   assignments: Assignment[]
 }) {
@@ -449,6 +482,7 @@ export default function DispatchPanel({
           <div className="space-y-1.5">
             {assignments.map((a) => {
               const m = ASSIGNMENT_META[a.status] ?? { badge: 'bg-gray-50 text-gray-600 border-gray-200', dot: 'bg-gray-400', label: a.status }
+              const geotag = geotagSummary(a, serviceLat, serviceLng)
               return (
                 <div key={a.cleaner_id} className="flex items-center gap-3 py-1.5">
                   {a.profiles?.photo_url ? (
@@ -463,9 +497,14 @@ export default function DispatchPanel({
                       {a.profiles?.full_name?.charAt(0).toUpperCase() ?? '?'}
                     </div>
                   )}
-                  <span className="text-sm font-medium text-gray-900 flex-1 min-w-0 truncate">
-                    {a.profiles?.full_name ?? 'Cleaner'}
-                  </span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-gray-900 truncate">
+                      {a.profiles?.full_name ?? 'Cleaner'}
+                    </p>
+                    {geotag && (
+                      <p className="text-[11px] text-gray-400 truncate">{geotag}</p>
+                    )}
+                  </div>
                   <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 text-[11px] font-semibold rounded-full border shrink-0 ${m.badge}`}>
                     <span className={`w-1.5 h-1.5 rounded-full ${m.dot}`} />
                     {m.label}

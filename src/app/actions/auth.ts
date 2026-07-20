@@ -4,8 +4,8 @@ import { redirect } from 'next/navigation'
 import { cookies, headers } from 'next/headers'
 import { createClient, createAdminClient } from '@/utils/supabase/server'
 import { getRateLimitBlock, recordLoginFailure, clearLoginFailures } from '@/utils/rate-limit'
-import { isAdminHost } from '@/utils/base-path'
-import { resolveRoleHome } from '@/utils/hosts'
+import { isAdminHost, getCurrentOrigin } from '@/utils/base-path'
+import { resolveRoleHome, ADMIN_HOST } from '@/utils/hosts'
 
 export type AuthState = {
   error?: string
@@ -80,10 +80,16 @@ export async function login(state: AuthState, formData: FormData): Promise<AuthS
   }
 
   const role = profile.role
+  const onAdminHost = await isAdminHost()
 
   if (MOBILE_ONLY_ROLES.has(role)) {
     await supabase.auth.signOut()
     return { error: 'Please use the mobile app to sign in.' }
+  }
+
+  if (role === 'super_admin' && !onAdminHost) {
+    await supabase.auth.signOut()
+    return { error: `Admin accounts must sign in at ${ADMIN_HOST}.` }
   }
 
   clearLoginFailures(rateLimitKey)
@@ -97,7 +103,7 @@ export async function login(state: AuthState, formData: FormData): Promise<AuthS
     maxAge: 60 * 60 * 24 * 7,
   })
 
-  redirect(resolveRoleHome(role, await isAdminHost()))
+  redirect(resolveRoleHome(role, onAdminHost, await getCurrentOrigin()))
 }
 
 export async function register(state: AuthState, formData: FormData): Promise<AuthState> {
@@ -113,6 +119,7 @@ export async function register(state: AuthState, formData: FormData): Promise<Au
   // Name
   if (!rawName) fieldErrors.name = 'Full name is required.'
   else if (rawName.length < 2) fieldErrors.name = 'Name must be at least 2 characters.'
+  else if (!/^[\p{L}\p{M} .'-]+$/u.test(rawName)) fieldErrors.name = "Name can only contain letters, spaces, and . ' -"
 
   // Email
   if (!rawEmail) fieldErrors.email = 'Email is required.'
@@ -147,8 +154,11 @@ export async function register(state: AuthState, formData: FormData): Promise<Au
   if (error) return { error: error.message, fields }
   if (!data.user) return { error: 'Registration failed. Please try again.', fields }
 
+  // A DB trigger auto-provisions a bare profiles row (empty full_name, role
+  // 'customer') the instant auth.users gets the new row — upsert so this
+  // real data overwrites that stub instead of colliding with it.
   const adminClient = createAdminClient()
-  const { error: profileError } = await adminClient.from('profiles').insert({
+  const { error: profileError } = await adminClient.from('profiles').upsert({
     id: data.user.id,
     full_name: rawName,
     role: 'customer',
@@ -189,9 +199,24 @@ export async function resetPassword(state: ResetState, formData: FormData): Prom
   if (password !== confirm) return { error: 'Passwords do not match.' }
 
   const supabase = await createClient()
-  const { error } = await supabase.auth.updateUser({ password })
+  const { data: userData, error } = await supabase.auth.updateUser({ password })
 
   if (error) return { error: error.message }
+
+  const adminClient = createAdminClient()
+  const { data: profile } = await adminClient
+    .from('profiles')
+    .select('role')
+    .eq('id', userData.user.id)
+    .single()
+
+  // Cleaners have no web login — sending them back to the web sign-in form
+  // after a password reset would just dead-end on "Please use the mobile
+  // app to sign in." Tell them that up front instead.
+  if (profile && MOBILE_ONLY_ROLES.has(profile.role)) {
+    await supabase.auth.signOut()
+    redirect('/login?resetMobile=true')
+  }
 
   redirect('/login?reset=true')
 }

@@ -4,6 +4,18 @@ import { createClient, createAdminClient } from '@/utils/supabase/server'
 import { getBasePath } from '@/utils/base-path'
 import ComplaintRow from './complaint-row'
 import NewChatButton from './new-chat-button'
+import { SortSelect } from '@/components/dashboard/sort-select'
+import { Pagination } from '@/components/dashboard/pagination'
+import { paginate, resolvePage } from '@/utils/pagination'
+
+const PAGE_SIZE = 10
+
+const SORT_OPTIONS = [
+  { value: 'newest',    label: 'Newest First' },
+  { value: 'oldest',    label: 'Oldest First' },
+  { value: 'name_asc',  label: 'Customer A–Z' },
+  { value: 'name_desc', label: 'Customer Z–A' },
+]
 
 const STATUS_STYLES: Record<string, string> = {
   open: 'bg-yellow-50 text-yellow-700 border-yellow-200',
@@ -26,7 +38,7 @@ type ComplaintRecord = {
 export default async function AdminComplaintsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ view?: string }>
+  searchParams: Promise<{ view?: string; sort?: string; page?: string }>
 }) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -35,7 +47,7 @@ export default async function AdminComplaintsPage({
   if (profile?.role !== 'super_admin') notFound()
 
   const basePath = await getBasePath()
-  const { view } = await searchParams
+  const { view, sort, page: rawPage } = await searchParams
   const showArchived = view === 'archived'
 
   const adminDb = createAdminClient()
@@ -58,10 +70,26 @@ export default async function AdminComplaintsPage({
     rows = (primary.data ?? []) as ComplaintRecord[]
   }
 
+  const nameOf = (c: ComplaintRecord) =>
+    ((Array.isArray(c.profiles) ? c.profiles[0] : c.profiles) as { full_name: string } | null)?.full_name ?? 'Customer'
+
   const active = rows.filter((c) => !c.archived_at)
   const archived = rows.filter((c) => c.archived_at)
-  const list = showArchived ? archived : active
+  const scoped = showArchived ? archived : active
   const openCount = active.filter((c) => c.status !== 'resolved').length
+
+  const sortKey = sort ?? 'newest'
+  const list = [...scoped].sort((a, b) => {
+    switch (sortKey) {
+      case 'oldest':    return new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+      case 'name_asc':  return nameOf(a).localeCompare(nameOf(b))
+      case 'name_desc': return nameOf(b).localeCompare(nameOf(a))
+      default:          return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    }
+  })
+
+  const page = resolvePage(rawPage, list.length, PAGE_SIZE)
+  const pageItems = paginate(list, page, PAGE_SIZE)
 
   const tabClass = (isActive: boolean) =>
     `text-sm font-medium pb-2 -mb-px border-b-2 transition-colors ${
@@ -79,6 +107,7 @@ export default async function AdminComplaintsPage({
             {openCount} open · {active.length} active
           </p>
         </div>
+        <SortSelect options={SORT_OPTIONS} />
       </div>
 
       {/* Active / Archived tabs */}
@@ -99,12 +128,12 @@ export default async function AdminComplaintsPage({
             </p>
           </div>
         ) : (
-          list.map((c) => (
+          pageItems.map((c) => (
             <ComplaintRow
               key={c.id}
               complaintId={c.id}
               subject={c.subject}
-              customerName={((Array.isArray(c.profiles) ? c.profiles[0] : c.profiles) as { full_name: string } | null)?.full_name ?? 'Customer'}
+              customerName={nameOf(c)}
               dateLabel={new Date(c.created_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'Asia/Manila' })}
               statusLabel={STATUS_LABELS[c.status] ?? c.status}
               statusClass={STATUS_STYLES[c.status] ?? ''}
@@ -112,6 +141,7 @@ export default async function AdminComplaintsPage({
             />
           ))
         )}
+        {list.length > 0 && <Pagination totalItems={list.length} pageSize={PAGE_SIZE} />}
       </div>
     </div>
   )

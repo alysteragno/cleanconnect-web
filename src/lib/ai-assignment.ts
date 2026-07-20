@@ -7,21 +7,37 @@
  *   3. Filter: remove cleaners with a conflicting booking (± 2-hour buffer)
  *   4. Score remaining cleaners:
  *        workload   — number of assigned jobs on service_date (lower = better)
- *        proximity  — haversine distance from departure point to service address (lower = better)
- *                     departure = last confirmed same-day job location → service location
- *                     fallback  = business office → service location (when no prior same-day job)
+ *        proximity  — land/road distance from departure point to service address
+ *                     (lower = better), via OpenRouteService (OSM-based) road
+ *                     routing, falling back to a haversine straight-line
+ *                     estimate if routing is unavailable (no key, request
+ *                     failure, etc.). Departure point, in priority order:
+ *                       1. last confirmed same-day job → that job's verified
+ *                          arrival geotag (cleaner_assignments.arrived_lat/lng),
+ *                          falling back to the customer's service_lat/lng pin
+ *                       2. today's bookings only — cleaner_assignments'
+ *                          opportunistic "last seen" ping (profiles.last_seen_lat/
+ *                          lng), if fresh (within 6h); irrelevant for a future-dated
+ *                          booking, since where a cleaner is *right now* doesn't
+ *                          predict where they'll be on another day
+ *                       3. the cleaner's admin-set home address (profiles.home_lat/lng)
+ *                       4. business office (BUSINESS_LAT/LNG), if none of the above exist
  *        rating     — average customer feedback rating (higher = better)
  *        combined   — weighted: 50% workload + 30% proximity + 20% rating
  *                     degrades to 70% workload + 30% rating when booking has no coordinates
  *   5. Select top N candidates (required_cleaners + 2 buffer, max 5)
  *   6. Create cleaner_assignments with status = 'assigned' for each candidate
  *
- * This is rule-based AI — no trained model, no external API.
+ * This is rule-based AI — no trained model. Proximity calls OpenRouteService
+ * (requires ORS_API_KEY) for a real road-network distance instead of a
+ * straight line.
  * Proximity falls back to workload-only when booking geo data is absent.
  */
 
 import { createClient, createAdminClient } from '@/utils/supabase/server'
 import { BUSINESS_LAT, BUSINESS_LNG } from '@/lib/constants'
+import { getRoadRoute } from '@/lib/openrouteservice'
+import { haversineKm } from '@/lib/geo'
 
 export type RankedCleaner = {
   cleanerId: string
@@ -31,7 +47,7 @@ export type RankedCleaner = {
   distanceKm: number | null
   departureLat: number | null
   departureLng: number | null
-  departureSource: 'inter_job' | 'business' | null
+  departureSource: 'inter_job' | 'last_seen' | 'home' | 'business' | null
   avgRating: number | null
   finalScore: number
   rank: number
@@ -74,9 +90,11 @@ export async function runAIDispatch(bookingId: string, dryRun = false): Promise<
   const bookingLng = booking.service_lng != null ? Number(booking.service_lng) : null
 
   // ── Step 2: All active cleaners ─────────────────────────────────────────
+  // home_lat/lng and last_seen_lat/lng/at feed the departure-point fallback
+  // chain in Step 4c below, for cleaners with no job yet today.
   const { data: allCleaners } = await adminClient
     .from('profiles')
-    .select('id, full_name, photo_url')
+    .select('id, full_name, photo_url, home_lat, home_lng, last_seen_lat, last_seen_lng, last_seen_at')
     .eq('role', 'cleaner')
     .eq('is_active', true)
 
@@ -136,11 +154,14 @@ export async function runAIDispatch(bookingId: string, dryRun = false): Promise<
 
   // Fetch all same-day assignments for our candidate pool — one query covers
   // conflict detection, workload counting, and proximity routing.
-  let allSameDayAssignments: { cleaner_id: string; booking_id: string }[] = []
+  // arrived_lat/lng is the cleaner's own verified geotag from the "I've
+  // Arrived" checkpoint in the mobile app — preferred below over the
+  // customer's dropped pin (bookings.service_lat/lng) when present.
+  let allSameDayAssignments: { cleaner_id: string; booking_id: string; arrived_lat: number | null; arrived_lng: number | null }[] = []
   if (sameDayBookingIds.length > 0) {
     const { data } = await supabase
       .from('cleaner_assignments')
-      .select('cleaner_id, booking_id')
+      .select('cleaner_id, booking_id, arrived_lat, arrived_lng')
       .eq('status', 'assigned')
       .in('cleaner_id', afterDayOff.map((c) => c.id))
       .in('booking_id', sameDayBookingIds)
@@ -192,16 +213,28 @@ export async function runAIDispatch(bookingId: string, dryRun = false): Promise<
 
   const maxWorkload = Math.max(1, ...eligible.map((c) => workloadMap[c.id] ?? 0))
 
-  // ── Step 4c: Inter-job proximity ────────────────────────────────────────
-  // Departure point for each cleaner:
-  //   1. Last confirmed same-day assignment that ends before this booking starts
-  //      → use that job's service_lat/service_lng
-  //   2. Fallback: business office coordinates (BUSINESS_LAT / BUSINESS_LNG)
+  // ── Step 4c: Proximity — departure point fallback chain ─────────────────
+  // 1. Last confirmed same-day job that ends before this one starts → its
+  //    verified arrival geotag (or the customer's pin if unavailable)
+  // 2. Today's bookings only: a fresh "last seen" ping (app-foreground,
+  //    not continuous tracking — see profiles.last_seen_lat/lng/at)
+  // 3. The cleaner's admin-set home address
+  // 4. Business office coordinates (BUSINESS_LAT / BUSINESS_LNG)
   const hasBookingGeo = bookingLat != null && bookingLng != null
+  const LAST_SEEN_STALENESS_MS = 6 * 60 * 60 * 1000
+  // "Today" must be evaluated in the business's own timezone (Asia/Manila,
+  // UTC+8), not the server's UTC clock — service_date is a plain calendar
+  // date with no time component, and a bare `new Date().toISOString()`
+  // would still report the *previous* day for the first 8 hours of every
+  // Manila calendar day, wrongly gating out a same-day last_seen ping.
+  const todayInManila = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Manila' }).format(new Date())
+  const isServiceToday = booking.service_date === todayInManila
 
   const distanceMap: Record<string, number | null> = {}
-  const departureMap: Record<string, { lat: number; lng: number; source: 'inter_job' | 'business' }> = {}
+  const departureMap: Record<string, { lat: number; lng: number; source: 'inter_job' | 'last_seen' | 'home' | 'business' }> = {}
   let interJobCount = 0
+  let lastSeenCount = 0
+  let homeCount = 0
   let businessFallbackCount = 0
 
   if (hasBookingGeo) {
@@ -209,28 +242,83 @@ export async function runAIDispatch(bookingId: string, dryRun = false): Promise<
       // Find prior jobs for this cleaner that end at or before the new booking starts
       const priorJobs = allSameDayAssignments
         .filter((a) => a.cleaner_id === c.id)
-        .map((a) => timeMap[a.booking_id])
-        .filter((t): t is BookingEntry => t != null)
+        .map((a) => {
+          const entry = timeMap[a.booking_id]
+          return entry ? { ...entry, assignment: a } : null
+        })
+        .filter((t): t is BookingEntry & { assignment: (typeof allSameDayAssignments)[number] } => t != null)
         .filter((t) => {
           const endMin = timeToMinutes(t.service_time) + (Number(t.duration_hours) || 2) * 60
           return endMin <= newStart
         })
         .sort((a, b) => timeToMinutes(b.service_time) - timeToMinutes(a.service_time))
 
-      if (priorJobs.length > 0 && priorJobs[0].lat != null && priorJobs[0].lng != null) {
-        const { lat, lng } = priorJobs[0]
-        distanceMap[c.id] = haversineKm(lat, lng, bookingLat, bookingLng)
-        departureMap[c.id] = { lat, lng, source: 'inter_job' }
+      // Prefer the cleaner's own verified arrival geotag over the customer's
+      // dropped pin when available — it's ground-truth GPS from the "I've
+      // Arrived" checkpoint rather than a possibly-off address pin.
+      const top = priorJobs[0]
+      const interJobLat = top ? (top.assignment.arrived_lat != null ? Number(top.assignment.arrived_lat) : top.lat) : null
+      const interJobLng = top ? (top.assignment.arrived_lng != null ? Number(top.assignment.arrived_lng) : top.lng) : null
+
+      const lastSeenFresh =
+        isServiceToday &&
+        c.last_seen_lat != null && c.last_seen_lng != null && c.last_seen_at != null &&
+        (Date.now() - new Date(c.last_seen_at).getTime()) <= LAST_SEEN_STALENESS_MS
+
+      if (interJobLat != null && interJobLng != null) {
+        departureMap[c.id] = { lat: interJobLat, lng: interJobLng, source: 'inter_job' }
         interJobCount++
+      } else if (lastSeenFresh) {
+        departureMap[c.id] = { lat: Number(c.last_seen_lat), lng: Number(c.last_seen_lng), source: 'last_seen' }
+        lastSeenCount++
+      } else if (c.home_lat != null && c.home_lng != null) {
+        departureMap[c.id] = { lat: Number(c.home_lat), lng: Number(c.home_lng), source: 'home' }
+        homeCount++
       } else {
-        distanceMap[c.id] = haversineKm(BUSINESS_LAT, BUSINESS_LNG, bookingLat, bookingLng)
         departureMap[c.id] = { lat: BUSINESS_LAT, lng: BUSINESS_LNG, source: 'business' }
         businessFallbackCount++
       }
     }
 
+    // Road-route each *unique* departure point rather than per-cleaner — many
+    // cleaners share the business-office fallback, so this both cuts
+    // OpenRouteService calls and keeps the dispatch responsive (and the free
+    // tier's daily quota further away). Falls back to a haversine
+    // straight-line estimate per point if ORS is unreachable/unconfigured or
+    // finds no drivable route.
+    const uniqueDepartures = new Map<string, { lat: number; lng: number }>()
+    for (const dep of Object.values(departureMap)) {
+      uniqueDepartures.set(`${dep.lat},${dep.lng}`, dep)
+    }
+
+    const routeEntries = await Promise.all(
+      Array.from(uniqueDepartures.entries()).map(async ([key, dep]) => {
+        const route = await getRoadRoute(dep.lat, dep.lng, bookingLat, bookingLng)
+        return [key, {
+          distanceKm: route?.distanceKm ?? haversineKm(dep.lat, dep.lng, bookingLat, bookingLng),
+          isRoadDistance: route != null,
+        }] as const
+      })
+    )
+    const routeMap = new Map(routeEntries)
+
+    let roadRouteCount = 0
+    for (const c of eligible) {
+      const dep = departureMap[c.id]
+      const route = routeMap.get(`${dep.lat},${dep.lng}`)!
+      distanceMap[c.id] = route.distanceKm
+      if (route.isRoadDistance) roadRouteCount++
+    }
+
     reasoning.push(
-      `Proximity: ${interJobCount} cleaner(s) routed from prior same-day job; ${businessFallbackCount} from business office.`
+      `Proximity: ${interJobCount} cleaner(s) routed from prior same-day job, ` +
+      `${lastSeenCount} from a recent location ping, ${homeCount} from home address, ` +
+      `${businessFallbackCount} from business office.`
+    )
+    reasoning.push(
+      roadRouteCount === uniqueDepartures.size
+        ? `Distance: road-network routing (OpenRouteService) for all ${uniqueDepartures.size} departure point(s).`
+        : `Distance: road-network routing for ${roadRouteCount}/${uniqueDepartures.size} departure point(s); straight-line estimate used where routing was unavailable.`
     )
   } else {
     reasoning.push('Proximity: booking has no coordinates — skipping geo factor.')
@@ -312,16 +400,6 @@ export async function runAIDispatch(bookingId: string, dryRun = false): Promise<
 }
 
 // ── Utilities ────────────────────────────────────────────────────────────────
-
-function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
-  const R = 6371
-  const dLat = (lat2 - lat1) * Math.PI / 180
-  const dLng = (lng2 - lng1) * Math.PI / 180
-  const a =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLng / 2) ** 2
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
-}
 
 function timeToMinutes(timeStr: string): number {
   const [h, m] = timeStr.split(':').map(Number)

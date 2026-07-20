@@ -1,18 +1,23 @@
 ﻿import Image from 'next/image'
 import Link from 'next/link'
 import RegisterForm from './register-form'
+import { getMarketingHomeHref } from '@/utils/base-path'
 
-export default function RegisterPage() {
+export default async function RegisterPage() {
+  const homeHref = await getMarketingHomeHref()
+
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center px-4 py-12">
-      <Image
-        src="/Logo.webp"
-        alt="Maid For You Cleaning Services"
-        width={160}
-        height={64}
-        className="w-auto object-contain mb-6"
-        priority
-      />
+      <Link href={homeHref}>
+        <Image
+          src="/Logo.webp"
+          alt="Maid For You Cleaning Services"
+          width={160}
+          height={64}
+          className="w-auto object-contain mb-6"
+          priority
+        />
+      </Link>
 
       <div className="w-full max-w-sm bg-white rounded-2xl shadow-sm border border-gray-200 p-8">
         <div className="mb-6">

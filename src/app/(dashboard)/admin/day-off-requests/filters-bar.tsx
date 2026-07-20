@@ -1,12 +1,26 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
-import { useState, useRef } from 'react'
+import { useState } from 'react'
 import { useBasePath } from '@/components/dashboard/base-path-context'
+import { SelectDropdown } from '@/components/dashboard/select-dropdown'
 
 const MONTH_LABELS = [
   'January', 'February', 'March', 'April', 'May', 'June',
   'July', 'August', 'September', 'October', 'November', 'December',
+]
+
+const STATUS_OPTIONS = [
+  { value: 'all',      label: 'All statuses' },
+  { value: 'pending',  label: 'Pending' },
+  { value: 'expired',  label: 'Expired' },
+  { value: 'approved', label: 'Approved' },
+  { value: 'rejected', label: 'Rejected' },
+]
+
+const MONTH_OPTIONS = [
+  { value: '', label: 'Any month' },
+  ...MONTH_LABELS.map((label, i) => ({ value: String(i + 1).padStart(2, '0'), label })),
 ]
 
 function getYearOptions() {
@@ -18,19 +32,6 @@ function parseMonth(raw: string) {
   if (!raw) return { year: '', mo: '' }
   const [y, m] = raw.split('-')
   return { year: y ?? '', mo: m ?? '' }
-}
-
-function SelectWrapper({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="relative">
-      {children}
-      <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-gray-400">
-        <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
-          <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clipRule="evenodd" />
-        </svg>
-      </span>
-    </div>
-  )
 }
 
 export default function FiltersBar({
@@ -83,64 +84,24 @@ export default function FiltersBar({
         {/* Status */}
         <div className="flex-1 min-w-[140px]">
           <label className="block text-xs font-semibold text-gray-500 mb-1.5">Status</label>
-          <SelectWrapper>
-            <select
-              value={status}
-              onChange={(e) => setStatus(e.target.value)}
-              className="w-full appearance-none pl-3 pr-9 py-2.5 text-sm font-medium text-gray-800
-                         border border-gray-200 rounded-xl bg-gray-50
-                         focus:outline-none focus:ring-2 focus:ring-pink-400 focus:border-transparent
-                         hover:border-gray-300 transition-colors cursor-pointer"
-            >
-              <option value="all">All statuses</option>
-              <option value="pending">Pending</option>
-              <option value="approved">Approved</option>
-              <option value="rejected">Rejected</option>
-            </select>
-          </SelectWrapper>
+          <SelectDropdown value={status} onChange={setStatus} options={STATUS_OPTIONS} />
         </div>
 
         {/* Month */}
         <div className="flex-1 min-w-[120px]">
           <label className="block text-xs font-semibold text-gray-500 mb-1.5">Month</label>
-          <SelectWrapper>
-            <select
-              value={mo}
-              onChange={(e) => setMo(e.target.value)}
-              className="w-full appearance-none pl-3 pr-9 py-2.5 text-sm font-medium text-gray-800
-                         border border-gray-200 rounded-xl bg-gray-50
-                         focus:outline-none focus:ring-2 focus:ring-pink-400 focus:border-transparent
-                         hover:border-gray-300 transition-colors cursor-pointer"
-            >
-              <option value="">Any month</option>
-              {MONTH_LABELS.map((label, i) => (
-                <option key={i} value={String(i + 1).padStart(2, '0')}>
-                  {label}
-                </option>
-              ))}
-            </select>
-          </SelectWrapper>
+          <SelectDropdown value={mo} onChange={setMo} options={MONTH_OPTIONS} placeholder="Any month" />
         </div>
 
         {/* Year */}
         <div className="w-[100px]">
           <label className="block text-xs font-semibold text-gray-500 mb-1.5">Year</label>
-          <SelectWrapper>
-            <select
-              value={year}
-              onChange={(e) => setYear(e.target.value)}
-              disabled={!mo}
-              className="w-full appearance-none pl-3 pr-9 py-2.5 text-sm font-medium text-gray-800
-                         border border-gray-200 rounded-xl bg-gray-50
-                         focus:outline-none focus:ring-2 focus:ring-pink-400 focus:border-transparent
-                         hover:border-gray-300 transition-colors cursor-pointer
-                         disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              {yearOptions.map((y) => (
-                <option key={y} value={String(y)}>{y}</option>
-              ))}
-            </select>
-          </SelectWrapper>
+          <SelectDropdown
+            value={year}
+            onChange={setYear}
+            disabled={!mo}
+            options={yearOptions.map((y) => ({ value: String(y), label: String(y) }))}
+          />
         </div>
 
         {/* Actions */}

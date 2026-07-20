@@ -58,7 +58,9 @@ export default function ArchiveSupportButton({
         className="flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg font-medium border border-gray-200 bg-white text-gray-500 hover:border-gray-300 hover:text-gray-700 active:scale-95 transition-all whitespace-nowrap"
       >
         <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M3 6h14M4 6l1 10a1 1 0 001 1h8a1 1 0 001-1l1-10M8 9v5M12 9v5M2.5 6l1.2-2.4A1 1 0 014.6 3h10.8a1 1 0 01.9.6L17.5 6" />
+          <rect x="1" y="3" width="18" height="4" rx="0.5" />
+          <path d="M2.5 7v9.5a1 1 0 001 1h13a1 1 0 001-1V7" />
+          <line x1="8" y1="10.5" x2="12" y2="10.5" />
         </svg>
         <span className="hidden sm:inline">Archive</span>
       </button>
@@ -75,7 +77,9 @@ export default function ArchiveSupportButton({
             <div className="flex items-start gap-3">
               <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center shrink-0">
                 <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className="text-gray-500">
-                  <path d="M3 6h14M4 6l1 10a1 1 0 001 1h8a1 1 0 001-1l1-10M8 9v5M12 9v5M2.5 6l1.2-2.4A1 1 0 014.6 3h10.8a1 1 0 01.9.6L17.5 6" />
+                  <rect x="1" y="3" width="18" height="4" rx="0.5" />
+                  <path d="M2.5 7v9.5a1 1 0 001 1h13a1 1 0 001-1V7" />
+                  <line x1="8" y1="10.5" x2="12" y2="10.5" />
                 </svg>
               </div>
               <div className="min-w-0">

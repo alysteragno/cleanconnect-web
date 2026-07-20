@@ -27,7 +27,29 @@ function fmtLabel(s: string) {
   return fromISO(s).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
-export function CustomRangeTab({ active, start, end }: { active: boolean; start: string; end: string }) {
+/**
+ * Reusable date-range picker tab, driven entirely by URL search params on
+ * `path`. `extraParams` carries other filters (status, sort, …) already on
+ * the page through into the picker's target URL so they survive applying a
+ * custom range. `allowFuture` lifts the "no future dates" restriction —
+ * reports look backward only, but a bookings schedule needs to reach
+ * forward too.
+ */
+export function CustomRangeTab({
+  active,
+  start,
+  end,
+  path,
+  extraParams,
+  allowFuture = false,
+}: {
+  active: boolean
+  start: string
+  end: string
+  path: string
+  extraParams?: Record<string, string | undefined>
+  allowFuture?: boolean
+}) {
   const router = useRouter()
   const basePath = useBasePath()
   const [open, setOpen] = useState(false)
@@ -61,7 +83,7 @@ export function CustomRangeTab({ active, start, end }: { active: boolean; start:
   }
 
   function pickDay(iso: string) {
-    if (iso > todayISO) return
+    if (!allowFuture && iso > todayISO) return
     if (placing === 'start') {
       setRangeStart(iso)
       setRangeEnd(iso)
@@ -87,7 +109,14 @@ export function CustomRangeTab({ active, start, end }: { active: boolean; start:
 
   function apply() {
     closeDropdown()
-    router.push(`${basePath}/reports?period=custom&start=${rangeStart}&end=${rangeEnd}`, { scroll: false })
+    const params = new URLSearchParams()
+    for (const [k, v] of Object.entries(extraParams ?? {})) {
+      if (v) params.set(k, v)
+    }
+    params.set('period', 'custom')
+    params.set('start', rangeStart)
+    params.set('end', rangeEnd)
+    router.push(`${basePath}${path}?${params.toString()}`, { scroll: false })
   }
 
   const weeks = useMemo(() => {
@@ -168,7 +197,7 @@ export function CustomRangeTab({ active, start, end }: { active: boolean; start:
             {weeks.flat().map((day) => {
               const iso = toISO(day)
               const inMonth = day.getMonth() === viewMonth.getMonth()
-              const isFuture = iso > todayISO
+              const isFuture = !allowFuture && iso > todayISO
               const isStart = iso === rangeStart
               const isEnd = iso === previewEnd
               const inRange = iso > rangeStart && iso < previewEnd

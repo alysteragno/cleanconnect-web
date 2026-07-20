@@ -1,8 +1,11 @@
 import Image from 'next/image'
 import Link from 'next/link'
 import ForgotForm from './forgot-form'
+import { getMarketingHomeHref } from '@/utils/base-path'
 
-export default function ForgotPasswordPage() {
+export default async function ForgotPasswordPage() {
+  const homeHref = await getMarketingHomeHref()
+
   return (
     <div className="min-h-screen bg-gray-50 flex">
       {/* Left panel — branding */}
@@ -29,7 +32,7 @@ export default function ForgotPasswordPage() {
       <div className="flex-1 flex items-center justify-center px-6 py-12">
         <div className="w-full max-w-sm">
           <div className="flex justify-center mb-8">
-            <Link href="/">
+            <Link href={homeHref}>
               <Image
                 src="/Logo.webp"
                 alt="Maid For You Cleaning Services"

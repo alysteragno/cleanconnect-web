@@ -29,6 +29,7 @@ const STATUS_META: Record<string, { pill: string; dot: string; label: string }> 
   pending:  { pill: 'bg-yellow-50 text-yellow-700 border-yellow-200', dot: 'bg-yellow-400', label: 'Pending'  },
   approved: { pill: 'bg-green-50 text-green-700 border-green-200',   dot: 'bg-green-500',  label: 'Approved' },
   rejected: { pill: 'bg-red-50 text-red-700 border-red-200',         dot: 'bg-red-400',    label: 'Rejected' },
+  expired:  { pill: 'bg-gray-100 text-gray-500 border-gray-200',     dot: 'bg-gray-400',   label: 'Expired'  },
 }
 
 function fmtDate(d: string) {
@@ -87,7 +88,11 @@ export default async function AdminDayOffRequestsPage({
       )
     `)
 
-  if (status !== 'all') {
+  // "expired" isn't a real DB status — it's a pending request whose date has
+  // already passed. Fetch pending rows and narrow to expired ones in JS below.
+  if (status === 'expired') {
+    query = query.eq('status', 'pending')
+  } else if (status !== 'all') {
     query = query.eq('status', status)
   }
 
@@ -104,14 +109,25 @@ export default async function AdminDayOffRequestsPage({
   const { data: rows } = await query
   let requests = (rows ?? []) as unknown as DayOffRequest[]
 
-  // Pending rows float to top, then preserve created_at desc order
+  // Zero-padded YYYY-MM-DD in Manila time, so it string-compares safely against
+  // the DATE column without any timezone/offset conversion.
+  const todayManila = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' })
+  const isExpiredRequest = (r: DayOffRequest) => r.status === 'pending' && r.requested_date <= todayManila
+
+  if (status === 'expired') {
+    requests = requests.filter(isExpiredRequest)
+  }
+
+  // Still-actionable pending rows float to top, then preserve created_at desc order
   requests.sort((a, b) => {
-    if (a.status === 'pending' && b.status !== 'pending') return -1
-    if (a.status !== 'pending' && b.status === 'pending') return 1
+    const aActive = a.status === 'pending' && !isExpiredRequest(a)
+    const bActive = b.status === 'pending' && !isExpiredRequest(b)
+    if (aActive && !bActive) return -1
+    if (!aActive && bActive) return 1
     return 0
   })
 
-  const pendingCount = requests.filter((r) => r.status === 'pending').length
+  const pendingCount = requests.filter((r) => r.status === 'pending' && !isExpiredRequest(r)).length
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-8 space-y-6">
@@ -162,10 +178,17 @@ export default async function AdminDayOffRequestsPage({
               </thead>
               <tbody className="divide-y divide-gray-50">
                 {requests.map((r) => {
-                  const sm = STATUS_META[r.status] ?? STATUS_META.pending
+                  const isExpired = isExpiredRequest(r)
+                  const effectiveStatus = isExpired ? 'expired' : r.status
+                  const sm = STATUS_META[effectiveStatus] ?? STATUS_META.pending
                   const initials = r.cleaner?.full_name?.charAt(0).toUpperCase() ?? '?'
                   return (
-                    <tr key={r.id} className="hover:bg-gray-50/70 transition-colors">
+                    <tr
+                      key={r.id}
+                      className={`transition-colors ${
+                        isExpired ? 'bg-gray-50/60 hover:bg-gray-100/60' : 'hover:bg-gray-50/70'
+                      }`}
+                    >
 
                       {/* Cleaner */}
                       <td className="px-5 py-4">
@@ -195,7 +218,7 @@ export default async function AdminDayOffRequestsPage({
 
                       {/* Requested date */}
                       <td className="px-5 py-4">
-                        <span className="text-sm font-medium text-gray-900 whitespace-nowrap">
+                        <span className={`text-sm font-medium whitespace-nowrap ${isExpired ? 'text-gray-400' : 'text-gray-900'}`}>
                           {fmtDate(r.requested_date)}
                         </span>
                       </td>
@@ -253,7 +276,9 @@ export default async function AdminDayOffRequestsPage({
 
                       {/* Actions */}
                       <td className="px-5 py-4 text-right">
-                        {r.status === 'pending' && (
+                        {effectiveStatus === 'expired' ? (
+                          <span className="text-xs text-gray-300">No longer actionable</span>
+                        ) : r.status === 'pending' && (
                           <ReviewModal
                             requestId={r.id}
                             cleanerName={r.cleaner?.full_name ?? 'this cleaner'}

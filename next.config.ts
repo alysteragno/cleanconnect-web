@@ -41,6 +41,10 @@ const cspDirectives = [
   `connect-src 'self'${supabaseHost ? ` https://${supabaseHost} wss://${supabaseHost}` : ''} https://nominatim.openstreetmap.org`,
   // No <object>/<embed>/Flash-style plugins anywhere in the app.
   `object-src 'none'`,
+  // Contact page embeds a Google Maps iframe for the branch location. Without
+  // an explicit frame-src, CSP falls back to default-src 'self' and blocks
+  // it (Chrome renders "This content is blocked" inside the iframe box).
+  `frame-src https://maps.google.com https://www.google.com`,
   // Blocks a <base> tag injection from rebasing relative URLs elsewhere.
   `base-uri 'self'`,
   // Server Actions and native forms only ever submit back to this origin —

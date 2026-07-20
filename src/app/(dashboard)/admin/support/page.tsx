@@ -3,9 +3,13 @@ import { notFound } from 'next/navigation'
 import { createClient, createAdminClient } from '@/utils/supabase/server'
 import { getBasePath } from '@/utils/base-path'
 import { SortSelect } from '@/components/dashboard/sort-select'
+import { Pagination } from '@/components/dashboard/pagination'
+import { paginate, resolvePage } from '@/utils/pagination'
 import { isSupportConversationArchived, daysUntilSupportAutoArchive } from '@/utils/chat-helpers'
 import NewChatButton from './new-chat-button'
 import SupportConversationRow from './conversation-row'
+
+const PAGE_SIZE = 10
 
 function formatRelativeTime(iso: string) {
   const diff  = Date.now() - new Date(iso).getTime()
@@ -41,9 +45,9 @@ const SORT_OPTIONS = [
 export default async function AdminSupportPage({
   searchParams,
 }: {
-  searchParams: Promise<{ sort?: string; view?: string }>
+  searchParams: Promise<{ sort?: string; view?: string; page?: string }>
 }) {
-  const { sort, view } = await searchParams
+  const { sort, view, page: rawPage } = await searchParams
   const showArchived = view === 'archived'
   const supabase = await createClient()
   const adminDb  = createAdminClient()
@@ -151,6 +155,9 @@ export default async function AdminSupportPage({
     }
   })
 
+  const page = resolvePage(rawPage, sorted.length, PAGE_SIZE)
+  const pageItems = paginate(sorted, page, PAGE_SIZE)
+
   const tabClass = (isActive: boolean) =>
     `text-sm font-medium pb-2 -mb-px border-b-2 transition-colors ${
       isActive
@@ -192,7 +199,7 @@ export default async function AdminSupportPage({
           </div>
         ) : (
           <div className="divide-y divide-gray-100">
-            {sorted.map((c) => {
+            {pageItems.map((c) => {
               const msg = lastMsg.get(c.id)!
               return (
                 <SupportConversationRow
@@ -210,6 +217,7 @@ export default async function AdminSupportPage({
             })}
           </div>
         )}
+        <Pagination totalItems={sorted.length} pageSize={PAGE_SIZE} />
       </div>
     </div>
   )

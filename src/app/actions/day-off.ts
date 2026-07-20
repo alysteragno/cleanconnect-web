@@ -135,6 +135,9 @@ export async function reviewDayOffRequest(
   if (!req) return { error: 'Request not found.' }
   if (req.status !== 'pending') return { error: 'This request has already been reviewed.' }
 
+  const todayManila = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' })
+  if (req.requested_date <= todayManila) return { error: 'This request\'s date has already passed and can no longer be reviewed.' }
+
   // Update the request status
   const { error: updateErr } = await admin
     .from('cleaner_day_off_requests')

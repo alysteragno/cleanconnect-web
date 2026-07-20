@@ -1,5 +1,11 @@
 import MobileAppPlaceholder from '@/components/mobile-placeholder'
+import ExitSignout from './exit-signout'
 
 export default function CustomerPage() {
-  return <MobileAppPlaceholder role="customer" />
+  return (
+    <>
+      <ExitSignout />
+      <MobileAppPlaceholder role="customer" />
+    </>
+  )
 }

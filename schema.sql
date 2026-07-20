@@ -161,6 +161,17 @@ FOR EACH ROW EXECUTE FUNCTION apply_cleanconnect_operational_rules();
 
 
 -- ─────────────────────────────────────────────────────────────────────────────
+-- 3b. INDEXES
+-- ─────────────────────────────────────────────────────────────────────────────
+-- Admin bookings list filters/sorts by these columns per request (period tabs
+-- + status chips) instead of loading the whole table — see
+-- src/app/(dashboard)/admin/bookings/page.tsx.
+CREATE INDEX IF NOT EXISTS idx_bookings_service_date ON bookings (service_date);
+CREATE INDEX IF NOT EXISTS idx_bookings_created_at   ON bookings (created_at);
+CREATE INDEX IF NOT EXISTS idx_bookings_status        ON bookings (status);
+
+
+-- ─────────────────────────────────────────────────────────────────────────────
 -- 4. ROW LEVEL SECURITY
 -- ─────────────────────────────────────────────────────────────────────────────
 
@@ -192,6 +203,13 @@ CREATE POLICY "Super admins can update any profile"
     ON profiles FOR UPDATE USING (
         EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'super_admin')
     );
+
+-- Missing from this file until migration_profiles_self_update_rls.sql — a
+-- plain user's own-row UPDATE (push_token registration on login, the
+-- cleaner app's last_seen_lat/lng/at ping, profile edits, etc.) needs this;
+-- without it only super_admin can UPDATE any profiles row at all.
+CREATE POLICY "Users can update own profile"
+    ON profiles FOR UPDATE USING (auth.uid() = id);
 
 -- bookings
 CREATE POLICY "Customers manage own bookings"
