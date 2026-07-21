@@ -15,11 +15,11 @@
  *                       1. last confirmed same-day job → that job's verified
  *                          arrival geotag (cleaner_assignments.arrived_lat/lng),
  *                          falling back to the customer's service_lat/lng pin
- *                       2. today's bookings only — cleaner_assignments'
- *                          opportunistic "last seen" ping (profiles.last_seen_lat/
- *                          lng), if fresh (within 6h); irrelevant for a future-dated
- *                          booking, since where a cleaner is *right now* doesn't
- *                          predict where they'll be on another day
+ *                       2. an opportunistic "last seen" ping (profiles.last_seen_lat/
+ *                          lng), if fresh (within 6h) — used regardless of the
+ *                          booking's own service_date, so this stays consistent
+ *                          with the "All Cleaner Locations" map, which surfaces
+ *                          the same ping unconditionally
  *                       3. the cleaner's admin-set home address (profiles.home_lat/lng)
  *                       4. business office (BUSINESS_LAT/LNG), if none of the above exist
  *        rating     — average customer feedback rating (higher = better)
@@ -216,19 +216,16 @@ export async function runAIDispatch(bookingId: string, dryRun = false): Promise<
   // ── Step 4c: Proximity — departure point fallback chain ─────────────────
   // 1. Last confirmed same-day job that ends before this one starts → its
   //    verified arrival geotag (or the customer's pin if unavailable)
-  // 2. Today's bookings only: a fresh "last seen" ping (app-foreground,
-  //    not continuous tracking — see profiles.last_seen_lat/lng/at)
+  // 2. A fresh "last seen" ping (app-foreground, not continuous tracking —
+  //    see profiles.last_seen_lat/lng/at), regardless of the booking's own
+  //    service_date — it's still the best evidence available of where the
+  //    cleaner actually is, and the "All Cleaner Locations" map surfaces the
+  //    same ping unconditionally, so this keeps proximity figures consistent
+  //    with what admins see plotted on the map.
   // 3. The cleaner's admin-set home address
   // 4. Business office coordinates (BUSINESS_LAT / BUSINESS_LNG)
   const hasBookingGeo = bookingLat != null && bookingLng != null
   const LAST_SEEN_STALENESS_MS = 6 * 60 * 60 * 1000
-  // "Today" must be evaluated in the business's own timezone (Asia/Manila,
-  // UTC+8), not the server's UTC clock — service_date is a plain calendar
-  // date with no time component, and a bare `new Date().toISOString()`
-  // would still report the *previous* day for the first 8 hours of every
-  // Manila calendar day, wrongly gating out a same-day last_seen ping.
-  const todayInManila = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Manila' }).format(new Date())
-  const isServiceToday = booking.service_date === todayInManila
 
   const distanceMap: Record<string, number | null> = {}
   const departureMap: Record<string, { lat: number; lng: number; source: 'inter_job' | 'last_seen' | 'home' | 'business' }> = {}
@@ -261,7 +258,6 @@ export async function runAIDispatch(bookingId: string, dryRun = false): Promise<
       const interJobLng = top ? (top.assignment.arrived_lng != null ? Number(top.assignment.arrived_lng) : top.lng) : null
 
       const lastSeenFresh =
-        isServiceToday &&
         c.last_seen_lat != null && c.last_seen_lng != null && c.last_seen_at != null &&
         (Date.now() - new Date(c.last_seen_at).getTime()) <= LAST_SEEN_STALENESS_MS
 

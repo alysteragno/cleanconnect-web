@@ -3,13 +3,36 @@
 import { revalidatePath } from 'next/cache'
 import { createClient, createAdminClient } from '@/utils/supabase/server'
 import { runAIDispatch, type RankedCleaner } from '@/lib/ai-assignment'
+import type { CleanerLocation } from '../(dashboard)/admin/bookings/[id]/all-cleaners-map'
 
 // ── Preview (dry-run): evaluate without writing assignments ──────────────────
 
 export type PreviewState =
-  | { ranked: RankedCleaner[]; reasoning: string[]; bookingLat: number | null; bookingLng: number | null }
+  | { ranked: RankedCleaner[]; reasoning: string[]; bookingLat: number | null; bookingLng: number | null; cleanerLocations: CleanerLocation[] }
   | { error: string }
   | undefined
+
+// Every active cleaner's last known location — same last_seen → home fallback
+// as the /admin/cleaners map, fetched independently of the ranking pass above
+// (which uses a different, booking-specific departure-point chain that also
+// considers same-day prior jobs and the business office).
+async function getAllCleanerLocations(): Promise<CleanerLocation[]> {
+  const adminClient = createAdminClient()
+  const { data } = await adminClient
+    .from('profiles')
+    .select('id, full_name, photo_url, home_lat, home_lng, last_seen_lat, last_seen_lng, last_seen_at')
+    .eq('role', 'cleaner')
+    .eq('is_active', true)
+
+  return (data ?? []).reduce<CleanerLocation[]>((acc, c) => {
+    if (c.last_seen_lat != null && c.last_seen_lng != null) {
+      acc.push({ id: c.id, full_name: c.full_name, photo_url: c.photo_url, lat: c.last_seen_lat, lng: c.last_seen_lng, source: 'last_seen', lastSeenAt: c.last_seen_at })
+    } else if (c.home_lat != null && c.home_lng != null) {
+      acc.push({ id: c.id, full_name: c.full_name, photo_url: c.photo_url, lat: c.home_lat, lng: c.home_lng, source: 'home', lastSeenAt: null })
+    }
+    return acc
+  }, [])
+}
 
 export async function previewAIDispatch(
   _state: PreviewState,
@@ -27,8 +50,11 @@ export async function previewAIDispatch(
   if (!bookingId) return { error: 'Missing booking ID.' }
 
   try {
-    const result = await runAIDispatch(bookingId, true) // dry run — no DB writes
-    return { ranked: result.rankedCleaners, reasoning: result.reasoning, bookingLat: result.bookingLat, bookingLng: result.bookingLng }
+    const [result, cleanerLocations] = await Promise.all([
+      runAIDispatch(bookingId, true), // dry run — no DB writes
+      getAllCleanerLocations(),
+    ])
+    return { ranked: result.rankedCleaners, reasoning: result.reasoning, bookingLat: result.bookingLat, bookingLng: result.bookingLng, cleanerLocations }
   } catch (e) {
     return { error: e instanceof Error ? e.message : 'AI evaluation failed.' }
   }

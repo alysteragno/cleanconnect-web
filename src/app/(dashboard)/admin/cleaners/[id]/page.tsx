@@ -62,15 +62,7 @@ export default async function CleanerDetailPage({ params }: { params: Promise<{ 
       </div>
 
       {/* Availability Management */}
-      <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
-        <div>
-          <p className="text-sm font-semibold text-gray-900">Availability Override</p>
-          <p className="text-xs text-gray-500 mt-0.5">
-            Mark dates when this cleaner is unavailable. The AI dispatch will skip them on those days.
-          </p>
-        </div>
-        <AvailabilityPanel cleanerId={c.id} dayOffs={dayOffs} />
-      </div>
+      {/*unimported */}
     </div>
   )
 }

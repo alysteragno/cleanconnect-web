@@ -4,8 +4,10 @@ import { useActionState } from 'react'
 import dynamic from 'next/dynamic'
 import { previewAIDispatch, confirmAIDispatch, type PreviewState, type ConfirmState } from '@/app/actions/ai-dispatch'
 import type { RankedCleaner } from '@/lib/ai-assignment'
+import type { CleanerLocation } from './all-cleaners-map'
 
 const DispatchMap = dynamic(() => import('./dispatch-map'), { ssr: false })
+const AllCleanersMap = dynamic(() => import('./all-cleaners-map'), { ssr: false })
 
 function NetworkIcon({ className }: { className?: string }) {
   return (
@@ -35,6 +37,7 @@ function PreviewPanel({
   serviceDate,
   bookingLat,
   bookingLng,
+  cleanerLocations,
   onDiscard,
 }: {
   ranked: RankedCleaner[]
@@ -43,6 +46,7 @@ function PreviewPanel({
   serviceDate: string
   bookingLat: number | null
   bookingLng: number | null
+  cleanerLocations: CleanerLocation[]
   onDiscard: () => void
 }) {
   const formattedDate = new Date(serviceDate + 'T00:00:00').toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })
@@ -53,7 +57,22 @@ function PreviewPanel({
 
   const toDispatch = ranked.filter((c) => c.dispatched)
   const skipped    = ranked.filter((c) => !c.dispatched)
-  const topCleaner = toDispatch[0] ?? null
+
+  // The #1 overall rank — weighted 50% workload + 30% proximity + 20% average
+  // rating — is the "most capable" pick: not just whoever's closest, but
+  // whoever's the best all-round fit once workload and performance history
+  // are weighed in too.
+  const mostCapable = toDispatch[0] ?? null
+
+  // Nearest by distance is a different question entirely — find that
+  // separately, straight off distanceKm, across every evaluated cleaner (not
+  // just the ones proposed for dispatch). The two can and often will differ:
+  // being close doesn't guarantee being the recommended pick.
+  const withDistance = ranked.filter((c): c is RankedCleaner & { distanceKm: number } => c.distanceKm != null)
+  const nearestCleaner = withDistance.length > 0
+    ? withDistance.reduce((closest, c) => (c.distanceKm < closest.distanceKm ? c : closest))
+    : null
+  const nearestIsMostCapable = nearestCleaner != null && mostCapable != null && nearestCleaner.cleanerId === mostCapable.cleanerId
 
   if (confirmState && 'dispatched' in confirmState) {
     return <SuccessPanel dispatched={confirmState.dispatched} reasoning={reasoning} onRerun={onDiscard} />
@@ -70,6 +89,9 @@ function PreviewPanel({
           {toDispatch.length} cleaner{toDispatch.length !== 1 ? 's' : ''} proposed
         </span>
       </div>
+      <p className="text-[11px] text-gray-400 -mt-2.5">
+        Ranked by workload, proximity, and average performance rating — the most capable pick isn&apos;t always the closest one.
+      </p>
 
       {/* Proposed cleaners */}
       {toDispatch.length > 0 ? (
@@ -77,7 +99,11 @@ function PreviewPanel({
           {toDispatch.map((c) => (
             <div
               key={c.cleanerId}
-              className="flex items-center gap-3 p-3 bg-gray-50 border border-gray-200 rounded-xl"
+              className={`flex items-center gap-3 p-3 border rounded-xl ${
+                c.cleanerId === mostCapable?.cleanerId
+                  ? 'bg-amber-50 border-amber-200'
+                  : 'bg-gray-50 border-gray-200'
+              }`}
             >
               {c.photoUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
@@ -92,7 +118,15 @@ function PreviewPanel({
                 </div>
               )}
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-gray-900 truncate">{c.fullName}</p>
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <p className="text-sm font-semibold text-gray-900 truncate">{c.fullName}</p>
+                  {c.cleanerId === mostCapable?.cleanerId && (
+                    <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-700 bg-amber-100 border border-amber-200 px-1.5 py-0.5 rounded-full shrink-0">
+                      <StarIcon className="w-2.5 h-2.5" />
+                      Most Capable
+                    </span>
+                  )}
+                </div>
                 <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                   {c.avgRating != null && (
                     <span className="flex items-center gap-0.5 text-[11px] text-amber-600 font-medium">
@@ -127,16 +161,41 @@ function PreviewPanel({
         </p>
       )}
 
-      {/* Proximity map */}
+      {/* Nearest cleaner to customer, by km — not the same as the #1 overall rank */}
       {bookingLat != null && bookingLng != null && (
-        <DispatchMap
-          bookingLat={bookingLat}
-          bookingLng={bookingLng}
-          departureLat={topCleaner?.departureLat ?? null}
-          departureLng={topCleaner?.departureLng ?? null}
-          departureSource={topCleaner?.departureSource ?? null}
-        />
+        <div className="space-y-2">
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-widest">
+              Nearest Cleaner
+            </p>
+            {nearestCleaner && (
+              <span className="text-[11px] text-gray-500 font-medium">
+                {nearestCleaner.fullName} · {nearestCleaner.distanceKm.toFixed(1)} km
+              </span>
+            )}
+          </div>
+          {nearestCleaner && mostCapable && !nearestIsMostCapable && (
+            <p className="text-[11px] text-gray-400 leading-relaxed">
+              Closest by distance, but not the top recommendation above — {mostCapable.fullName} ranks higher once workload and rating are factored in.
+            </p>
+          )}
+          <DispatchMap
+            bookingLat={bookingLat}
+            bookingLng={bookingLng}
+            departureLat={nearestCleaner?.departureLat ?? null}
+            departureLng={nearestCleaner?.departureLng ?? null}
+            departureSource={nearestCleaner?.departureSource ?? null}
+          />
+        </div>
       )}
+
+      {/* Every cleaner's last known location */}
+      <div className="space-y-2">
+        <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-widest">
+          All Cleaner Locations
+        </p>
+        <AllCleanersMap cleaners={cleanerLocations} />
+      </div>
 
       {/* Reasoning */}
       <details className="group">
@@ -279,6 +338,7 @@ export default function AIDispatchButton({ bookingId, serviceDate, disabled = fa
         serviceDate={serviceDate}
         bookingLat={previewState.bookingLat}
         bookingLng={previewState.bookingLng}
+        cleanerLocations={previewState.cleanerLocations}
         onDiscard={handleDiscard}
       />
     )

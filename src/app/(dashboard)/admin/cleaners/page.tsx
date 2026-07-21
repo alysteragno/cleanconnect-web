@@ -1,4 +1,4 @@
-﻿import Link from 'next/link'
+import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { createClient, createAdminClient } from '@/utils/supabase/server'
 import { getBasePath } from '@/utils/base-path'
@@ -7,6 +7,7 @@ import { SearchBox } from '@/components/dashboard/search-box'
 import { Pagination } from '@/components/dashboard/pagination'
 import { paginate, resolvePage } from '@/utils/pagination'
 import { escapeLikeTerm } from '@/utils/search'
+import CleanersLocationMap, { type CleanerLocation } from './cleaners-location-map'
 
 const PAGE_SIZE = 10
 
@@ -17,6 +18,11 @@ type Cleaner = {
   is_active: boolean
   created_at: string
   photo_url: string | null
+  home_lat: number | null
+  home_lng: number | null
+  last_seen_lat: number | null
+  last_seen_lng: number | null
+  last_seen_at: string | null
 }
 
 const SORT_OPTIONS = [
@@ -43,7 +49,7 @@ export default async function AdminCleanersPage({
 
   let cleanersQuery = supabase
     .from('profiles')
-    .select('id, full_name, phone, is_active, created_at, photo_url')
+    .select('id, full_name, phone, is_active, created_at, photo_url, home_lat, home_lng, last_seen_lat, last_seen_lng, last_seen_at')
     .eq('role', 'cleaner')
     .order('full_name')
   const search = q?.trim()
@@ -61,6 +67,20 @@ export default async function AdminCleanersPage({
   })
   const active = list.filter((c) => c.is_active)
   const inactive = list.filter((c) => !c.is_active)
+
+  // One pin per active cleaner: their most recent "last seen" ping (opportunistic,
+  // sent when the mobile app is foregrounded — not continuous tracking) when
+  // available, else their admin-set home address as a fallback. Same source
+  // chain the AI dispatcher uses (src/lib/ai-assignment.ts). Cleaners with
+  // neither on file are left off the map.
+  const cleanerLocations: CleanerLocation[] = active.reduce<CleanerLocation[]>((acc, c) => {
+    if (c.last_seen_lat != null && c.last_seen_lng != null) {
+      acc.push({ id: c.id, full_name: c.full_name, photo_url: c.photo_url, lat: c.last_seen_lat, lng: c.last_seen_lng, source: 'last_seen', lastSeenAt: c.last_seen_at })
+    } else if (c.home_lat != null && c.home_lng != null) {
+      acc.push({ id: c.id, full_name: c.full_name, photo_url: c.photo_url, lat: c.home_lat, lng: c.home_lng, source: 'home', lastSeenAt: null })
+    }
+    return acc
+  }, [])
 
   const activePage = resolvePage(rawPage, active.length, PAGE_SIZE)
   const inactivePage = resolvePage(rawInactivePage, inactive.length, PAGE_SIZE)
@@ -85,6 +105,11 @@ export default async function AdminCleanersPage({
           </div>
         </div>
       </div>
+
+      <section className="bg-white rounded-xl border border-gray-200 p-5">
+        <h2 className="text-sm font-semibold text-gray-900 mb-3">Cleaner Locations</h2>
+        <CleanersLocationMap cleaners={cleanerLocations} />
+      </section>
 
       <CleanerSection title="Active" cleaners={activePageItems} totalItems={active.length} basePath={basePath} emptyLabel={search ? 'No matches.' : 'None.'} />
       {inactive.length > 0 && (

@@ -640,7 +640,7 @@ export default function DispatchPanel({
               {/* ── Manual Dispatch ─────────────────────────────── */}
               <div>
                 <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-widest mb-3">
-                  Manual Dispatch
+                  Dispatch Cleaners
                 </p>
                 <div className="space-y-3">
                   {availableForDispatch.length > 0 ? (
