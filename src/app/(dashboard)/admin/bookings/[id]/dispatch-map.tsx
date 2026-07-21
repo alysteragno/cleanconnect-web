@@ -50,7 +50,7 @@ export default function DispatchMap({
   const DEPARTURE_LABELS: Record<string, { short: string; long: string }> = {
     inter_job: { short: 'Prior Job Location', long: 'Departure — Prior Same-Day Job Location' },
     last_seen: { short: 'Recent Location Ping', long: 'Departure — Recent Location Ping' },
-    home:      { short: 'Home Address', long: 'Departure — Cleaner Home Address' },
+    home:      { short: "Cleaner's Last Location", long: "Departure — Cleaner's Last Location" },
     business:  { short: 'Business Office', long: `Departure — ${BUSINESS_LABEL}` },
   }
   const departureMeta = DEPARTURE_LABELS[departureSource ?? 'business'] ?? DEPARTURE_LABELS.business
