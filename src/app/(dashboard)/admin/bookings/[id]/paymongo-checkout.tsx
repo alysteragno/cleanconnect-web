@@ -1,10 +1,11 @@
 'use client'
 
 import { useState } from 'react'
+import { PAYMENT_METHOD_META } from '@/components/payment-icons'
 
-// PayMongo checkout link management for a booking. Digital (non-cash) bookings
-// are collected through a hosted PayMongo Checkout Session; the webhook flips the
-// status to Paid automatically once payment clears. The manual "Mark as Paid" in
+// PayMongo checkout link management for a booking. Digital bookings are collected
+// through a hosted PayMongo Checkout Session; the webhook flips the status to Paid
+// automatically once payment clears. The manual "Mark as Paid" in
 // PaymentVerificationCard remains as a fallback override.
 export default function PayMongoCheckout({
   bookingId,
@@ -24,8 +25,9 @@ export default function PayMongoCheckout({
   const [error, setError] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
 
-  // Cash is collected on-site — no online checkout.
-  if (paymentMethod === 'cash') return null
+  // Non-digital methods (cash, bank check) are collected on-site — no online checkout.
+  const isDigital = PAYMENT_METHOD_META[paymentMethod]?.isDigital ?? false
+  if (!isDigital) return null
 
   const isPaid = paymentStatus === 'paid'
 

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { revalidatePath } from 'next/cache'
 import { createClient, createAdminClient } from '@/utils/supabase/server'
 import { createCheckoutSession } from '@/lib/paymongo'
+import { PAYMENT_METHOD_META } from '@/components/payment-icons'
 
 // Creates (or returns the existing) PayMongo hosted Checkout Session for a booking.
 // Callable from the web admin (super_admin cookie session) or the mobile app
@@ -54,9 +55,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Forbidden.' }, { status: 403 })
     }
 
-    // PayMongo cannot collect physical cash — that stays the cleaner-confirmed flow.
-    if (booking.payment_method === 'cash') {
-      return NextResponse.json({ error: 'Cash payments are collected on-site by the cleaner.' }, { status: 422 })
+    // PayMongo only handles digital methods — cash and bank check are collected on-site/offline.
+    if (!PAYMENT_METHOD_META[booking.payment_method]?.isDigital) {
+      return NextResponse.json({ error: 'This payment method is collected on-site, not through PayMongo.' }, { status: 422 })
     }
     if (booking.payment_status === 'paid') {
       return NextResponse.json({ error: 'This booking is already paid.' }, { status: 409 })
