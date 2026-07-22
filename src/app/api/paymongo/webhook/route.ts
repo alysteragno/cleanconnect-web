@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { revalidatePath } from 'next/cache'
 import { createAdminClient } from '@/utils/supabase/server'
 import { createNotification } from '@/app/actions/notifications'
-import { verifyWebhookSignature, paymongoDetailFromRawPayment, paymentDetailColumns, type RawPayment } from '@/lib/paymongo'
+import { verifyWebhookSignature, paymongoDetailFromRawPayment, paymentDetailColumns, sendPaymentReceipt, type RawPayment } from '@/lib/paymongo'
 
 // PayMongo webhook receiver. Verifies the signature, then marks the matching
 // booking as paid once PayMongo confirms payment — from either flow this app
@@ -74,6 +74,7 @@ export async function POST(req: NextRequest) {
     if (updateErr) return NextResponse.json({ error: updateErr.message }, { status: 500 })
 
     await notifyPaid(admin, booking)
+    if (detail) await sendPaymentReceipt(admin, booking.id, booking.customer_id, detail)
     revalidatePath(`/admin/bookings/${booking.id}`)
     revalidatePath('/admin/bookings')
     return NextResponse.json({ received: true })
@@ -114,6 +115,7 @@ export async function POST(req: NextRequest) {
     if (updateErr) return NextResponse.json({ error: updateErr.message }, { status: 500 })
 
     await notifyPaid(admin, booking)
+    await sendPaymentReceipt(admin, booking.id, booking.customer_id, detail)
     revalidatePath(`/admin/bookings/${booking.id}`)
     revalidatePath('/admin/bookings')
     return NextResponse.json({ received: true })

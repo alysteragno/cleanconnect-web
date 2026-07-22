@@ -6,9 +6,9 @@ import { getMarketingHomeHref } from '@/utils/base-path'
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ registered?: string; reset?: string; resetMobile?: string; error?: string }>
+  searchParams: Promise<{ registered?: string; reset?: string; error?: string }>
 }) {
-  const { registered, reset, resetMobile, error } = await searchParams
+  const { registered, reset, error } = await searchParams
   const homeHref = await getMarketingHomeHref()
 
   return (
@@ -65,12 +65,6 @@ export default async function LoginPage({
           {reset && (
             <div className="mb-5 px-4 py-3 bg-emerald-50 border border-emerald-200 rounded-lg text-sm text-emerald-700">
               Password updated successfully. Sign in with your new password.
-            </div>
-          )}
-
-          {resetMobile && (
-            <div className="mb-5 px-4 py-3 bg-emerald-50 border border-emerald-200 rounded-lg text-sm text-emerald-700">
-              Password updated successfully. Return to the Maid For You Cleaning Services app on your phone to sign in.
             </div>
           )}
 

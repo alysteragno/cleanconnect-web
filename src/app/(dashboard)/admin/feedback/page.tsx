@@ -3,7 +3,6 @@ import { createClient } from '@/utils/supabase/server'
 import { getBasePath } from '@/utils/base-path'
 import { SortSelect } from '@/components/dashboard/sort-select'
 import { PeriodSelect } from '@/components/dashboard/period-select'
-import { CustomRangeTab } from '@/components/dashboard/custom-range-tab'
 import { Pagination } from '@/components/dashboard/pagination'
 import { paginate, resolvePage } from '@/utils/pagination'
 
@@ -47,13 +46,13 @@ const PERIODS = [
   { value: 'month', label: 'This Month' },
 ] as const
 const ALL_TIME = { value: 'all', label: 'All Time' } as const
-type Period = (typeof PERIODS)[number]['value'] | typeof ALL_TIME.value | 'custom'
+type Period = (typeof PERIODS)[number]['value'] | typeof ALL_TIME.value
 const DEFAULT_PERIOD: Period = 'all'
-const VALID_PERIODS = new Set<string>([...PERIODS.map((p) => p.value), ALL_TIME.value, 'custom'])
+const VALID_PERIODS = new Set<string>([...PERIODS.map((p) => p.value), ALL_TIME.value])
 
 type DateRange = { start: string; end: string }
 
-function getDateRange(period: Period, custom?: { start?: string; end?: string }): DateRange | null {
+function getDateRange(period: Period): DateRange | null {
   // Always derive dates in Philippines time (UTC+8), matching /admin/bookings.
   const phToday = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' }) // 'YYYY-MM-DD'
   const noonPH = (iso: string) => new Date(`${iso}T12:00:00+08:00`)
@@ -74,15 +73,6 @@ function getDateRange(period: Period, custom?: { start?: string; end?: string })
       const [y, mo] = phToday.split('-').map(Number) // mo is 1-indexed
       const lastDay = new Date(y, mo, 0).getDate()
       return { start: `${y}-${pad(mo)}-01`, end: `${y}-${pad(mo)}-${pad(lastDay)}` }
-    }
-    case 'custom': {
-      if (custom?.start && custom?.end) {
-        return custom.start <= custom.end
-          ? { start: custom.start, end: custom.end }
-          : { start: custom.end, end: custom.start }
-      }
-      const start = noonPH(phToday); start.setDate(start.getDate() - 29)
-      return { start: toISO(start), end: phToday }
     }
     default: // 'all'
       return null
@@ -106,17 +96,13 @@ function toPHDateISO(iso: string) {
 // changed.
 function hrefWith(
   basePath: string,
-  current: { sort?: string; period?: string; start?: string; end?: string; rating?: string },
+  current: { sort?: string; period?: string; rating?: string },
   overrides: Partial<typeof current>
 ) {
   const merged = { ...current, ...overrides }
   const params = new URLSearchParams()
   if (merged.sort) params.set('sort', merged.sort)
   if (merged.period && merged.period !== DEFAULT_PERIOD) params.set('period', merged.period)
-  if (merged.period === 'custom') {
-    if (merged.start) params.set('start', merged.start)
-    if (merged.end) params.set('end', merged.end)
-  }
   if (merged.rating) params.set('rating', merged.rating)
   const qs = params.toString()
   return `${basePath}/feedback${qs ? `?${qs}` : ''}`
@@ -125,9 +111,9 @@ function hrefWith(
 export default async function AdminFeedbackPage({
   searchParams,
 }: {
-  searchParams: Promise<{ sort?: string; page?: string; period?: string; start?: string; end?: string; rating?: string }>
+  searchParams: Promise<{ sort?: string; page?: string; period?: string; rating?: string }>
 }) {
-  const { sort, page: rawPage, period: rawPeriod, start: rawStart, end: rawEnd, rating: rawRating } = await searchParams
+  const { sort, page: rawPage, period: rawPeriod, rating: rawRating } = await searchParams
   const supabase = await createClient()
   const basePath = await getBasePath()
 
@@ -139,8 +125,8 @@ export default async function AdminFeedbackPage({
   const unsorted = (feedbackRows ?? []) as unknown as Feedback[]
 
   const period: Period = VALID_PERIODS.has(rawPeriod ?? '') ? (rawPeriod as Period) : DEFAULT_PERIOD
-  const range = getDateRange(period, { start: rawStart, end: rawEnd })
-  const current = { sort, period, start: rawStart, end: rawEnd, rating: rawRating }
+  const range = getDateRange(period)
+  const current = { sort, period, rating: rawRating }
 
   const scoped = range
     ? unsorted.filter((f) => {
@@ -186,12 +172,12 @@ export default async function AdminFeedbackPage({
         </div>
       </div>
 
-      {/* Period filter: bounded presets in a dropdown, plus the two open-ended options */}
+      {/* Period filter: bounded presets in a dropdown, plus the open-ended "All Time" option */}
       <div className="flex flex-wrap items-center gap-2">
         <PeriodSelect options={PERIODS} activeValue={period} defaultValue={DEFAULT_PERIOD} />
         <div className="flex items-center gap-1 bg-gray-100 rounded-xl p-1">
           <Link
-            href={hrefWith(basePath, current, { period: ALL_TIME.value, start: undefined, end: undefined })}
+            href={hrefWith(basePath, current, { period: ALL_TIME.value })}
             className={`px-4 py-2 rounded-lg text-xs font-semibold transition-all whitespace-nowrap ${
               period === ALL_TIME.value
                 ? 'bg-white text-gray-900 shadow-sm'
@@ -200,13 +186,6 @@ export default async function AdminFeedbackPage({
           >
             {ALL_TIME.label}
           </Link>
-          <CustomRangeTab
-            active={period === 'custom'}
-            start={range?.start ?? ''}
-            end={range?.end ?? ''}
-            path="/feedback"
-            extraParams={{ sort, rating: rawRating }}
-          />
         </div>
       </div>
       {range && (

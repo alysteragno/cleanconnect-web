@@ -6,8 +6,10 @@ import { getBasePath } from '@/utils/base-path'
 import { SortSelect } from '@/components/dashboard/sort-select'
 import { PeriodSelect } from '@/components/dashboard/period-select'
 import { CustomRangeTab } from '@/components/dashboard/custom-range-tab'
+import { SearchBox } from '@/components/dashboard/search-box'
 import { Pagination } from '@/components/dashboard/pagination'
 import { resolvePage } from '@/utils/pagination'
+import { escapeLikeTerm, quotePostgrestValue } from '@/utils/search'
 import { paymentStatusLabel, serviceNeedsSqm } from '@/lib/booking-pricing'
 import { PAYMENT_METHOD_META } from '@/components/payment-icons'
 
@@ -180,7 +182,7 @@ function rangeSubtitle(range: DateRange): string {
 // fields overridden, always dropping `page` since the result set just changed.
 function hrefWith(
   basePath: string,
-  current: { status?: string; sort?: string; period?: string; start?: string; end?: string },
+  current: { status?: string; sort?: string; period?: string; start?: string; end?: string; q?: string },
   overrides: Partial<typeof current>
 ) {
   const merged = { ...current, ...overrides }
@@ -192,16 +194,23 @@ function hrefWith(
     if (merged.start) params.set('start', merged.start)
     if (merged.end) params.set('end', merged.end)
   }
+  if (merged.q) params.set('q', merged.q)
   const qs = params.toString()
   return `${basePath}/bookings${qs ? `?${qs}` : ''}`
+}
+
+// One OR-clause matching `term` against `column`, escaped for LIKE and
+// quoted so PostgREST's `.or()` parser doesn't choke on spaces/commas.
+function orIlike(column: string, term: string) {
+  return `${column}.ilike.${quotePostgrestValue(`%${escapeLikeTerm(term)}%`)}`
 }
 
 export default async function AdminBookingsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string; sort?: string; page?: string; period?: string; start?: string; end?: string }>
+  searchParams: Promise<{ status?: string; sort?: string; page?: string; period?: string; start?: string; end?: string; q?: string }>
 }) {
-  const { status, sort, page: rawPage, period: rawPeriod, start: rawStart, end: rawEnd } = await searchParams
+  const { status, sort, page: rawPage, period: rawPeriod, start: rawStart, end: rawEnd, q: rawQ } = await searchParams
   const authClient = await createClient()
   const { data: { user } } = await authClient.auth.getUser()
   if (!user) notFound()
@@ -214,7 +223,32 @@ export default async function AdminBookingsPage({
   const period: Period = VALID_PERIODS.has(rawPeriod ?? '') ? (rawPeriod as Period) : DEFAULT_PERIOD
   const range = getDateRange(period, { start: rawStart, end: rawEnd })
   const sortKey = sort ?? 'booked_desc'
-  const current = { status, sort, period, start: rawStart, end: rawEnd }
+  const search = rawQ?.trim()
+  const current = { status, sort, period, start: rawStart, end: rawEnd, q: search }
+
+  // Search matches the customer's name/phone (via a lookup into profiles —
+  // bookings has no name column of its own) or the booking's own service
+  // name / address text, combined into one OR filter reused by every count
+  // query below and the main list query, so status counts and pagination
+  // stay consistent with what's actually shown.
+  let searchOr: string | null = null
+  if (search) {
+    const { data: nameMatches } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('role', 'customer')
+      .or(`${orIlike('full_name', search)},${orIlike('phone', search)}`)
+    const customerIds = (nameMatches ?? []).map((p) => p.id)
+
+    const clauses = [
+      orIlike('service_name', search),
+      orIlike('address_city', search),
+      orIlike('address_street', search),
+      orIlike('address_barangay', search),
+    ]
+    if (customerIds.length > 0) clauses.push(`customer_id.in.(${customerIds.join(',')})`)
+    searchOr = clauses.join(',')
+  }
 
   // Status counts scoped to the selected period — head-only counts (no row
   // data ever transferred), so "All Time" over a huge table costs the same
@@ -225,6 +259,7 @@ export default async function AdminBookingsPage({
     let q = supabase.from('bookings').select('*', { count: 'exact', head: true })
     if (range) q = q.gte('service_date', range.start).lte('service_date', range.end)
     if (statusValue) q = q.eq('status', statusValue)
+    if (searchOr) q = q.or(searchOr)
     return q
   }
 
@@ -247,6 +282,7 @@ export default async function AdminBookingsPage({
     .select('id, created_at, service_date, service_time, service_name, service_slug, property_sqm, base_price, status, payment_status, payment_method, address_city, profiles!customer_id (full_name)')
   if (range) query = query.gte('service_date', range.start).lte('service_date', range.end)
   if (status) query = query.eq('status', status)
+  if (searchOr) query = query.or(searchOr)
   switch (sortKey) {
     case 'date_desc':   query = query.order('service_date', { ascending: false }).order('service_time', { ascending: false }); break
     case 'date_asc':    query = query.order('service_date', { ascending: true }).order('service_time', { ascending: true }); break
@@ -274,6 +310,7 @@ export default async function AdminBookingsPage({
           >
             + New Booking
           </Link>
+          <SearchBox placeholder="Search customer, service, address…" />
           <SortSelect options={SORT_OPTIONS} />
           <p className="text-sm text-gray-400 tabular-nums">{periodTotal} in period</p>
         </div>
@@ -298,7 +335,7 @@ export default async function AdminBookingsPage({
             start={range?.start ?? ''}
             end={range?.end ?? ''}
             path="/bookings"
-            extraParams={{ status, sort }}
+            extraParams={{ status, sort, q: search }}
             allowFuture
           />
         </div>
@@ -348,11 +385,13 @@ export default async function AdminBookingsPage({
             <div>
               <p className="text-sm font-semibold text-gray-700">No bookings found</p>
               <p className="text-xs text-gray-400 mt-0.5">
-                {status
-                  ? `No ${status.replace('_', ' ')} bookings in this period.`
-                  : period === 'all'
-                    ? 'Bookings will appear here once created.'
-                    : 'No bookings in this period — try a different range above.'}
+                {search
+                  ? `No bookings match "${search}"${status ? ` in ${status.replace('_', ' ')}` : ''}.`
+                  : status
+                    ? `No ${status.replace('_', ' ')} bookings in this period.`
+                    : period === 'all'
+                      ? 'Bookings will appear here once created.'
+                      : 'No bookings in this period — try a different range above.'}
               </p>
             </div>
           </div>

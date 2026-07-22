@@ -458,15 +458,17 @@ export default function DispatchPanel({
 
   const [selected,            setSelected]            = useState<string[]>([])
   const [calendarSelectedIds, setCalendarSelectedIds] = useState<string[]>([])
-  const [conflictingIds,      setConflictingIds]      = useState<Set<string>>(new Set())
+  const [conflictWindows,     setConflictWindows]     = useState<Map<string, string>>(new Map())
 
   // Same conflict rule the server enforces before writing (findConflictingCleaners,
   // ±2h buffer) — fetched once so the manual list can gray out cleaners who'd
-  // just be rejected anyway instead of only finding out after submitting.
+  // just be rejected anyway instead of only finding out after submitting. A
+  // cleaner with a non-overlapping job earlier/later the same day is not
+  // included here and stays fully selectable.
   useEffect(() => {
     let cancelled = false
-    getConflictingCleanerIds(bookingId).then((ids) => {
-      if (!cancelled) setConflictingIds(new Set(ids))
+    getConflictingCleanerIds(bookingId).then((conflicts) => {
+      if (!cancelled) setConflictWindows(new Map(conflicts.map((c) => [c.cleanerId, c.conflictWindow])))
     })
     return () => { cancelled = true }
   }, [bookingId])
@@ -660,11 +662,12 @@ export default function DispatchPanel({
                       <div className="space-y-1.5">
                         {availableForDispatch.map((c) => {
                           const isSelected = selected.includes(c.id)
-                          const isConflicting = conflictingIds.has(c.id)
+                          const conflictWindow = conflictWindows.get(c.id)
+                          const isConflicting = conflictWindow != null
                           return (
                             <label
                               key={c.id}
-                              title={isConflicting ? 'Has assigned job on this day — overlaps this booking’s time.' : undefined}
+                              title={isConflicting ? `Has an assigned job ${conflictWindow} that overlaps this booking’s time.` : undefined}
                               className={`flex items-center gap-3 p-3 border rounded-xl transition-all ${
                                 isConflicting
                                   ? 'border-gray-100 bg-gray-50 opacity-60 cursor-not-allowed'
@@ -696,7 +699,7 @@ export default function DispatchPanel({
                               <div className="flex-1 min-w-0">
                                 <p className={`text-sm font-medium truncate ${isConflicting ? 'text-gray-500' : 'text-gray-900'}`}>{c.full_name}</p>
                                 {isConflicting ? (
-                                  <p className="text-[11px] text-gray-400">Has assigned job on this day</p>
+                                  <p className="text-[11px] text-gray-400">Busy {conflictWindow}</p>
                                 ) : c.phone && <p className="text-xs text-gray-400">{c.phone}</p>}
                               </div>
                               {isSelected && !isConflicting && (

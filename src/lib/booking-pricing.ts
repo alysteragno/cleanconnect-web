@@ -9,12 +9,6 @@ export const SQM_PRICED_SLUGS = new Set([
   'post_construction',
 ])
 
-// Base rate per sqm-priced service type, matching mobile's BASE_RATE map.
-// post_construction has its own rate; the other four sqm services share the general rate.
-const SQM_BASE_RATE: Record<string, number> = {
-  post_construction: 1500,
-}
-const DEFAULT_SQM_BASE_RATE = 500
 const RATE_PER_SQM = 8
 
 export function serviceNeedsSqm(slug: string | null | undefined): boolean {
@@ -22,10 +16,12 @@ export function serviceNeedsSqm(slug: string | null | undefined): boolean {
 }
 
 /**
- * Estimated price for a booking. For the 5 sqm-priced services this follows
- * mobile's `BASE_RATE + sqm * 8` formula. For everything else it falls back to
- * the service's live `starting_price` (admin-editable, so more accurate than
- * mobile's bundled static price list).
+ * Estimated price for a booking. For the 5 sqm-priced services this is the
+ * service's live `starting_price` (admin-editable, e.g. ₱1,200 for condo
+ * cleaning) plus `sqm * 8`. Using the live starting_price as the base — instead
+ * of a hardcoded per-slug rate — keeps this in sync with whatever admins set
+ * on the services page, rather than drifting from it. Non-sqm services just
+ * use the starting_price directly.
  */
 export function estimateBookingPrice(
   slug: string | null | undefined,
@@ -33,8 +29,7 @@ export function estimateBookingPrice(
   fallbackStartingPrice: number
 ): number {
   if (serviceNeedsSqm(slug)) {
-    const base = SQM_BASE_RATE[slug as string] ?? DEFAULT_SQM_BASE_RATE
-    return base + sqm * RATE_PER_SQM
+    return fallbackStartingPrice + sqm * RATE_PER_SQM
   }
   return fallbackStartingPrice
 }

@@ -90,7 +90,7 @@ export async function confirmAIDispatch(
   // close that race instead of trusting the client-submitted ID list.
   const conflicts = await findConflictingCleaners(bookingId, cleanerIds)
   if (conflicts.length > 0) {
-    return { error: `${conflicts.map((c) => c.fullName).join(', ')} already ${conflicts.length === 1 ? 'has' : 'have'} an overlapping booking around this time — refresh and try again.` }
+    return { error: `${conflicts.map((c) => `${c.fullName} (${c.conflictWindow})`).join(', ')} already ${conflicts.length === 1 ? 'has' : 'have'} an overlapping booking — refresh and try again.` }
   }
 
   const adminClient = createAdminClient()

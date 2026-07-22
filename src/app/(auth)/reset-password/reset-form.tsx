@@ -72,6 +72,26 @@ export default function ResetForm() {
     )
   }
 
+  // No working web dashboard to sign back into for this account — stay here
+  // and point to the mobile app instead of redirecting to a web sign-in form.
+  if (state?.success) {
+    return (
+      <div className="text-center space-y-4">
+        <div className="w-14 h-14 bg-emerald-50 rounded-full flex items-center justify-center mx-auto">
+          <svg className="w-7 h-7 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M5 13l4 4L19 7" />
+          </svg>
+        </div>
+        <div>
+          <p className="text-sm font-semibold text-gray-900">Password updated</p>
+          <p className="text-sm text-gray-500 mt-1 leading-relaxed">
+            Open the Maid For You mobile app and sign in with your new password.
+          </p>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <form action={action} className="space-y-4">
       <AuthField

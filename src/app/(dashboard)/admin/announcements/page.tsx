@@ -5,6 +5,10 @@ import { getBasePath } from '@/utils/base-path'
 import { toggleAnnouncement, deleteAnnouncement } from '@/app/actions/announcements'
 import AnnouncementCreateForm from './create-form'
 import { SortSelect } from '@/components/dashboard/sort-select'
+import { Pagination } from '@/components/dashboard/pagination'
+import { paginate, resolvePage } from '@/utils/pagination'
+
+const PAGE_SIZE = 10
 
 type Announcement = {
   id: string
@@ -26,9 +30,9 @@ const SORT_OPTIONS = [
 export default async function AdminAnnouncementsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ sort?: string }>
+  searchParams: Promise<{ sort?: string; page?: string }>
 }) {
-  const { sort } = await searchParams
+  const { sort, page: rawPage } = await searchParams
   const authClient = await createClient()
   const { data: { user } } = await authClient.auth.getUser()
   if (!user) notFound()
@@ -70,6 +74,9 @@ export default async function AdminAnnouncementsPage({
 
   const activeCount = list.filter((a) => a.is_active).length
 
+  const page = resolvePage(rawPage, list.length, PAGE_SIZE)
+  const pageItems = paginate(list, page, PAGE_SIZE)
+
   return (
     <div className="max-w-2xl space-y-6">
       <div>
@@ -93,7 +100,7 @@ export default async function AdminAnnouncementsPage({
           <p className="text-sm text-gray-400 text-center py-12">No announcements yet.</p>
         ) : (
           <div className="divide-y divide-gray-100">
-            {list.map((a) => (
+            {pageItems.map((a) => (
               <div key={a.id} className="p-4 flex items-start justify-between gap-4">
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 flex-wrap mb-0.5">
@@ -134,6 +141,7 @@ export default async function AdminAnnouncementsPage({
             ))}
           </div>
         )}
+        <Pagination totalItems={list.length} pageSize={PAGE_SIZE} />
       </div>
     </div>
   )

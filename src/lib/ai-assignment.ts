@@ -62,6 +62,9 @@ export type ExcludedCleaner = {
   fullName: string
   photoUrl: string | null
   reason: 'day_off' | 'conflict'
+  // Only set when reason is 'conflict' — the actual window ("8:00 AM – 11:00 AM")
+  // of the other booking that overlaps, not just "busy this day."
+  conflictWindow?: string
 }
 
 export type AIDispatchResult = {
@@ -182,22 +185,30 @@ export async function runAIDispatch(bookingId: string, dryRun = false): Promise<
     allSameDayAssignments = data ?? []
   }
 
-  // Conflict detection (± 2-hour buffer)
-  const conflictSet = new Set<string>()
+  // Conflict detection (± 2-hour buffer) — a cleaner with a job earlier or
+  // later the same day that doesn't overlap this one (plus buffer) is NOT
+  // excluded here and stays eligible below.
+  const conflictWindows = new Map<string, string>()
   for (const a of allSameDayAssignments) {
     const bData = timeMap[a.booking_id]
     if (!bData) continue
     const existingStart = timeToMinutes(bData.service_time)
     const existingDuration = Number(bData.duration_hours) || 2
     if (hasTimeConflict(newStart, newDuration, existingStart, existingDuration)) {
-      conflictSet.add(a.cleaner_id)
+      if (!conflictWindows.has(a.cleaner_id)) {
+        conflictWindows.set(a.cleaner_id, formatBookingWindow(bData.service_time, existingDuration))
+      }
     }
   }
+  const conflictSet = new Set(conflictWindows.keys())
 
   const eligible = afterDayOff.filter((c) => !conflictSet.has(c.id))
   const conflictExcluded: ExcludedCleaner[] = afterDayOff
     .filter((c) => conflictSet.has(c.id))
-    .map((c) => ({ cleanerId: c.id, fullName: c.full_name, photoUrl: c.photo_url ?? null, reason: 'conflict' as const }))
+    .map((c) => ({
+      cleanerId: c.id, fullName: c.full_name, photoUrl: c.photo_url ?? null,
+      reason: 'conflict' as const, conflictWindow: conflictWindows.get(c.id),
+    }))
   const excludedCleaners: ExcludedCleaner[] = [...dayOffExcluded, ...conflictExcluded]
   reasoning.push(`Conflict filter (±2h buffer): removed ${conflictSet.size}, ${eligible.length} eligible.`)
 
@@ -426,12 +437,14 @@ export async function runAIDispatch(bookingId: string, dryRun = false): Promise<
  * Returns the subset of candidateCleanerIds that already have an 'assigned'
  * cleaner_assignments row on another booking whose time window overlaps
  * bookingId's (± 2-hour buffer, same rule as the AI engine), with each
- * conflicting cleaner's name for a readable error message.
+ * conflicting cleaner's name and the actual window they're busy for a
+ * readable error message — a cleaner with a non-overlapping job earlier or
+ * later the same day is NOT included here and remains assignable.
  */
 export async function findConflictingCleaners(
   bookingId: string,
   candidateCleanerIds: string[]
-): Promise<{ cleanerId: string; fullName: string }[]> {
+): Promise<{ cleanerId: string; fullName: string; conflictWindow: string }[]> {
   if (candidateCleanerIds.length === 0) return []
 
   const adminClient = createAdminClient()
@@ -467,25 +480,34 @@ export async function findConflictingCleaners(
     .in('cleaner_id', candidateCleanerIds)
     .in('booking_id', sameDayIds)
 
-  const conflictingIds = new Set<string>()
+  const conflictWindows = new Map<string, string>()
   for (const a of existingAssignments ?? []) {
     const bData = timeMap[a.booking_id]
     if (!bData) continue
     const existingStart = timeToMinutes(bData.service_time)
     const existingDuration = Number(bData.duration_hours) || 2
     if (hasTimeConflict(newStart, newDuration, existingStart, existingDuration)) {
-      conflictingIds.add(a.cleaner_id)
+      // Keep the first conflict found — a cleaner conflicting with two
+      // separate bookings the same day is rare enough that showing one
+      // window is a fine tradeoff against fetching/joining every conflict.
+      if (!conflictWindows.has(a.cleaner_id)) {
+        conflictWindows.set(a.cleaner_id, formatBookingWindow(bData.service_time, existingDuration))
+      }
     }
   }
 
-  if (conflictingIds.size === 0) return []
+  if (conflictWindows.size === 0) return []
 
   const { data: names } = await adminClient
     .from('profiles')
     .select('id, full_name')
-    .in('id', Array.from(conflictingIds))
+    .in('id', Array.from(conflictWindows.keys()))
 
-  return (names ?? []).map((n: { id: string; full_name: string }) => ({ cleanerId: n.id, fullName: n.full_name }))
+  return (names ?? []).map((n: { id: string; full_name: string }) => ({
+    cleanerId: n.id,
+    fullName: n.full_name,
+    conflictWindow: conflictWindows.get(n.id)!,
+  }))
 }
 
 // ── Utilities ────────────────────────────────────────────────────────────────
@@ -507,4 +529,21 @@ function hasTimeConflict(
   const existingWindowStart = existingStart - BUFFER
   const existingWindowEnd = existingStart + existingDuration * 60 + BUFFER
   return newWindowStart < existingWindowEnd && newWindowEnd > existingWindowStart
+}
+
+function formatClockMinutes(totalMin: number): string {
+  const h24 = ((Math.floor(totalMin / 60) % 24) + 24) % 24
+  const m = ((totalMin % 60) + 60) % 60
+  const period = h24 >= 12 ? 'PM' : 'AM'
+  const h12 = h24 % 12 || 12
+  return `${h12}:${String(m).padStart(2, '0')} ${period}`
+}
+
+/** "08:00" + 3 → "8:00 AM – 11:00 AM" — the actual job window a conflict is
+ *  against, so admins/dispatch UIs can show *why* a cleaner is unavailable
+ *  instead of just flagging the whole day as busy. */
+export function formatBookingWindow(serviceTime: string, durationHours: number): string {
+  const startMin = timeToMinutes(serviceTime)
+  const endMin = startMin + durationHours * 60
+  return `${formatClockMinutes(startMin)} – ${formatClockMinutes(endMin)}`
 }

@@ -4,7 +4,12 @@ import { createClient, createAdminClient } from '@/utils/supabase/server'
 import { getBasePath } from '@/utils/base-path'
 import CustomerToggleForm from './customer-toggle-form'
 import ConvertToCleanerForm from './convert-to-cleaner-form'
+import DeleteCustomerButton from './delete-customer-button'
 import { IconHeadset } from '@/components/icons'
+import { Pagination } from '@/components/dashboard/pagination'
+import { resolvePage } from '@/utils/pagination'
+
+const PAGE_SIZE = 10
 
 type Customer = {
   id: string
@@ -46,10 +51,13 @@ function formatTime(t: string) {
 
 export default async function CustomerDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>
+  searchParams: Promise<{ page?: string }>
 }) {
   const { id } = await params
+  const { page: rawPage } = await searchParams
   const authClient = await createClient()
   const { data: { user } } = await authClient.auth.getUser()
   if (!user) notFound()
@@ -59,28 +67,47 @@ export default async function CustomerDetailPage({
   const basePath = await getBasePath()
   const supabase = createAdminClient()
 
-  const [{ data: customer }, { data: bookings }] = await Promise.all([
+  const [{ data: customer }, { data: statsRows }, { count: totalBookings }] = await Promise.all([
     supabase
       .from('profiles')
       .select('id, full_name, phone, is_active, created_at')
       .eq('id', id)
       .eq('role', 'customer')
       .single(),
+    // Lightweight full-history fetch (status + price only) so the summary
+    // stats below cover every booking, not just the current page.
     supabase
       .from('bookings')
-      .select('id, service_date, service_time, service_name, base_price, status, payment_status')
-      .eq('customer_id', id)
-      .order('service_date', { ascending: false })
-      .limit(20),
+      .select('status, base_price')
+      .eq('customer_id', id),
+    supabase
+      .from('bookings')
+      .select('*', { count: 'exact', head: true })
+      .eq('customer_id', id),
   ])
 
   if (!customer) notFound()
 
   const c = customer as unknown as Customer
-  const bookingList = (bookings ?? []) as unknown as Booking[]
-  const totalSpent = bookingList
+  const stats = statsRows ?? []
+  const completedCount = stats.filter((b) => b.status === 'completed').length
+  const totalSpent = stats
     .filter((b) => b.status === 'completed')
     .reduce((sum, b) => sum + Number(b.base_price), 0)
+
+  const total = totalBookings ?? 0
+  const page = resolvePage(rawPage, total, PAGE_SIZE)
+  const from = (page - 1) * PAGE_SIZE
+  const to = from + PAGE_SIZE - 1
+
+  const { data: bookings } = await supabase
+    .from('bookings')
+    .select('id, service_date, service_time, service_name, base_price, status, payment_status')
+    .eq('customer_id', id)
+    .order('service_date', { ascending: false })
+    .range(from, to)
+
+  const bookingList = (bookings ?? []) as unknown as Booking[]
 
   return (
     <div className="max-w-2xl space-y-6">
@@ -112,8 +139,8 @@ export default async function CustomerDetailPage({
 
         <div className="divide-y divide-gray-100">
           <Row label="Member since" value={formatDate(c.created_at.slice(0, 10))} />
-          <Row label="Total bookings" value={String(bookingList.length)} />
-          <Row label="Completed bookings" value={String(bookingList.filter((b) => b.status === 'completed').length)} />
+          <Row label="Total bookings" value={String(total)} />
+          <Row label="Completed bookings" value={String(completedCount)} />
           <Row label="Total spent" value={`₱${totalSpent.toLocaleString()}`} />
         </div>
 
@@ -128,13 +155,18 @@ export default async function CustomerDetailPage({
           <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Role</p>
           <ConvertToCleanerForm customerId={c.id} fullName={c.full_name} defaultPhone={c.phone} />
         </div>
+
+        {/* Delete account permanently */}
+        <div>
+          <DeleteCustomerButton customerId={c.id} />
+        </div>
       </div>
 
       {/* Booking history */}
       <div className="bg-white rounded-xl border border-gray-200">
         <div className="p-5 border-b border-gray-100 flex items-center justify-between">
           <p className="text-sm font-semibold text-gray-900">Booking History</p>
-          <span className="text-xs text-gray-400">{bookingList.length}</span>
+          <span className="text-xs text-gray-400">{total}</span>
         </div>
         {bookingList.length === 0 ? (
           <p className="text-sm text-gray-400 text-center py-10">No bookings yet.</p>
@@ -164,6 +196,7 @@ export default async function CustomerDetailPage({
             ))}
           </div>
         )}
+        <Pagination totalItems={total} pageSize={PAGE_SIZE} />
       </div>
     </div>
   )

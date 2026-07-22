@@ -5,6 +5,7 @@ import { redirect } from 'next/navigation'
 import { createClient, createAdminClient } from '@/utils/supabase/server'
 import { getBasePath } from '@/utils/base-path'
 import { createNotification } from './notifications'
+import { sendCustomerWelcomeEmail } from '@/lib/email'
 import { estimateBookingPrice, estimateDurationHours, serviceNeedsSqm } from '@/lib/booking-pricing'
 import { findConflictingCleaners } from '@/lib/ai-assignment'
 import { SPACE_TYPES, METRO_MANILA_CITIES, PAYMENT_METHODS } from '@/lib/booking-constants'
@@ -481,6 +482,41 @@ export async function toggleCustomerStatus(
   return { success: current ? 'Customer deactivated.' : 'Customer reactivated.' }
 }
 
+// Permanently removes the auth user — ON DELETE CASCADE on profiles.id then
+// removes the profile row and, in turn (unlike a cleaner), every booking
+// tied to this customer via bookings.customer_id ON DELETE CASCADE. Their
+// entire booking, complaint, and payment history goes with it. Available
+// regardless of active/inactive status — the confirmation panel in
+// DeleteCustomerButton is the only guard against an accidental click.
+export async function deleteCustomerAccount(
+  state: AdminActionState,
+  formData: FormData
+): Promise<AdminActionState> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user || !(await assertSuperAdmin(supabase, user.id))) return { error: 'Unauthorized.' }
+
+  const customer_id = formData.get('customer_id') as string
+  if (!customer_id) return { error: 'Missing customer.' }
+
+  const adminClient = createAdminClient()
+
+  const { data: target } = await adminClient
+    .from('profiles')
+    .select('id, role')
+    .eq('id', customer_id)
+    .single()
+
+  if (!target) return { error: 'Customer not found.' }
+  if (target.role !== 'customer') return { error: 'This account is not a customer.' }
+
+  const { error } = await adminClient.auth.admin.deleteUser(customer_id)
+  if (error) return { error: error.message }
+
+  revalidatePath('/admin/customers')
+  redirect(`${await getBasePath()}/customers`)
+}
+
 // ── Payment management ─────────────────────────────────────────────────────
 
 export async function updatePaymentStatus(
@@ -559,7 +595,7 @@ export async function dispatchCleaners(
 
   const conflicts = await findConflictingCleaners(bookingId, cleanerIds)
   if (conflicts.length > 0) {
-    return { error: `${conflicts.map((c) => c.fullName).join(', ')} already ${conflicts.length === 1 ? 'has' : 'have'} an overlapping booking around this time.` }
+    return { error: `${conflicts.map((c) => `${c.fullName} (${c.conflictWindow})`).join(', ')} already ${conflicts.length === 1 ? 'has' : 'have'} an overlapping booking.` }
   }
 
   const rows = cleanerIds.map((cleaner_id) => ({
@@ -637,7 +673,7 @@ export async function forceAssignCleaner(
 
   const conflicts = await findConflictingCleaners(bookingId, cleanerIds)
   if (conflicts.length > 0) {
-    return { error: `${conflicts.map((c) => c.fullName).join(', ')} already ${conflicts.length === 1 ? 'has' : 'have'} an overlapping booking around this time.` }
+    return { error: `${conflicts.map((c) => `${c.fullName} (${c.conflictWindow})`).join(', ')} already ${conflicts.length === 1 ? 'has' : 'have'} an overlapping booking.` }
   }
 
   const admin = createAdminClient()
@@ -953,7 +989,9 @@ export async function getCleanerWeekScheduleData(
 // forceAssignCleaner re-run this exact same check (findConflictingCleaners)
 // immediately before writing regardless, since this can go stale the moment
 // another tab/admin assigns a cleaner elsewhere.
-export async function getConflictingCleanerIds(bookingId: string): Promise<string[]> {
+export async function getConflictingCleanerIds(
+  bookingId: string
+): Promise<{ cleanerId: string; conflictWindow: string }[]> {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user || !(await assertSuperAdmin(supabase, user.id))) return []
@@ -967,7 +1005,7 @@ export async function getConflictingCleanerIds(bookingId: string): Promise<strin
     .eq('is_active', true)
 
   const conflicts = await findConflictingCleaners(bookingId, (cleaners ?? []).map((c) => c.id))
-  return conflicts.map((c) => c.cleanerId)
+  return conflicts.map((c) => ({ cleanerId: c.cleanerId, conflictWindow: c.conflictWindow }))
 }
 
 // ── Customer search (for manual booking) ──────────────────────────────────
@@ -1057,12 +1095,24 @@ export async function createCustomerAccount(
 
   if (profileError) return { error: profileError.message }
 
-  // Send the customer a "set your password" email so they can log in themselves —
-  // the tempPassword above is never shown or handed to anyone.
+  // Send the customer a branded "set your password" email carrying our own
+  // magic-link token — the tempPassword above is never shown or handed to
+  // anyone. generateLink() only mints the token (it sends no email itself);
+  // token_hash + type is verified by the same handling already in
+  // src/app/auth/callback/route.ts for signup/invite confirmations, reused
+  // here with type 'magiclink' instead of Supabase's own built-in
+  // reset-password email.
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000'
-  await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: `${siteUrl}/auth/callback?next=/reset-password`,
+  const { data: linkData, error: linkError } = await adminClient.auth.admin.generateLink({
+    type: 'magiclink',
+    email,
+    options: { redirectTo: `${siteUrl}/auth/callback?next=/reset-password` },
   })
+
+  if (!linkError) {
+    const magicLink = `${siteUrl}/auth/callback?token_hash=${linkData.properties.hashed_token}&type=magiclink&next=${encodeURIComponent('/reset-password')}`
+    await sendCustomerWelcomeEmail({ customerName: full_name, magicLink }, email)
+  }
 
   revalidatePath('/admin/customers')
   return { customer: { id: signUpData.user.id, full_name, phone } }

@@ -185,7 +185,7 @@ function PreviewPanel({
                 )}
                 <p className="text-xs font-medium text-gray-500 truncate flex-1 min-w-0">{c.fullName}</p>
                 <span className="text-[10px] font-semibold text-gray-500 bg-gray-200 px-2 py-0.5 rounded-full shrink-0">
-                  {c.reason === 'conflict' ? 'Has assigned job on this day' : 'Day off'}
+                  {c.reason === 'conflict' ? `Busy ${c.conflictWindow}` : 'Day off'}
                 </span>
               </div>
             ))}

@@ -6,6 +6,7 @@ import { createClient, createAdminClient } from '@/utils/supabase/server'
 import { getRateLimitBlock, recordLoginFailure, clearLoginFailures } from '@/utils/rate-limit'
 import { isAdminHost, getCurrentOrigin } from '@/utils/base-path'
 import { resolveRoleHome, ADMIN_HOST } from '@/utils/hosts'
+import { sendPasswordResetEmail } from '@/lib/email'
 
 export type AuthState = {
   error?: string
@@ -14,7 +15,7 @@ export type AuthState = {
   fields?: Record<string, string>
 } | undefined
 export type ForgotState = { error?: string; success?: boolean } | undefined
-export type ResetState = { error?: string } | undefined
+export type ResetState = { error?: string; success?: boolean } | undefined
 
 async function getClientIp(): Promise<string> {
   const h = await headers()
@@ -26,6 +27,13 @@ async function getClientIp(): Promise<string> {
 }
 
 const MOBILE_ONLY_ROLES = new Set(['cleaner'])
+
+// Only super_admin has an actual working web dashboard to sign back into.
+// Cleaners are blocked from web login entirely, and the customer web
+// dashboard is just a "mobile app coming soon" placeholder (see
+// src/app/(dashboard)/customer/page.tsx) — so for every other role, bouncing
+// back to the web sign-in form after a password reset dead-ends the same way.
+const WEB_DASHBOARD_ROLES = new Set(['super_admin'])
 
 export async function login(state: AuthState, formData: FormData): Promise<AuthState> {
   const rawEmail = (formData.get('email') as string ?? '').trim().toLowerCase()
@@ -177,15 +185,49 @@ export async function register(state: AuthState, formData: FormData): Promise<Au
 }
 
 export async function forgotPassword(state: ForgotState, formData: FormData): Promise<ForgotState> {
-  const email = formData.get('email') as string
+  const email = ((formData.get('email') as string) ?? '').trim().toLowerCase()
   if (!email) return { error: 'Email is required.' }
 
-  const supabase = await createClient()
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000'
+  // Supabase's own resetPasswordForEmail() throttles itself; generateLink()
+  // below is a privileged admin call with no such built-in limit, so this
+  // request needs its own IP-based throttle to keep the same abuse
+  // resistance (reusing the login attempt limiter's sliding-window/lockout
+  // logic under a separate key namespace).
+  const ip = await getClientIp()
+  const rateLimitKey = `forgot-password:${ip}`
+  const blocked = getRateLimitBlock(rateLimitKey)
+  if (blocked > 0) {
+    const minutes = Math.ceil(blocked / 60)
+    return { error: `Too many requests. Please try again in ${minutes} minute${minutes !== 1 ? 's' : ''}.` }
+  }
+  recordLoginFailure(rateLimitKey)
 
-  await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: `${siteUrl}/auth/callback?next=/reset-password`,
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000'
+  const adminClient = createAdminClient()
+
+  // generateLink() errors when the email has no account — swallowed below so
+  // the response never reveals whether an address is registered, the same
+  // enumeration-safe contract Supabase's own resetPasswordForEmail had.
+  //
+  // Uses the same magic-link pattern as sendCustomerWelcomeEmail (see
+  // createCustomerAccount in admin.ts) instead of Supabase's built-in
+  // "reset password" email, so this flow also gets our branded template.
+  const { data: linkData, error: linkError } = await adminClient.auth.admin.generateLink({
+    type: 'magiclink',
+    email,
+    options: { redirectTo: `${siteUrl}/auth/callback?next=/reset-password` },
   })
+
+  if (!linkError && linkData.user) {
+    const { data: profile } = await adminClient
+      .from('profiles')
+      .select('full_name')
+      .eq('id', linkData.user.id)
+      .single()
+
+    const magicLink = `${siteUrl}/auth/callback?token_hash=${linkData.properties.hashed_token}&type=magiclink&next=${encodeURIComponent('/reset-password')}`
+    await sendPasswordResetEmail({ customerName: profile?.full_name || 'there', magicLink }, email)
+  }
 
   return { success: true }
 }
@@ -210,12 +252,12 @@ export async function resetPassword(state: ResetState, formData: FormData): Prom
     .eq('id', userData.user.id)
     .single()
 
-  // Cleaners have no web login — sending them back to the web sign-in form
-  // after a password reset would just dead-end on "Please use the mobile
-  // app to sign in." Tell them that up front instead.
-  if (profile && MOBILE_ONLY_ROLES.has(profile.role)) {
+  // No working web destination for this role — stay on this page and tell
+  // them to continue on the mobile app instead of redirecting to a web
+  // sign-in form that dead-ends the same way.
+  if (!profile || !WEB_DASHBOARD_ROLES.has(profile.role)) {
     await supabase.auth.signOut()
-    redirect('/login?resetMobile=true')
+    return { success: true }
   }
 
   redirect('/login?reset=true')

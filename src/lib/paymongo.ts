@@ -2,6 +2,7 @@ import 'server-only'
 import crypto from 'crypto'
 import { createAdminClient } from '@/utils/supabase/server'
 import { createNotification } from '@/app/actions/notifications'
+import { sendPaymentReceiptEmail } from '@/lib/email'
 
 // ── PayMongo server client ──────────────────────────────────────────────────
 // Thin wrapper over the PayMongo REST API used for hosted Checkout Sessions.
@@ -291,6 +292,64 @@ export async function createQrPhIntent(opts: {
 }
 
 /**
+ * Emails the customer their payment receipt. Called from every settlement
+ * path right after `payment_status` flips to 'paid' (the QR poll path, the
+ * checkout fallback, and both webhook branches) — re-fetches the booking's
+ * display fields + customer email fresh rather than threading them through
+ * every caller, since only `bookingId`/`customerId`/the settled `detail` are
+ * reliably in scope at each call site. Best-effort: a failure here (missing
+ * email, Resend outage, etc.) is swallowed so it can never affect payment
+ * confirmation itself — the customer still sees "paid" in-app either way.
+ */
+export async function sendPaymentReceipt(
+  admin: ReturnType<typeof createAdminClient>,
+  bookingId: string,
+  customerId: string,
+  detail: PaymongoPaymentDetail
+) {
+  try {
+    const [{ data: booking }, { data: profile }, { data: userData }] = await Promise.all([
+      admin
+        .from('bookings')
+        .select(`
+          id, service_name, service_slug, service_date, service_time,
+          address_unit, address_street, address_barangay, address_city, address_province
+        `)
+        .eq('id', bookingId)
+        .maybeSingle(),
+      admin.from('profiles').select('full_name').eq('id', customerId).maybeSingle(),
+      admin.auth.admin.getUserById(customerId),
+    ])
+
+    const email = userData?.user?.email
+    if (!booking || !email) return
+
+    const address = [
+      booking.address_unit, booking.address_street, booking.address_barangay,
+      booking.address_city, booking.address_province,
+    ].filter(Boolean).join(', ')
+
+    await sendPaymentReceiptEmail(
+      {
+        bookingId: booking.id,
+        customerName: profile?.full_name ?? 'there',
+        serviceName: booking.service_name ?? booking.service_slug ?? 'Cleaning Service',
+        serviceDate: booking.service_date,
+        serviceTime: booking.service_time,
+        address: address || 'On file with your booking',
+        amountPaid: detail.amount,
+        sourceType: detail.sourceType,
+        paymongoPaymentId: detail.id,
+        paidAt: detail.paidAt ?? new Date().toISOString(),
+      },
+      email
+    )
+  } catch {
+    // Best-effort — see comment above.
+  }
+}
+
+/**
  * Retrieves a Payment Intent from PayMongo directly and reports whether it
  * has a settled payment. This is the primary confirmation path for the QR Ph
  * native flow (see caveat above) — the mobile QR screen polls the
@@ -342,6 +401,7 @@ export async function confirmQrPhPayment(bookingId: string): Promise<{ paid: boo
     type: 'payment_confirmed',
     bookingId: booking.id,
   })
+  await sendPaymentReceipt(admin, booking.id, booking.customer_id, detail)
 
   return { paid: true, detail }
 }
@@ -456,6 +516,7 @@ export async function confirmCheckoutPayment(bookingId: string): Promise<{ paid:
       type: 'payment_confirmed',
       bookingId: booking.id,
     })
+    await sendPaymentReceipt(admin, booking.id, booking.customer_id, detail)
 
     return { paid: true }
   } catch {

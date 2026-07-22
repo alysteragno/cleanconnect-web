@@ -1,7 +1,11 @@
 import { redirect } from 'next/navigation'
 import { createClient, createAdminClient } from '@/utils/supabase/server'
+import { Pagination } from '@/components/dashboard/pagination'
+import { paginate, resolvePage } from '@/utils/pagination'
 import ReviewModal from './review-form'
 import FiltersBar from './filters-bar'
+
+const PAGE_SIZE = 15
 
 type CleanerInfo = {
   id: string
@@ -47,9 +51,9 @@ function fmtTs(ts: string) {
 export default async function AdminDayOffRequestsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string; month?: string }>
+  searchParams: Promise<{ status?: string; month?: string; page?: string }>
 }) {
-  const { status = 'pending', month = '' } = await searchParams
+  const { status = 'pending', month = '', page: rawPage } = await searchParams
 
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -129,6 +133,9 @@ export default async function AdminDayOffRequestsPage({
 
   const pendingCount = requests.filter((r) => r.status === 'pending' && !isExpiredRequest(r)).length
 
+  const page = resolvePage(rawPage, requests.length, PAGE_SIZE)
+  const pageItems = paginate(requests, page, PAGE_SIZE)
+
   return (
     <div className="max-w-6xl mx-auto px-4 py-8 space-y-6">
 
@@ -177,7 +184,7 @@ export default async function AdminDayOffRequestsPage({
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
-                {requests.map((r) => {
+                {pageItems.map((r) => {
                   const isExpired = isExpiredRequest(r)
                   const effectiveStatus = isExpired ? 'expired' : r.status
                   const sm = STATUS_META[effectiveStatus] ?? STATUS_META.pending
@@ -292,6 +299,7 @@ export default async function AdminDayOffRequestsPage({
               </tbody>
             </table>
           </div>
+          <Pagination totalItems={requests.length} pageSize={PAGE_SIZE} />
         </div>
       )}
     </div>
