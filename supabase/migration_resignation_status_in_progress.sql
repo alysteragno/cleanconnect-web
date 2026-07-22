@@ -15,4 +15,3 @@
 -- 'approved' is left in the enum — Postgres can't drop enum values without
 -- recreating the type — but is no longer written by the web admin flow.
 
-ALTER TYPE resignation_status ADD VALUE IF NOT EXISTS 'in_progress';
