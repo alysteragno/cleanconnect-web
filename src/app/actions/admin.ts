@@ -1102,7 +1102,7 @@ export async function createCustomerAccount(
   // src/app/auth/callback/route.ts for signup/invite confirmations, reused
   // here with type 'magiclink' instead of Supabase's own built-in
   // reset-password email.
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000'
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://www.maidforyouph.com'
   const { data: linkData, error: linkError } = await adminClient.auth.admin.generateLink({
     type: 'magiclink',
     email,

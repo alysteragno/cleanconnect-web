@@ -39,7 +39,7 @@ export async function POST(req: NextRequest) {
     }
 
     const adminClient = createAdminClient()
-    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000'
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://www.maidforyouph.com'
 
     // generateLink(type: 'signup') both creates the (unconfirmed) auth user
     // and mints the token_hash for our own branded email — it errors like a

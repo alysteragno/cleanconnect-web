@@ -202,7 +202,7 @@ export async function forgotPassword(state: ForgotState, formData: FormData): Pr
   }
   recordLoginFailure(rateLimitKey)
 
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000'
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://www.maidforyouph.com'
   const adminClient = createAdminClient()
 
   // generateLink() errors when the email has no account — swallowed below so
