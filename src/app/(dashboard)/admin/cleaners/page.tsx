@@ -83,9 +83,17 @@ export default async function AdminCleanersPage({
   }, [])
 
   const activePage = resolvePage(rawPage, active.length, PAGE_SIZE)
-  const inactivePage = resolvePage(rawInactivePage, inactive.length, PAGE_SIZE)
   const activePageItems = paginate(active, activePage, PAGE_SIZE)
+  const inactivePage = resolvePage(rawInactivePage, inactive.length, PAGE_SIZE)
   const inactivePageItems = paginate(inactive, inactivePage, PAGE_SIZE)
+
+  // Degrades to 0 (badge just stays hidden) if the resignation-requests
+  // migration hasn't been applied yet — same graceful-fallback approach used
+  // elsewhere in this file for is_active-adjacent features.
+  const { count: pendingResignations } = await supabase
+    .from('cleaner_resignation_requests')
+    .select('id', { count: 'exact', head: true })
+    .eq('status', 'pending')
 
   return (
     <div className="max-w-3xl space-y-5">
@@ -112,6 +120,7 @@ export default async function AdminCleanersPage({
       </section>
 
       <CleanerSection title="Active" cleaners={activePageItems} totalItems={active.length} basePath={basePath} emptyLabel={search ? 'No matches.' : 'None.'} />
+
       {inactive.length > 0 && (
         <CleanerSection
           title="Deactivated"
@@ -123,6 +132,39 @@ export default async function AdminCleanersPage({
           dimmed
         />
       )}
+
+      <Link
+        href={`${basePath}/cleaners/archive`}
+        className="flex items-center justify-between p-4 bg-white rounded-xl border border-gray-200 hover:border-gray-300 transition-colors group"
+      >
+        <div>
+          <p className="text-sm font-semibold text-gray-900 group-hover:text-pink-600 transition-colors">Past Cleaners history</p>
+          <p className="text-xs text-gray-400 mt-0.5">Jobs completed, joined & deactivated dates for every deactivated account</p>
+        </div>
+        <div className="flex items-center gap-2 text-gray-400 group-hover:text-pink-600 transition-colors">
+          <span className="text-sm font-medium">{inactive.length}</span>
+          <span aria-hidden>→</span>
+        </div>
+      </Link>
+
+      <Link
+        href={`${basePath}/resignation-requests`}
+        className="flex items-center justify-between p-4 bg-white rounded-xl border border-gray-200 hover:border-gray-300 transition-colors group"
+      >
+        <div>
+          <p className="text-sm font-semibold text-gray-900 group-hover:text-pink-600 transition-colors">Resignation Requests</p>
+          <p className="text-xs text-gray-400 mt-0.5">Review cleaners requesting to resign</p>
+        </div>
+        <div className="flex items-center gap-2 text-gray-400 group-hover:text-pink-600 transition-colors">
+          {!!pendingResignations && (
+            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 bg-yellow-50 border border-yellow-200 text-yellow-700 text-xs font-semibold rounded-full">
+              <span className="w-1.5 h-1.5 rounded-full bg-yellow-400" />
+              {pendingResignations} pending
+            </span>
+          )}
+          <span aria-hidden>→</span>
+        </div>
+      </Link>
     </div>
   )
 }

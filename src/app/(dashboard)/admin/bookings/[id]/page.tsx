@@ -10,6 +10,7 @@ import PaymentVerificationCard from './payment-verification'
 import PayMongoCheckout from './paymongo-checkout'
 import CleanersForm from './cleaners-form'
 import FurniturePhotoGrid from './furniture-photo-grid'
+import { serviceNeedsSqm } from '@/lib/booking-pricing'
 
 type Booking = {
   id: string
@@ -310,7 +311,9 @@ export default async function AdminBookingDetailPage({
               <DetailRow label="Address"            value={address || '—'} />
               <DetailRow label="Service"            value={serviceLabel} />
               <DetailRow label="Space Type"         value={b.space_type ? b.space_type.charAt(0).toUpperCase() + b.space_type.slice(1) : '—'} />
-              <DetailRow label="Property Size"      value={`${b.property_sqm} sqm`} />
+              {serviceNeedsSqm(b.service_slug) && (
+                <DetailRow label="Property Size"      value={`${b.property_sqm} sqm`} />
+              )}
               <CleanersForm bookingId={b.id} currentCount={b.required_cleaners ?? 1} />
               <DetailRow label="Duration"           value={b.duration_hours ? `${b.duration_hours} hours` : '—'} />
               {b.sofa_seaters != null && b.sofa_seaters > 0 && <DetailRow label="Sofa Seaters" value={String(b.sofa_seaters)} />}

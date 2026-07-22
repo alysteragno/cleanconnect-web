@@ -10,12 +10,15 @@ type Props = {
   required?: boolean
   /** Hidden input name carried into the form submission. */
   name?: string
+  /** Server-side validation message from the last submit (e.g. "photo required"). */
+  serverError?: string
 }
 
-export default function CleanerPhotoField({ initialUrl, required, name = 'photo_url' }: Props) {
+export default function CleanerPhotoField({ initialUrl, required, name = 'photo_url', serverError }: Props) {
   const [url, setUrl] = useState(initialUrl ?? '')
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const shownError = error ?? serverError ?? null
 
   async function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
@@ -68,7 +71,7 @@ export default function CleanerPhotoField({ initialUrl, required, name = 'photo_
             className="w-24 h-24 rounded-full object-cover border border-gray-200 bg-gray-50 shrink-0"
           />
         ) : (
-          <div className="w-24 h-24 rounded-full border-2 border-dashed border-gray-300 flex items-center justify-center text-gray-300 shrink-0">
+          <div className={`w-24 h-24 rounded-full border-2 border-dashed flex items-center justify-center text-gray-300 shrink-0 ${shownError ? 'border-red-300 bg-red-50/40' : 'border-gray-300'}`}>
             <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
               <circle cx="12" cy="8" r="4" />
               <path d="M4 20c0-4 4-6 8-6s8 2 8 6" />
@@ -93,12 +96,12 @@ export default function CleanerPhotoField({ initialUrl, required, name = 'photo_
           </label>
           <p className="text-xs text-gray-400">JPEG, PNG or WebP · max 5 MB</p>
           {uploading && <p className="text-xs text-gray-400">Uploading…</p>}
-          {required && !url && !uploading && (
+          {required && !url && !uploading && !shownError && (
             <p className="text-xs text-gray-400">A photo is required before saving.</p>
           )}
-          {error && (
+          {shownError && (
             <p className="text-xs text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
-              {error}
+              {shownError}
             </p>
           )}
         </div>

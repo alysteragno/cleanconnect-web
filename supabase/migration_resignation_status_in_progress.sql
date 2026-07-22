@@ -1,0 +1,18 @@
+-- Run in Supabase SQL Editor.
+-- Follow-up to migration_cleaner_resignation_request_details.sql.
+--
+-- The web admin's "Approve" action used to flip the cleaner's profile
+-- straight to resigned/inactive the moment an admin clicked Approve. That
+-- was wrong: resignation is only ever finalized in person at the business
+-- office (see migration_cleaner_resignation_requests.sql's closing
+-- comment), so acknowledging the *request* and deactivating the *account*
+-- are two different events that can happen days apart. The web admin flow
+-- (src/app/actions/resignations.ts) now moves a request to 'in_progress'
+-- instead of 'approved' and never touches profiles — the account itself is
+-- deactivated later, separately, from the cleaner's own profile page
+-- (Account Status toggle) once they actually show up at the office.
+--
+-- 'approved' is left in the enum — Postgres can't drop enum values without
+-- recreating the type — but is no longer written by the web admin flow.
+
+ALTER TYPE resignation_status ADD VALUE IF NOT EXISTS 'in_progress';

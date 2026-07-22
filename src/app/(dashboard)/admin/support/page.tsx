@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation'
 import { createClient, createAdminClient } from '@/utils/supabase/server'
 import { getBasePath } from '@/utils/base-path'
 import { SortSelect } from '@/components/dashboard/sort-select'
+import { SearchBox } from '@/components/dashboard/search-box'
 import { Pagination } from '@/components/dashboard/pagination'
 import { paginate, resolvePage } from '@/utils/pagination'
 import { isSupportConversationArchived, daysUntilSupportAutoArchive } from '@/utils/chat-helpers'
@@ -45,9 +46,9 @@ const SORT_OPTIONS = [
 export default async function AdminSupportPage({
   searchParams,
 }: {
-  searchParams: Promise<{ sort?: string; view?: string; page?: string }>
+  searchParams: Promise<{ sort?: string; view?: string; page?: string; q?: string }>
 }) {
-  const { sort, view, page: rawPage } = await searchParams
+  const { sort, view, page: rawPage, q } = await searchParams
   const showArchived = view === 'archived'
   const supabase = await createClient()
   const adminDb  = createAdminClient()
@@ -155,8 +156,21 @@ export default async function AdminSupportPage({
     }
   })
 
-  const page = resolvePage(rawPage, sorted.length, PAGE_SIZE)
-  const pageItems = paginate(sorted, page, PAGE_SIZE)
+  // Search spans the customer's name and their last message, so it's
+  // filtered in memory rather than pushed down as a DB query.
+  const search = q?.trim().toLowerCase()
+  const list = search
+    ? sorted.filter((c) => {
+        const msg = lastMsg.get(c.id)
+        return (
+          c.full_name.toLowerCase().includes(search) ||
+          (msg?.message.toLowerCase().includes(search) ?? false)
+        )
+      })
+    : sorted
+
+  const page = resolvePage(rawPage, list.length, PAGE_SIZE)
+  const pageItems = paginate(list, page, PAGE_SIZE)
 
   const tabClass = (isActive: boolean) =>
     `text-sm font-medium pb-2 -mb-px border-b-2 transition-colors ${
@@ -174,7 +188,8 @@ export default async function AdminSupportPage({
             {active.length} active {active.length === 1 ? 'conversation' : 'conversations'}
           </p>
         </div>
-        <div className='flex items-center gap-4'>
+        <div className='flex items-center gap-3'>
+          <SearchBox placeholder="Search customer name" resetParams={['page']} />
           <NewChatButton />
           <SortSelect options={SORT_OPTIONS} />
         </div>
@@ -191,10 +206,10 @@ export default async function AdminSupportPage({
       </div>
 
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
-        {sorted.length === 0 ? (
+        {list.length === 0 ? (
           <div className="text-center py-16">
             <p className="text-sm text-gray-400 font-medium">
-              {showArchived ? 'No archived conversations.' : 'No active conversations.'}
+              {search ? 'No matches.' : showArchived ? 'No archived conversations.' : 'No active conversations.'}
             </p>
           </div>
         ) : (
@@ -217,7 +232,7 @@ export default async function AdminSupportPage({
             })}
           </div>
         )}
-        <Pagination totalItems={sorted.length} pageSize={PAGE_SIZE} />
+        <Pagination totalItems={list.length} pageSize={PAGE_SIZE} />
       </div>
     </div>
   )

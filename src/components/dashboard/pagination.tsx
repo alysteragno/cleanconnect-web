@@ -17,8 +17,6 @@ export function Pagination({
   const totalPages = Math.max(1, Math.ceil(totalItems / pageSize))
   const currentPage = resolvePage(searchParams.get(paramName) ?? undefined, totalItems, pageSize)
 
-  if (totalPages <= 1) return null
-
   function goTo(page: number) {
     const params = new URLSearchParams(searchParams.toString())
     if (page <= 1) params.delete(paramName)

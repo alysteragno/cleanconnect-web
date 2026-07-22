@@ -8,7 +8,7 @@ import { PeriodSelect } from '@/components/dashboard/period-select'
 import { CustomRangeTab } from '@/components/dashboard/custom-range-tab'
 import { Pagination } from '@/components/dashboard/pagination'
 import { resolvePage } from '@/utils/pagination'
-import { paymentStatusLabel } from '@/lib/booking-pricing'
+import { paymentStatusLabel, serviceNeedsSqm } from '@/lib/booking-pricing'
 import { PAYMENT_METHOD_META } from '@/components/payment-icons'
 
 const PAGE_SIZE = 10
@@ -40,6 +40,7 @@ type Booking = {
   service_date: string
   service_time: string
   service_name: string | null
+  service_slug: string | null
   property_sqm: number
   base_price: number
   status: string
@@ -243,7 +244,7 @@ export default async function AdminBookingsPage({
 
   let query = supabase
     .from('bookings')
-    .select('id, created_at, service_date, service_time, service_name, property_sqm, base_price, status, payment_status, payment_method, address_city, profiles!customer_id (full_name)')
+    .select('id, created_at, service_date, service_time, service_name, service_slug, property_sqm, base_price, status, payment_status, payment_method, address_city, profiles!customer_id (full_name)')
   if (range) query = query.gte('service_date', range.start).lte('service_date', range.end)
   if (status) query = query.eq('status', status)
   switch (sortKey) {
@@ -404,7 +405,9 @@ export default async function AdminBookingsPage({
                         <span className="text-sm font-semibold text-gray-900 group-hover:text-pink-700 transition-colors truncate">
                           {serviceLabel}
                         </span>
-                        <span className="text-xs text-gray-400 shrink-0">{b.property_sqm} sqm</span>
+                        {serviceNeedsSqm(b.service_slug) && (
+                          <span className="text-xs text-gray-400 shrink-0">{b.property_sqm} sqm</span>
+                        )}
                         <span className={`text-[11px] px-2 py-0.5 rounded-full border font-semibold shrink-0 ${sm.pill}`}>
                           {sm.label}
                         </span>
@@ -443,10 +446,9 @@ export default async function AdminBookingsPage({
                 )
               })}
             </div>
-
-            <Pagination totalItems={totalForFilter} pageSize={PAGE_SIZE} />
           </>
         )}
+        <Pagination totalItems={totalForFilter} pageSize={PAGE_SIZE} />
       </div>
     </div>
   )

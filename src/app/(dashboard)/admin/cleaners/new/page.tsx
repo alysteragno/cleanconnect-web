@@ -1,10 +1,37 @@
 'use client'
 
 import Link from 'next/link'
-import { useActionState, useState } from 'react'
+import { useActionState, useEffect, useRef, useState } from 'react'
 import { createCleanerAccount } from '@/app/actions/admin'
 import CleanerPhotoField from '../cleaner-photo-field'
 import { useBasePath } from '@/components/dashboard/base-path-context'
+
+// Same character rules as the manual-booking form (src/lib/booking-constants
+// doesn't cover these — they're name/address text, not booking option
+// whitelists) — strips <, @, %, and other markup/injection characters as typed.
+// Mirrors NAME_TEXT_RE / ADDRESS_TEXT_RE in src/app/actions/admin.ts.
+const NAME_UNSAFE_CHARS_RE = /[^a-zA-ZÀ-ÿ' .-]/g
+function sanitizeNameInput(value: string) {
+  return value.replace(NAME_UNSAFE_CHARS_RE, '')
+}
+const ADDRESS_UNSAFE_CHARS_RE = /[^a-zA-Z0-9À-ÿ.,'#\-/() ]/g
+function sanitizeAddressInput(value: string) {
+  return value.replace(ADDRESS_UNSAFE_CHARS_RE, '')
+}
+// Mirrors EMAIL_RE's charset in src/app/actions/admin.ts — only letters,
+// digits, and . _ - + @ are allowed, so <, >, spaces, and anything else
+// (e.g. "<><?><?><") never make it into the field at all as typed.
+const EMAIL_UNSAFE_CHARS_RE = /[^a-zA-Z0-9._+@-]/g
+function sanitizeEmailInput(value: string) {
+  return value.replace(EMAIL_UNSAFE_CHARS_RE, '')
+}
+// PH mobile numbers are digits only — pattern="09[0-9]{9}" only catches this
+// at submit time, and type="tel" doesn't block keystrokes on its own, so
+// strip anything non-numeric as typed too.
+const PHONE_UNSAFE_CHARS_RE = /[^0-9]/g
+function sanitizePhoneInput(value: string) {
+  return value.replace(PHONE_UNSAFE_CHARS_RE, '')
+}
 
 const PASSWORD_REQUIREMENTS = [
   { label: 'Minimum 8 characters',           test: (p: string) => p.length >= 8 },
@@ -36,6 +63,9 @@ function Field({
   value,
   onChange,
   revealable,
+  autoComplete,
+  sanitize,
+  error,
 }: {
   label: string
   name: string
@@ -50,19 +80,27 @@ function Field({
   value?: string
   onChange?: (e: React.ChangeEvent<HTMLInputElement>) => void
   revealable?: boolean
+  autoComplete?: string
+  /** Strips disallowed characters as the user types (imperative — works even on uncontrolled inputs). */
+  sanitize?: (value: string) => string
+  /** Server-side validation message for this exact field — shown inline under the input. */
+  error?: string
 }) {
   const [revealed, setRevealed] = useState(false)
   const isPassword = revealable && type === 'password'
   const effectiveType = isPassword ? (revealed ? 'text' : 'password') : type
 
+  const fieldId = `field-${name}`
+
   return (
     <div>
-      <label className="block text-sm font-medium text-gray-700 mb-1">
+      <label htmlFor={fieldId} className="block text-sm font-medium text-gray-700 mb-1">
         {label}{required && <span className="text-red-500 ml-0.5">*</span>}
         {!required && <span className="text-gray-400 font-normal ml-1">(optional)</span>}
       </label>
       <div className="relative">
         <input
+          id={fieldId}
           name={name}
           type={effectiveType}
           required={required}
@@ -72,8 +110,18 @@ function Field({
           maxLength={maxLength}
           pattern={pattern}
           value={value}
-          onChange={onChange}
-          className={`w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-pink-500 ${isPassword ? 'pr-10' : ''}`}
+          autoComplete={autoComplete}
+          aria-invalid={!!error}
+          aria-describedby={error ? `${fieldId}-error` : undefined}
+          onChange={(e) => {
+            if (sanitize) e.target.value = sanitize(e.target.value)
+            onChange?.(e)
+          }}
+          className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 transition-colors ${isPassword ? 'pr-10' : ''} ${
+            error
+              ? 'border-red-300 focus:ring-red-400 bg-red-50/40'
+              : 'border-gray-300 focus:ring-pink-500'
+          }`}
         />
         {isPassword && (
           <button
@@ -97,9 +145,37 @@ function Field({
           </button>
         )}
       </div>
-      {hint && <p className="text-xs text-gray-400 mt-1">{hint}</p>}
+      {error ? (
+        <p id={`${fieldId}-error`} className="text-xs text-red-600 mt-1 flex items-center gap-1">
+          <svg className="w-3 h-3 shrink-0" fill="currentColor" viewBox="0 0 20 20">
+            <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+          </svg>
+          {error}
+        </p>
+      ) : hint ? (
+        <p className="text-xs text-gray-400 mt-1">{hint}</p>
+      ) : null}
     </div>
   )
+}
+
+type FormValues = {
+  email: string
+  confirm_password: string
+  full_name: string
+  phone: string
+  date_of_birth: string
+  address_street: string
+  address_city: string
+  address_province: string
+  emergency_contact_name: string
+  emergency_contact_phone: string
+}
+
+const EMPTY_VALUES: FormValues = {
+  email: '', confirm_password: '', full_name: '', phone: '', date_of_birth: '',
+  address_street: '', address_city: '', address_province: '',
+  emergency_contact_name: '', emergency_contact_phone: '',
 }
 
 export default function NewCleanerPage() {
@@ -107,6 +183,30 @@ export default function NewCleanerPage() {
   const basePath = useBasePath()
   const [password, setPassword] = useState('')
   const typed = password.length > 0
+  const formRef = useRef<HTMLFormElement>(null)
+  const fieldErrors = state?.fieldErrors ?? {}
+
+  // React resets every uncontrolled field in a <form action={...}> once the
+  // action call completes — including on a failed submit, not just a
+  // successful one. Without this, a typo in one field would wipe every
+  // other field the admin already filled in. Controlling them from state
+  // sidesteps that reset entirely (React re-renders from `values` right
+  // after, overriding whatever the reset just did).
+  const [values, setValues] = useState<FormValues>(EMPTY_VALUES)
+  function setField(name: keyof FormValues) {
+    return (e: React.ChangeEvent<HTMLInputElement>) => {
+      setValues(v => ({ ...v, [name]: e.target.value }))
+    }
+  }
+
+  // Jump straight to the first invalid field instead of leaving the admin to
+  // hunt through four sections for whichever one the server rejected.
+  useEffect(() => {
+    if (!state?.fieldErrors) return
+    const firstBadField = formRef.current?.querySelector<HTMLElement>('[aria-invalid="true"]')
+    firstBadField?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    firstBadField?.focus()
+  }, [state])
 
   // Latest date of birth that still makes the cleaner 18 today.
   const maxDob = (() => {
@@ -114,6 +214,42 @@ export default function NewCleanerPage() {
     d.setFullYear(d.getFullYear() - 18)
     return d.toISOString().slice(0, 10)
   })()
+
+  // The account exists but can't sign in until the cleaner confirms their
+  // email (createCleanerAccount no longer redirects straight to Cleaners on
+  // success) — this is the "still needs a step" state the admin needs to
+  // see, not a silent redirect implying everything's already usable.
+  if (state?.success) {
+    return (
+      <div className="max-w-2xl">
+        <div className="bg-white rounded-xl border border-gray-200 p-8 text-center space-y-4">
+          <div className="w-12 h-12 rounded-full bg-amber-50 flex items-center justify-center mx-auto">
+            <svg className="w-6 h-6 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+            </svg>
+          </div>
+          <div>
+            <p className="text-base font-semibold text-gray-900">Cleaner account created</p>
+            <p className="text-sm text-gray-500 mt-1.5 leading-relaxed">{state.success}</p>
+          </div>
+          <div className="flex items-center justify-center gap-2.5 pt-1">
+            <Link
+              href={`${basePath}/cleaners/new`}
+              className="px-4 py-2 border border-gray-200 text-gray-600 text-sm font-semibold rounded-lg hover:border-gray-400 hover:text-gray-900 transition-colors"
+            >
+              Add Another
+            </Link>
+            <Link
+              href={`${basePath}/cleaners`}
+              className="px-4 py-2 bg-pink-600 text-white text-sm font-semibold rounded-lg hover:bg-pink-700 transition-colors"
+            >
+              Go to Cleaners
+            </Link>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="max-w-2xl space-y-6">
@@ -128,11 +264,33 @@ export default function NewCleanerPage() {
         </p>
       </div>
 
-      <form action={action} className="space-y-5">
+      {/*
+        noValidate — the inputs below keep `required`/`type="email"`/`pattern`
+        etc. for semantics and mobile keyboard hints, but native HTML5
+        validation would otherwise intercept submit before our action ever
+        runs: it blocks on the FIRST invalid field it finds, shows only its
+        own native tooltip for that one field, and never calls the server —
+        so fieldErrors never gets populated and nothing else gets checked.
+        Disabling it hands 100% of validation to our sanitize-as-you-type +
+        server fieldErrors + inline-error-per-field system instead.
+      */}
+      <form ref={formRef} action={action} className="space-y-5" autoComplete="off" noValidate>
         {/* ── Account Credentials ─────────────────────────────────────── */}
         <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
           <SectionLabel>Account Credentials</SectionLabel>
-          <Field label="Email" name="email" type="email" required placeholder="maria@cleaningladyph.com" />
+          {/*
+            autoComplete is set on every field below to stop the browser from
+            offering to autofill the ADMIN's own saved login into what is
+            actually a brand-new cleaner account — "off" on the email/name
+            fields, and "new-password" (the standard signal for "this creates
+            a password, don't suggest a saved one") on both password fields.
+          */}
+          <Field
+            label="Email" name="email" type="email" required placeholder="maria@gmail.com"
+            autoComplete="off" sanitize={sanitizeEmailInput} maxLength={254}
+            value={values.email} onChange={setField('email')}
+            error={fieldErrors.email}
+          />
 
           <div>
             <Field
@@ -144,6 +302,8 @@ export default function NewCleanerPage() {
               placeholder="Create a strong password"
               value={password}
               onChange={e => setPassword(e.target.value)}
+              autoComplete="new-password"
+              error={fieldErrors.password}
             />
             <ul className="mt-2 space-y-1">
               {PASSWORD_REQUIREMENTS.map(req => {
@@ -168,14 +328,22 @@ export default function NewCleanerPage() {
             required
             revealable
             placeholder="Re-enter the password"
+            autoComplete="new-password"
+            value={values.confirm_password} onChange={setField('confirm_password')}
+            error={fieldErrors.confirm_password}
           />
         </div>
 
         {/* ── Personal Information ─────────────────────────────────────── */}
         <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
           <SectionLabel>Personal Information</SectionLabel>
-          <CleanerPhotoField required />
-          <Field label="Full Name" name="full_name" required placeholder="Maria Santos" />
+          <CleanerPhotoField required serverError={fieldErrors.photo} />
+          <Field
+            label="Full Name" name="full_name" required placeholder="Maria Santos" autoComplete="off"
+            sanitize={sanitizeNameInput} maxLength={100}
+            value={values.full_name} onChange={setField('full_name')}
+            error={fieldErrors.full_name}
+          />
           <div className="grid grid-cols-2 gap-4">
             <Field
               label="Phone"
@@ -186,6 +354,10 @@ export default function NewCleanerPage() {
               maxLength={11}
               pattern="09[0-9]{9}"
               hint="Philippine mobile number (09XXXXXXXXX)"
+              autoComplete="off"
+              sanitize={sanitizePhoneInput}
+              value={values.phone} onChange={setField('phone')}
+              error={fieldErrors.phone}
             />
             <Field
               label="Date of Birth"
@@ -194,6 +366,9 @@ export default function NewCleanerPage() {
               required
               max={maxDob}
               hint="Cleaner must be at least 18 years old"
+              autoComplete="off"
+              value={values.date_of_birth} onChange={setField('date_of_birth')}
+              error={fieldErrors.date_of_birth}
             />
           </div>
         </div>
@@ -201,10 +376,25 @@ export default function NewCleanerPage() {
         {/* ── Home Address ─────────────────────────────────────────────── */}
         <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
           <SectionLabel>Address</SectionLabel>
-          <Field label="Street Address" name="address_street" required placeholder="123 Sampaguita St., Brgy. Malaya" />
+          <Field
+            label="Street Address" name="address_street" required placeholder="123 Sampaguita St., Brgy. Malaya"
+            autoComplete="off" sanitize={sanitizeAddressInput} maxLength={200}
+            value={values.address_street} onChange={setField('address_street')}
+            error={fieldErrors.address_street}
+          />
           <div className="grid grid-cols-2 gap-4">
-            <Field label="City / Municipality" name="address_city" required placeholder="Quezon City" />
-            <Field label="Province" name="address_province" required placeholder="Metro Manila" />
+            <Field
+              label="City / Municipality" name="address_city" required placeholder="Quezon City" autoComplete="off"
+              sanitize={sanitizeAddressInput} maxLength={100}
+              value={values.address_city} onChange={setField('address_city')}
+              error={fieldErrors.address_city}
+            />
+            <Field
+              label="Province" name="address_province" required placeholder="Metro Manila" autoComplete="off"
+              sanitize={sanitizeAddressInput} maxLength={100}
+              value={values.address_province} onChange={setField('address_province')}
+              error={fieldErrors.address_province}
+            />
           </div>
         </div>
 
@@ -212,7 +402,12 @@ export default function NewCleanerPage() {
         <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
           <SectionLabel>Emergency Contact</SectionLabel>
           <div className="grid grid-cols-2 gap-4">
-            <Field label="Contact Name" name="emergency_contact_name" required placeholder="Juan Santos" />
+            <Field
+              label="Contact Name" name="emergency_contact_name" required placeholder="Juan Santos" autoComplete="off"
+              sanitize={sanitizeNameInput} maxLength={100}
+              value={values.emergency_contact_name} onChange={setField('emergency_contact_name')}
+              error={fieldErrors.emergency_contact_name}
+            />
             <Field
               label="Contact Phone"
               name="emergency_contact_phone"
@@ -221,6 +416,9 @@ export default function NewCleanerPage() {
               placeholder="09XX XXX XXXX"
               maxLength={11}
               pattern="09[0-9]{9}"
+              sanitize={sanitizePhoneInput}
+              value={values.emergency_contact_phone} onChange={setField('emergency_contact_phone')}
+              error={fieldErrors.emergency_contact_phone}
             />
           </div>
         </div>

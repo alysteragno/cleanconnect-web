@@ -2,7 +2,10 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { createClient, createAdminClient } from '@/utils/supabase/server'
 import { getBasePath } from '@/utils/base-path'
+import { getUpcomingAssignedJobCount } from '@/lib/cleaner-jobs'
 import CleanerEditForm, { type Cleaner } from './cleaner-edit-form'
+import CleanerToggleForm from './cleaner-toggle-form'
+import DeleteCleanerButton from './delete-cleaner-button'
 import AvailabilityPanel from './availability-panel'
 
 export default async function CleanerDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -20,15 +23,18 @@ export default async function CleanerDetailPage({ params }: { params: Promise<{ 
     { data: cleaner },
     { count: jobsDone },
     { data: dayOffRows },
+    upcomingJobCount,
   ] = await Promise.all([
-    adminDb.from('profiles').select('id, full_name, phone, is_active, created_at, address_street, address_city, address_province, date_of_birth, emergency_contact_name, emergency_contact_phone, home_lat, home_lng, photo_url').eq('id', id).eq('role', 'cleaner').single(),
+    adminDb.from('profiles').select('id, full_name, phone, is_active, deactivated_at, created_at, address_street, address_city, address_province, date_of_birth, emergency_contact_name, emergency_contact_phone, home_lat, home_lng, photo_url').eq('id', id).eq('role', 'cleaner').single(),
     adminDb.from('cleaner_assignments').select('*', { count: 'exact', head: true }).eq('cleaner_id', id).eq('status', 'completed'),
     adminDb.from('cleaner_availability').select('id, unavailable_date').eq('cleaner_id', id).order('unavailable_date'),
+    getUpcomingAssignedJobCount(adminDb, id),
   ])
 
   if (!cleaner) notFound()
 
   const c = cleaner as unknown as Cleaner
+  const deactivatedAt = (cleaner as unknown as { deactivated_at: string | null }).deactivated_at
   const dayOffs = (dayOffRows ?? []) as { id: string; unavailable_date: string }[]
 
   return (
@@ -59,6 +65,23 @@ export default async function CleanerDetailPage({ params }: { params: Promise<{ 
         </div>
 
         <CleanerEditForm cleaner={c} />
+      </div>
+
+      <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
+        <div>
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Account Status</p>
+          <CleanerToggleForm
+            cleanerId={c.id}
+            isActive={c.is_active}
+            deactivatedAt={deactivatedAt}
+            upcomingJobCount={upcomingJobCount}
+            bookingsHref={`${basePath}/bookings`}
+          />
+        </div>
+
+        <div className="pt-4 border-t border-gray-100">
+          <DeleteCleanerButton cleanerId={c.id} />
+        </div>
       </div>
 
       {/* Availability Management */}
