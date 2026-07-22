@@ -18,7 +18,6 @@ const PATH_LABELS: Record<string, string> = {
   feedback:      'Feedback',
   announcements: 'Announcements',
   reports:       'Reports',
-  settings:      'Bank Check Settings',
   customer:      'Dashboard',
   cleaner:       'Dashboard',
   manager:       'Dashboard',

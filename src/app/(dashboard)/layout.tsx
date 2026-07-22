@@ -11,7 +11,7 @@ import { SidebarNav, type NavSection } from '@/components/dashboard/sidebar-nav'
 import { DashboardShell } from '@/components/dashboard/dashboard-shell'
 import {
   IconDashboard, IconCalendar, IconUsers, IconChat, IconStar,
-  IconChart, IconSettings, IconSignOut, IconChevronRight, IconMegaphone, IconHeadset,
+  IconChart, IconSignOut, IconChevronRight, IconMegaphone, IconHeadset,
 } from '@/components/icons'
 
 function getAdminNav(basePath: string): NavSection[] {
@@ -39,7 +39,6 @@ function getAdminNav(basePath: string): NavSection[] {
       label: 'Admin',
       links: [
         { href: `${basePath}/reports`,   label: 'Reports',          icon: <IconChart /> },
-        { href: `${basePath}/settings`,  label: 'Bank Check Settings', icon: <IconSettings /> },
       ],
     },
   ]
