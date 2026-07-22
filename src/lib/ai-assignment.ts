@@ -54,8 +54,19 @@ export type RankedCleaner = {
   dispatched: boolean
 }
 
+// A cleaner who was removed from consideration before scoring — surfaced
+// (rather than silently dropped) so the dispatch UI can show them grayed out
+// with a reason instead of just not mentioning them at all.
+export type ExcludedCleaner = {
+  cleanerId: string
+  fullName: string
+  photoUrl: string | null
+  reason: 'day_off' | 'conflict'
+}
+
 export type AIDispatchResult = {
   rankedCleaners: RankedCleaner[]
+  excludedCleaners: ExcludedCleaner[]
   dispatched: number
   reasoning: string[]
   bookingLat: number | null
@@ -112,7 +123,7 @@ export async function runAIDispatch(bookingId: string, dryRun = false): Promise<
   reasoning.push(`Cleaner pool: ${allPool.length} active, ${alreadyAssigned.size} already assigned — ${pool.length} candidates.`)
 
   if (pool.length === 0) {
-    return { rankedCleaners: [], dispatched: 0, bookingLat, bookingLng, reasoning: [...reasoning, 'All active cleaners are already assigned to this booking.'] }
+    return { rankedCleaners: [], excludedCleaners: [], dispatched: 0, bookingLat, bookingLng, reasoning: [...reasoning, 'All active cleaners are already assigned to this booking.'] }
   }
 
   // ── Step 3a: Filter — day-offs ──────────────────────────────────────────
@@ -125,10 +136,13 @@ export async function runAIDispatch(bookingId: string, dryRun = false): Promise<
 
   const offSet = new Set((dayOffRows ?? []).map((d: { cleaner_id: string }) => d.cleaner_id))
   const afterDayOff = pool.filter((c) => !offSet.has(c.id))
+  const dayOffExcluded: ExcludedCleaner[] = pool
+    .filter((c) => offSet.has(c.id))
+    .map((c) => ({ cleanerId: c.id, fullName: c.full_name, photoUrl: c.photo_url ?? null, reason: 'day_off' as const }))
   reasoning.push(`Day-off filter: removed ${offSet.size}, ${afterDayOff.length} remaining.`)
 
   if (afterDayOff.length === 0) {
-    return { rankedCleaners: [], dispatched: 0, bookingLat, bookingLng, reasoning: [...reasoning, 'All cleaners have day-offs on this date.'] }
+    return { rankedCleaners: [], excludedCleaners: dayOffExcluded, dispatched: 0, bookingLat, bookingLng, reasoning: [...reasoning, 'All cleaners have day-offs on this date.'] }
   }
 
   // ── Step 3b: Shared same-day data (conflict + workload + proximity) ──────
@@ -181,10 +195,14 @@ export async function runAIDispatch(bookingId: string, dryRun = false): Promise<
   }
 
   const eligible = afterDayOff.filter((c) => !conflictSet.has(c.id))
+  const conflictExcluded: ExcludedCleaner[] = afterDayOff
+    .filter((c) => conflictSet.has(c.id))
+    .map((c) => ({ cleanerId: c.id, fullName: c.full_name, photoUrl: c.photo_url ?? null, reason: 'conflict' as const }))
+  const excludedCleaners: ExcludedCleaner[] = [...dayOffExcluded, ...conflictExcluded]
   reasoning.push(`Conflict filter (±2h buffer): removed ${conflictSet.size}, ${eligible.length} eligible.`)
 
   if (eligible.length === 0) {
-    return { rankedCleaners: [], dispatched: 0, bookingLat, bookingLng, reasoning: [...reasoning, 'All available cleaners have scheduling conflicts on this day.'] }
+    return { rankedCleaners: [], excludedCleaners, dispatched: 0, bookingLat, bookingLng, reasoning: [...reasoning, 'All available cleaners have scheduling conflicts on this day.'] }
   }
 
   // ── Step 4a: Fetch average performance ratings ──────────────────────────
@@ -392,7 +410,7 @@ export async function runAIDispatch(bookingId: string, dryRun = false): Promise<
 
   reasoning.push(`Done. ${toDispatch.length} cleaner(s) assigned.`)
 
-  return { rankedCleaners, dispatched: toDispatch.length, bookingLat, bookingLng, reasoning }
+  return { rankedCleaners, excludedCleaners, dispatched: toDispatch.length, bookingLat, bookingLng, reasoning }
 }
 
 // ── Shared conflict guard (used by every assignment write path) ────────────

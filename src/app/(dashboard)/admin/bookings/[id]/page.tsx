@@ -186,6 +186,8 @@ export default async function AdminBookingDetailPage({
         sourceType: pm.paymongo_source_type,
         status: pm.paymongo_status,
         paidAt: pm.paymongo_paid_at,
+        // Not persisted (no DB column) — only ever available on a fresh live fetch.
+        billingName: null as string | null,
       }
     : null
 
@@ -214,6 +216,7 @@ export default async function AdminBookingDetailPage({
         sourceType: liveDetail.sourceType,
         status: liveDetail.status,
         paidAt: liveDetail.paidAt,
+        billingName: liveDetail.billingName,
       }
     : cachedPaymongoDetail
 

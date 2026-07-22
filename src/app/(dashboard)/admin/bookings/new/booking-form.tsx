@@ -5,6 +5,10 @@ import { createManualBooking, createCustomerAccount, getCustomerBookingSlots } f
 import { serviceNeedsSqm, estimateBookingPrice, paymentStatusLabel } from '@/lib/booking-pricing'
 import { SPACE_TYPES, METRO_MANILA_CITIES as METRO_MANILA_CITY_NAMES, PAYMENT_METHODS } from '@/lib/booking-constants'
 import { SelectDropdown } from '@/components/dashboard/select-dropdown'
+import {
+  EMAIL_RE, NAME_TEXT_RE, PH_MOBILE_RE, describeEmailError,
+  sanitizeAddressInput, sanitizeNameInput, sanitizeEmailInput, sanitizePhoneInput,
+} from '@/lib/validation'
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -102,27 +106,6 @@ const MONTH_LABELS = [
 // Bookings must be made at least 24 hours ahead of the service slot.
 function minBookableDateTime() {
   return new Date(Date.now() + 24 * 60 * 60 * 1000)
-}
-
-// Address text: letters (incl. accented PH names), digits, spaces, and common
-// address punctuation only — strips <, @, %, and other markup/injection characters as typed.
-const ADDRESS_UNSAFE_CHARS_RE = /[^a-zA-Z0-9À-ÿ.,'#\-/() ]/g
-function sanitizeAddressInput(value: string) {
-  return value.replace(ADDRESS_UNSAFE_CHARS_RE, '')
-}
-
-// Full name: letters (incl. accented PH names), spaces, periods, apostrophes,
-// and hyphens only — same idea as sanitizeAddressInput but for a person's name.
-const NAME_UNSAFE_CHARS_RE = /[^a-zA-ZÀ-ÿ' .-]/g
-function sanitizeNameInput(value: string) {
-  return value.replace(NAME_UNSAFE_CHARS_RE, '')
-}
-
-// PH mobile numbers are digits only — pattern="09[0-9]{9}" only catches this
-// at submit time, and type="tel" doesn't block keystrokes on its own.
-const PHONE_UNSAFE_CHARS_RE = /[^0-9]/g
-function sanitizePhoneInput(value: string) {
-  return value.replace(PHONE_UNSAFE_CHARS_RE, '')
 }
 
 function toISO(d: Date) {
@@ -510,9 +493,29 @@ export default function BookingForm({ services, customers }: { services: Service
   // Create customer state
   const [createPending, startCreateTransition] = useTransition()
   const [createError, setCreateError] = useState<string | null>(null)
-  const newFullNameRef = useRef<HTMLInputElement>(null)
-  const newEmailRef = useRef<HTMLInputElement>(null)
-  const newPhoneRef = useRef<HTMLInputElement>(null)
+  const [createAttempted, setCreateAttempted] = useState(false)
+  const [newFullName, setNewFullName] = useState('')
+  const [newEmail, setNewEmail] = useState('')
+  const [newPhone, setNewPhone] = useState('')
+
+  // Mirrors the server-side checks in createCustomerAccount (src/app/actions/admin.ts)
+  // exactly, so an invalid submission never even leaves the browser — the
+  // server still re-validates from scratch regardless, since this action can
+  // always be called directly.
+  const newCustomerErrors = useMemo(() => {
+    const errors: Record<string, string> = {}
+    const trimmedName = newFullName.trim()
+    if (trimmedName.length < 2) errors.new_full_name = 'Full name is required (at least 2 characters).'
+    else if (!NAME_TEXT_RE.test(trimmedName)) errors.new_full_name = 'Full name contains unsupported characters.'
+
+    const trimmedEmail = newEmail.trim()
+    if (!EMAIL_RE.test(trimmedEmail)) errors.new_email = describeEmailError(trimmedEmail)
+
+    if (!PH_MOBILE_RE.test(newPhone)) errors.new_phone = 'Enter a valid Philippine mobile number (09XXXXXXXXX).'
+
+    return errors
+  }, [newFullName, newEmail, newPhone])
+  const showNewCustomerErrors = createAttempted && Object.keys(newCustomerErrors).length > 0
 
   // Service & pricing
   const [selectedServiceId, setSelectedServiceId] = useState('')
@@ -641,8 +644,16 @@ export default function BookingForm({ services, customers }: { services: Service
     [services]
   )
 
-  function handleCreateCustomer(fd: FormData) {
+  function handleCreateCustomer() {
+    setCreateAttempted(true)
+    if (Object.keys(newCustomerErrors).length > 0) return
+
     setCreateError(null)
+    const fd = new FormData()
+    fd.set('full_name', newFullName.trim())
+    fd.set('email', newEmail.trim())
+    fd.set('phone', newPhone)
+
     startCreateTransition(async () => {
       const result = await createCustomerAccount(fd)
       if (result.error) {
@@ -650,6 +661,10 @@ export default function BookingForm({ services, customers }: { services: Service
       } else if (result.customer) {
         setSelectedCustomer(result.customer)
         setCustomerMode('search')
+        setNewFullName('')
+        setNewEmail('')
+        setNewPhone('')
+        setCreateAttempted(false)
       }
     })
   }
@@ -719,26 +734,24 @@ export default function BookingForm({ services, customers }: { services: Service
               />
             ) : (
               <div className="space-y-3 border border-gray-200 rounded-lg p-4 bg-gray-50/50">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Full name<span className="text-red-400 ml-0.5">*</span></label>
-                  <input
-                    ref={newFullNameRef} name="new_full_name" required maxLength={100}
-                    className={`${inputClass} bg-white`} placeholder="Juan dela Cruz"
-                    onChange={(e) => { e.target.value = sanitizeNameInput(e.target.value) }}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Email<span className="text-red-400 ml-0.5">*</span></label>
-                  <input ref={newEmailRef} name="new_email" type="email" required className={`${inputClass} bg-white`} placeholder="customer@email.com" />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Phone<span className="text-red-400 ml-0.5">*</span></label>
-                  <input
-                    ref={newPhoneRef} name="new_phone" type="tel" required maxLength={11} pattern="09[0-9]{9}"
-                    className={`${inputClass} bg-white`} placeholder="09XX XXX XXXX"
-                    onChange={(e) => { e.target.value = sanitizePhoneInput(e.target.value) }}
-                  />
-                </div>
+                <Field
+                  label="Full name" name="new_full_name" required maxLength={100}
+                  placeholder="Juan dela Cruz" value={newFullName}
+                  error={showNewCustomerErrors ? newCustomerErrors.new_full_name : undefined}
+                  onChange={(e) => setNewFullName(sanitizeNameInput(e.target.value))}
+                />
+                <Field
+                  label="Email" name="new_email" type="email" required maxLength={254}
+                  placeholder="customer@email.com" value={newEmail}
+                  error={showNewCustomerErrors ? newCustomerErrors.new_email : undefined}
+                  onChange={(e) => setNewEmail(sanitizeEmailInput(e.target.value))}
+                />
+                <Field
+                  label="Phone" name="new_phone" type="tel" required maxLength={11}
+                  placeholder="09XX XXX XXXX" value={newPhone}
+                  error={showNewCustomerErrors ? newCustomerErrors.new_phone : undefined}
+                  onChange={(e) => setNewPhone(sanitizePhoneInput(e.target.value))}
+                />
 
                 {createError && (
                   <p className="text-xs text-red-600 bg-red-50 border border-red-100 px-3 py-2 rounded-lg">{createError}</p>
@@ -747,13 +760,7 @@ export default function BookingForm({ services, customers }: { services: Service
                 <button
                   type="button"
                   disabled={createPending}
-                  onClick={() => {
-                    const fd = new FormData()
-                    fd.set('full_name', newFullNameRef.current?.value ?? '')
-                    fd.set('email', newEmailRef.current?.value ?? '')
-                    fd.set('phone', newPhoneRef.current?.value ?? '')
-                    handleCreateCustomer(fd)
-                  }}
+                  onClick={handleCreateCustomer}
                   className="w-full py-2 bg-gray-900 text-white rounded-lg text-sm font-semibold hover:bg-gray-800 disabled:opacity-50 transition-colors"
                 >
                   {createPending ? 'Creating customer...' : 'Create Customer'}

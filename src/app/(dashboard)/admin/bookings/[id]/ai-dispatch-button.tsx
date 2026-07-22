@@ -3,7 +3,7 @@
 import { useActionState } from 'react'
 import dynamic from 'next/dynamic'
 import { previewAIDispatch, confirmAIDispatch, type PreviewState, type ConfirmState } from '@/app/actions/ai-dispatch'
-import type { RankedCleaner } from '@/lib/ai-assignment'
+import type { RankedCleaner, ExcludedCleaner } from '@/lib/ai-assignment'
 import type { CleanerLocation } from './all-cleaners-map'
 
 const DispatchMap = dynamic(() => import('./dispatch-map'), { ssr: false })
@@ -32,6 +32,7 @@ function StarIcon({ className }: { className?: string }) {
 
 function PreviewPanel({
   ranked,
+  excluded,
   reasoning,
   bookingId,
   serviceDate,
@@ -41,6 +42,7 @@ function PreviewPanel({
   onDiscard,
 }: {
   ranked: RankedCleaner[]
+  excluded: ExcludedCleaner[]
   reasoning: string[]
   bookingId: string
   serviceDate: string
@@ -159,6 +161,36 @@ function PreviewPanel({
         <p className="text-[11px] text-gray-400">
           +{skipped.length} other cleaner{skipped.length !== 1 ? 's' : ''} evaluated but not selected (ranked lower).
         </p>
+      )}
+
+      {/* Excluded before scoring — day off or an overlapping booking already on file */}
+      {excluded.length > 0 && (
+        <div className="space-y-2">
+          <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-widest">
+            Not Available
+          </p>
+          <div className="space-y-1.5">
+            {excluded.map((c) => (
+              <div
+                key={c.cleanerId}
+                className="flex items-center gap-3 p-2.5 border border-gray-100 rounded-xl bg-gray-50 opacity-60"
+              >
+                {c.photoUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={c.photoUrl} alt={c.fullName} className="w-7 h-7 rounded-full object-cover grayscale shrink-0" />
+                ) : (
+                  <div className="w-7 h-7 rounded-full bg-gray-200 text-gray-500 text-xs font-bold flex items-center justify-center shrink-0 select-none">
+                    {c.fullName.charAt(0).toUpperCase()}
+                  </div>
+                )}
+                <p className="text-xs font-medium text-gray-500 truncate flex-1 min-w-0">{c.fullName}</p>
+                <span className="text-[10px] font-semibold text-gray-500 bg-gray-200 px-2 py-0.5 rounded-full shrink-0">
+                  {c.reason === 'conflict' ? 'Has assigned job on this day' : 'Day off'}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
       )}
 
       {/* Nearest cleaner to customer, by km — not the same as the #1 overall rank */}
@@ -333,6 +365,7 @@ export default function AIDispatchButton({ bookingId, serviceDate, disabled = fa
     return (
       <PreviewPanel
         ranked={previewState.ranked}
+        excluded={previewState.excluded}
         reasoning={previewState.reasoning}
         bookingId={bookingId}
         serviceDate={serviceDate}

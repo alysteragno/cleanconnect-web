@@ -1,7 +1,7 @@
 'use client'
 
 import { useActionState, useEffect, useRef, useState } from 'react'
-import { dispatchCleaners, forceAssignCleaner, cancelBooking, getCleanerWeekScheduleData } from '@/app/actions/admin'
+import { dispatchCleaners, forceAssignCleaner, cancelBooking, getCleanerWeekScheduleData, getConflictingCleanerIds } from '@/app/actions/admin'
 import AIDispatchButton from './ai-dispatch-button'
 import DeleteBookingButton from './delete-booking-button'
 import { haversineKm } from '@/lib/geo'
@@ -458,6 +458,18 @@ export default function DispatchPanel({
 
   const [selected,            setSelected]            = useState<string[]>([])
   const [calendarSelectedIds, setCalendarSelectedIds] = useState<string[]>([])
+  const [conflictingIds,      setConflictingIds]      = useState<Set<string>>(new Set())
+
+  // Same conflict rule the server enforces before writing (findConflictingCleaners,
+  // ±2h buffer) — fetched once so the manual list can gray out cleaners who'd
+  // just be rejected anyway instead of only finding out after submitting.
+  useEffect(() => {
+    let cancelled = false
+    getConflictingCleanerIds(bookingId).then((ids) => {
+      if (!cancelled) setConflictingIds(new Set(ids))
+    })
+    return () => { cancelled = true }
+  }, [bookingId])
 
   const activelyAssigned     = new Set(assignments.filter((a) => a.status === 'assigned').map((a) => a.cleaner_id))
   const availableForDispatch = cleaners.filter((c) => !activelyAssigned.has(c.id))
@@ -648,37 +660,46 @@ export default function DispatchPanel({
                       <div className="space-y-1.5">
                         {availableForDispatch.map((c) => {
                           const isSelected = selected.includes(c.id)
+                          const isConflicting = conflictingIds.has(c.id)
                           return (
                             <label
                               key={c.id}
-                              className={`flex items-center gap-3 p-3 border rounded-xl cursor-pointer transition-all ${
-                                isSelected
-                                  ? 'border-pink-400 bg-pink-50'
-                                  : 'border-gray-200 hover:border-gray-300 bg-white'
+                              title={isConflicting ? 'Has assigned job on this day — overlaps this booking’s time.' : undefined}
+                              className={`flex items-center gap-3 p-3 border rounded-xl transition-all ${
+                                isConflicting
+                                  ? 'border-gray-100 bg-gray-50 opacity-60 cursor-not-allowed'
+                                  : isSelected
+                                    ? 'border-pink-400 bg-pink-50 cursor-pointer'
+                                    : 'border-gray-200 hover:border-gray-300 bg-white cursor-pointer'
                               }`}
                             >
-                              <input type="checkbox" checked={isSelected} onChange={() => toggle(c.id)} className="sr-only" />
+                              <input
+                                type="checkbox" checked={isSelected} disabled={isConflicting}
+                                onChange={() => toggle(c.id)} className="sr-only"
+                              />
                               {c.photo_url ? (
                                 // eslint-disable-next-line @next/next/no-img-element
                                 <img
                                   src={c.photo_url}
                                   alt={c.full_name}
                                   className={`w-7 h-7 rounded-full object-cover shrink-0 border ${
-                                    isSelected ? 'border-pink-500 ring-2 ring-pink-300' : 'border-gray-200'
+                                    isConflicting ? 'grayscale border-gray-200' : isSelected ? 'border-pink-500 ring-2 ring-pink-300' : 'border-gray-200'
                                   }`}
                                 />
                               ) : (
                                 <div className={`w-7 h-7 rounded-full text-xs font-bold flex items-center justify-center shrink-0 transition-colors ${
-                                  isSelected ? 'bg-pink-600 text-white' : 'bg-gray-100 text-gray-600'
+                                  isConflicting ? 'bg-gray-200 text-gray-500' : isSelected ? 'bg-pink-600 text-white' : 'bg-gray-100 text-gray-600'
                                 }`}>
                                   {c.full_name.charAt(0).toUpperCase()}
                                 </div>
                               )}
                               <div className="flex-1 min-w-0">
-                                <p className="text-sm font-medium text-gray-900 truncate">{c.full_name}</p>
-                                {c.phone && <p className="text-xs text-gray-400">{c.phone}</p>}
+                                <p className={`text-sm font-medium truncate ${isConflicting ? 'text-gray-500' : 'text-gray-900'}`}>{c.full_name}</p>
+                                {isConflicting ? (
+                                  <p className="text-[11px] text-gray-400">Has assigned job on this day</p>
+                                ) : c.phone && <p className="text-xs text-gray-400">{c.phone}</p>}
                               </div>
-                              {isSelected && (
+                              {isSelected && !isConflicting && (
                                 <svg className="w-4 h-4 text-pink-600 shrink-0" fill="currentColor" viewBox="0 0 20 20">
                                   <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                                 </svg>

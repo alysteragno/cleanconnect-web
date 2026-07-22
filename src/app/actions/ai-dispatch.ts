@@ -2,13 +2,13 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient, createAdminClient } from '@/utils/supabase/server'
-import { runAIDispatch, findConflictingCleaners, type RankedCleaner } from '@/lib/ai-assignment'
+import { runAIDispatch, findConflictingCleaners, type RankedCleaner, type ExcludedCleaner } from '@/lib/ai-assignment'
 import type { CleanerLocation } from '../(dashboard)/admin/bookings/[id]/all-cleaners-map'
 
 // ── Preview (dry-run): evaluate without writing assignments ──────────────────
 
 export type PreviewState =
-  | { ranked: RankedCleaner[]; reasoning: string[]; bookingLat: number | null; bookingLng: number | null; cleanerLocations: CleanerLocation[] }
+  | { ranked: RankedCleaner[]; excluded: ExcludedCleaner[]; reasoning: string[]; bookingLat: number | null; bookingLng: number | null; cleanerLocations: CleanerLocation[] }
   | { error: string }
   | undefined
 
@@ -54,7 +54,7 @@ export async function previewAIDispatch(
       runAIDispatch(bookingId, true), // dry run — no DB writes
       getAllCleanerLocations(),
     ])
-    return { ranked: result.rankedCleaners, reasoning: result.reasoning, bookingLat: result.bookingLat, bookingLng: result.bookingLng, cleanerLocations }
+    return { ranked: result.rankedCleaners, excluded: result.excludedCleaners, reasoning: result.reasoning, bookingLat: result.bookingLat, bookingLng: result.bookingLng, cleanerLocations }
   } catch (e) {
     return { error: e instanceof Error ? e.message : 'AI evaluation failed.' }
   }

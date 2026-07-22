@@ -9,6 +9,10 @@ import { estimateBookingPrice, estimateDurationHours, serviceNeedsSqm } from '@/
 import { findConflictingCleaners } from '@/lib/ai-assignment'
 import { SPACE_TYPES, METRO_MANILA_CITIES, PAYMENT_METHODS } from '@/lib/booking-constants'
 import { getUpcomingAssignedJobCount } from '@/lib/cleaner-jobs'
+import {
+  PH_MOBILE_RE, EMAIL_RE, ADDRESS_TEXT_RE, NAME_TEXT_RE, UUID_RE, DATE_RE, TIME_RE,
+  PH_LAT_RANGE, PH_LNG_RANGE, cleanText, ageInYears, describeEmailError,
+} from '@/lib/validation'
 
 export type AdminActionState = { error?: string; success?: string; fieldErrors?: Record<string, string> } | undefined
 
@@ -19,77 +23,6 @@ async function assertSuperAdmin(supabase: Awaited<ReturnType<typeof createClient
     .eq('id', userId)
     .single()
   return data?.role === 'super_admin'
-}
-
-// ── Shared input sanitization & validation ─────────────────────────────────
-
-const PH_MOBILE_RE = /^09\d{9}$/
-// Deliberately narrower than the full WHATWG/HTML5 email grammar: local part
-// is restricted to letters, digits, and . _ - + (no <, >, spaces, or the
-// other RFC-legal-but-rarely-used symbols like ! # $ % & ' * = ? ^ ` { | } ~).
-// Domain must be dot-separated labels that each start/end alphanumeric (so
-// "-bad.com" and "x..com" are rejected) with a required TLD — "user@localhost"
-// doesn't validate.
-const EMAIL_RE = /^[a-zA-Z0-9._+-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$/
-/** Letters (incl. accented PH names), digits, spaces, and common address punctuation only — no <, @, %, or other markup/injection characters. */
-const ADDRESS_TEXT_RE = /^[a-zA-Z0-9À-ÿ.,'#\-\/() ]+$/
-/** Letters (incl. accented PH names), spaces, periods, apostrophes, and hyphens only. */
-const NAME_TEXT_RE = /^[a-zA-ZÀ-ÿ' .\-]+$/
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-const DATE_RE = /^\d{4}-\d{2}-\d{2}$/
-const TIME_RE = /^\d{2}:\d{2}$/
-/** Roughly the Philippines' bounding box — cheap sanity check on submitted coordinates. */
-const PH_LAT_RANGE = [4, 21.5] as const
-const PH_LNG_RANGE = [116, 127] as const
-
-/** Trim, strip control characters, collapse whitespace, and cap length. */
-function cleanText(value: FormDataEntryValue | null, maxLength: number): string {
-  return (typeof value === 'string' ? value : '')
-    .replace(/[\u0000-\u001F\u007F]/g, '')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .slice(0, maxLength)
-}
-
-function ageInYears(dob: Date): number {
-  const now = new Date()
-  let age = now.getFullYear() - dob.getFullYear()
-  const monthDiff = now.getMonth() - dob.getMonth()
-  if (monthDiff < 0 || (monthDiff === 0 && now.getDate() < dob.getDate())) age--
-  return age
-}
-
-// Every character EMAIL_RE allows anywhere in an address (local part's
-// charset is a superset of the domain's), used below to point out exactly
-// which character broke validation instead of just saying "invalid".
-const EMAIL_ALLOWED_CHAR_RE = /[a-zA-Z0-9._+@-]/
-
-/**
- * Diagnoses exactly why an email failed EMAIL_RE instead of a blanket
- * "invalid email" — checked in order from "most likely what the admin
- * actually typed wrong" (a stray character like < or a missing @) down to
- * domain formatting edge cases.
- */
-function describeEmailError(email: string): string {
-  if (!email) return 'Email is required.'
-  if (/\s/.test(email)) return 'Email cannot contain spaces.'
-
-  const badChars = [...new Set([...email].filter((c) => !EMAIL_ALLOWED_CHAR_RE.test(c)))]
-  if (badChars.length > 0) {
-    return `Email contains characters that aren't allowed: ${badChars.join(' ')}`
-  }
-
-  const atCount = (email.match(/@/g) ?? []).length
-  if (atCount === 0) return 'Email must contain an @ symbol, e.g. name@example.com.'
-  if (atCount > 1) return 'Email must contain only one @ symbol.'
-
-  const [local, domain] = email.split('@')
-  if (!local) return 'Enter the part of the email before the @ symbol.'
-  if (!domain) return 'Enter a domain after the @ symbol, e.g. example.com.'
-  if (!domain.includes('.')) return 'Domain must include an extension, e.g. .com.'
-  if (/^[.-]|[.-]$|\.\.|-\.|\.-/.test(domain)) return 'Enter a valid domain, e.g. example.com.'
-
-  return 'Enter a valid email address, e.g. name@example.com.'
 }
 
 type CleanerFields = {
@@ -959,6 +892,10 @@ export async function getCleanerWeekScheduleData(
 }> {
   if (cleanerIds.length === 0) return { dayOffs: [], assignments: [] }
 
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user || !(await assertSuperAdmin(supabase, user.id))) return { dayOffs: [], assignments: [] }
+
   const end = new Date(weekStart + 'T00:00:00')
   end.setDate(end.getDate() + 6)
   const weekEnd = end.toISOString().slice(0, 10)
@@ -1008,6 +945,29 @@ export async function getCleanerWeekScheduleData(
   }
 
   return { dayOffs: dayOffs ?? [], assignments }
+}
+
+// Lets the manual "Dispatch Cleaners" list gray out cleaners who already have
+// an overlapping assignment for this booking's date/time, instead of only
+// finding out after submitting. Purely advisory — dispatchCleaners/
+// forceAssignCleaner re-run this exact same check (findConflictingCleaners)
+// immediately before writing regardless, since this can go stale the moment
+// another tab/admin assigns a cleaner elsewhere.
+export async function getConflictingCleanerIds(bookingId: string): Promise<string[]> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user || !(await assertSuperAdmin(supabase, user.id))) return []
+  if (!UUID_RE.test(bookingId)) return []
+
+  const adminClient = createAdminClient()
+  const { data: cleaners } = await adminClient
+    .from('profiles')
+    .select('id')
+    .eq('role', 'cleaner')
+    .eq('is_active', true)
+
+  const conflicts = await findConflictingCleaners(bookingId, (cleaners ?? []).map((c) => c.id))
+  return conflicts.map((c) => c.cleanerId)
 }
 
 // ── Customer search (for manual booking) ──────────────────────────────────
@@ -1061,9 +1021,9 @@ export async function createCustomerAccount(
   const { data: { user } } = await supabase.auth.getUser()
   if (!user || !(await assertSuperAdmin(supabase, user.id))) return { error: 'Unauthorized.' }
 
-  const full_name = (formData.get('full_name') as string ?? '').trim().slice(0, 100)
-  const email     = (formData.get('email') as string ?? '').trim().toLowerCase()
-  const phone     = (formData.get('phone') as string ?? '').trim()
+  const full_name = cleanText(formData.get('full_name'), 100)
+  const email     = cleanText(formData.get('email'), 254).toLowerCase()
+  const phone     = cleanText(formData.get('phone'), 11)
 
   if (!full_name || full_name.length < 2) return { error: 'Full name is required (at least 2 characters).' }
   if (!NAME_TEXT_RE.test(full_name)) return { error: 'Full name contains unsupported characters.' }

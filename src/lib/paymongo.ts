@@ -56,6 +56,12 @@ export type PaymongoPaymentDetail = {
   status: string
   /** ISO timestamp — PayMongo's own paid_at, not when this app recorded it. */
   paidAt: string | null
+  /**
+   * The name PayMongo has on file for whoever paid — not persisted (no DB
+   * column for it, unlike the rest of this shape), only ever shown when
+   * freshly fetched live. Null for cached/DB-reconstructed detail.
+   */
+  billingName: string | null
 }
 
 export type RawPayment = {
@@ -68,6 +74,7 @@ export type RawPayment = {
     status?: string
     paid_at?: number | null
     source?: { type?: string } | null
+    billing?: { name?: string | null } | null
   }
 }
 
@@ -84,6 +91,7 @@ export function paymongoDetailFromRawPayment(payment: RawPayment): PaymongoPayme
     sourceType: attrs.source?.type ?? null,
     status: attrs.status ?? 'paid',
     paidAt: typeof attrs.paid_at === 'number' ? new Date(attrs.paid_at * 1000).toISOString() : null,
+    billingName: attrs.billing?.name ?? null,
   }
 }
 

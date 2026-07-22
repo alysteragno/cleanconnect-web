@@ -48,6 +48,7 @@ export type PaymongoDetail = {
   sourceType: string | null
   status: string | null
   paidAt: string | null
+  billingName: string | null
 }
 
 export default function PayMongoCheckout({
@@ -110,6 +111,9 @@ export default function PayMongoCheckout({
 
       {detail && (
         <dl className="text-xs divide-y divide-gray-100 border border-gray-100 rounded-xl overflow-hidden">
+          {detail.billingName && (
+            <Row label="Billed To" value={detail.billingName} />
+          )}
           {detail.amount != null && (
             <Row label="Amount Charged" value={formatPeso(detail.amount)} strong />
           )}
