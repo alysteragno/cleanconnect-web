@@ -35,6 +35,72 @@ export type CheckoutSession = {
   paymentIntentId: string | null
 }
 
+// ── Settled-payment detail ───────────────────────────────────────────────────
+// Both confirmation paths below (QR Ph Payment Intent and hosted Checkout
+// Session) resolve to a PayMongo `Payment` resource once money has actually
+// moved. Both APIs already embed the full resource — not just its id — in
+// their `payments[]` array, so no extra API call is needed to get amount,
+// fee, and the rest; earlier versions of this file just weren't reading it.
+
+export type PaymongoPaymentDetail = {
+  id: string
+  /** Pesos, converted from PayMongo's centavos. */
+  amount: number
+  /** PayMongo's processing fee, pesos. */
+  fee: number
+  /** amount - fee, pesos — what actually lands in the account. */
+  netAmount: number
+  currency: string
+  /** e.g. 'qrph', 'gcash', 'card' — whichever method the customer actually used. */
+  sourceType: string | null
+  status: string
+  /** ISO timestamp — PayMongo's own paid_at, not when this app recorded it. */
+  paidAt: string | null
+}
+
+export type RawPayment = {
+  id: string
+  attributes?: {
+    amount?: number
+    fee?: number
+    net_amount?: number
+    currency?: string
+    status?: string
+    paid_at?: number | null
+    source?: { type?: string } | null
+  }
+}
+
+/** Converts a raw PayMongo Payment resource (as embedded in a Payment Intent's or Checkout Session's `payments[]`, or delivered directly by a `payment.paid` webhook) into our display/storage shape. */
+export function paymongoDetailFromRawPayment(payment: RawPayment): PaymongoPaymentDetail {
+  const attrs = payment.attributes ?? {}
+  const toPesos = (centavos?: number) => (typeof centavos === 'number' ? centavos / 100 : 0)
+  return {
+    id: payment.id,
+    amount: toPesos(attrs.amount),
+    fee: toPesos(attrs.fee),
+    netAmount: toPesos(attrs.net_amount),
+    currency: attrs.currency ?? 'PHP',
+    sourceType: attrs.source?.type ?? null,
+    status: attrs.status ?? 'paid',
+    paidAt: typeof attrs.paid_at === 'number' ? new Date(attrs.paid_at * 1000).toISOString() : null,
+  }
+}
+
+/** Shape of the DB update every settlement path writes — keeps the columns in sync in one place. */
+export function paymentDetailColumns(detail: PaymongoPaymentDetail) {
+  return {
+    paymongo_payment_id: detail.id,
+    paymongo_amount: detail.amount,
+    paymongo_fee: detail.fee,
+    paymongo_net_amount: detail.netAmount,
+    paymongo_currency: detail.currency,
+    paymongo_source_type: detail.sourceType,
+    paymongo_status: detail.status,
+    paymongo_paid_at: detail.paidAt,
+  }
+}
+
 type LineItem = { name: string; amount: number; quantity: number }
 
 /**
@@ -223,7 +289,7 @@ export async function createQrPhIntent(opts: {
  * `/api/paymongo/qrph-intent/confirm` route that wraps this while the code
  * is on screen.
  */
-export async function confirmQrPhPayment(bookingId: string): Promise<{ paid: boolean }> {
+export async function confirmQrPhPayment(bookingId: string): Promise<{ paid: boolean; detail?: PaymongoPaymentDetail }> {
   const admin = createAdminClient()
   const { data: booking } = await admin
     .from('bookings')
@@ -242,16 +308,18 @@ export async function confirmQrPhPayment(bookingId: string): Promise<{ paid: boo
 
   const json = await res.json()
   const attrs = json?.data?.attributes
-  const payments = attrs?.payments as Array<{ id: string; attributes?: { status?: string } }> | undefined
+  const payments = attrs?.payments as RawPayment[] | undefined
   const paidPayment = payments?.find((p) => p.attributes?.status === 'paid')
   if (!paidPayment) return { paid: false }
+
+  const detail = paymongoDetailFromRawPayment(paidPayment)
 
   const { error: updateErr } = await admin
     .from('bookings')
     .update({
       payment_status: 'paid',
       paid_at: new Date().toISOString(),
-      paymongo_payment_id: paidPayment.id,
+      ...paymentDetailColumns(detail),
     })
     .eq('id', booking.id)
   if (updateErr) return { paid: false }
@@ -267,22 +335,73 @@ export async function confirmQrPhPayment(bookingId: string): Promise<{ paid: boo
     bookingId: booking.id,
   })
 
-  return { paid: true }
+  return { paid: true, detail }
 }
 
 /** Looks up a Checkout Session directly on PayMongo and reports whether it has a settled payment. */
-async function retrieveCheckoutSession(sessionId: string): Promise<{ paid: boolean; paymentId: string | null }> {
+async function retrieveCheckoutSession(sessionId: string): Promise<{ paid: boolean; detail: PaymongoPaymentDetail | null }> {
   const res = await fetch(`${PAYMONGO_API}/checkout_sessions/${sessionId}`, {
     headers: { Authorization: authHeader() },
   })
-  if (!res.ok) return { paid: false, paymentId: null }
+  if (!res.ok) return { paid: false, detail: null }
 
   const json = await res.json()
-  const payments = json?.data?.attributes?.payments as
-    | Array<{ id: string; attributes?: { status?: string } }>
-    | undefined
+  const payments = json?.data?.attributes?.payments as RawPayment[] | undefined
   const paidPayment = payments?.find((p) => p.attributes?.status === 'paid')
-  return { paid: !!paidPayment, paymentId: paidPayment?.id ?? null }
+  return { paid: !!paidPayment, detail: paidPayment ? paymongoDetailFromRawPayment(paidPayment) : null }
+}
+
+/**
+ * Retrieves the current payment detail directly from PayMongo for a booking
+ * that's already marked paid — rather than only trusting whatever got
+ * cached in the DB at settlement time. That cache depends on the webhook (or
+ * the poll-based confirm path) having run and matched PayMongo's actual
+ * field shape, which — per the caveats elsewhere in this file — has never
+ * been verified against a live response in this environment; if it silently
+ * mismatched, the DB columns are just empty even though the payment genuinely
+ * settled. This asks PayMongo directly instead, tries the payment intent id
+ * first (native QR flow) and falls back to the checkout id (hosted flow),
+ * and self-heals the DB row on success so future page loads don't need to
+ * re-fetch. Called from the admin booking page whenever payment_status is
+ * 'paid' and either id is on file; returns null (not an error) if neither id
+ * is present (e.g. a manually marked-paid booking with no PayMongo history)
+ * or PayMongo can't be reached — the page falls back to whatever's cached.
+ */
+export async function fetchLivePaymentDetail(opts: {
+  bookingId: string
+  paymentIntentId: string | null
+  checkoutId: string | null
+}): Promise<PaymongoPaymentDetail | null> {
+  let detail: PaymongoPaymentDetail | null = null
+
+  try {
+    if (opts.paymentIntentId) {
+      const res = await fetch(`${PAYMONGO_API}/payment_intents/${opts.paymentIntentId}`, {
+        headers: { Authorization: authHeader() },
+      })
+      if (res.ok) {
+        const json = await res.json()
+        const payments = json?.data?.attributes?.payments as RawPayment[] | undefined
+        const paid = payments?.find((p) => p.attributes?.status === 'paid')
+        if (paid) detail = paymongoDetailFromRawPayment(paid)
+      }
+    }
+    if (!detail && opts.checkoutId) {
+      const { detail: checkoutDetail } = await retrieveCheckoutSession(opts.checkoutId)
+      detail = checkoutDetail
+    }
+  } catch {
+    // PayMongo unreachable, bad key, etc. — return whatever's cached instead of crashing the page.
+    return null
+  }
+
+  if (!detail) return null
+
+  // Best-effort self-heal — a failure here doesn't change what's returned for display.
+  const admin = createAdminClient()
+  await admin.from('bookings').update(paymentDetailColumns(detail)).eq('id', opts.bookingId)
+
+  return detail
 }
 
 /**
@@ -306,15 +425,15 @@ export async function confirmCheckoutPayment(bookingId: string): Promise<{ paid:
     if (booking.payment_status === 'paid') return { paid: true }
     if (!booking.paymongo_checkout_id) return { paid: false }
 
-    const { paid, paymentId } = await retrieveCheckoutSession(booking.paymongo_checkout_id)
-    if (!paid) return { paid: false }
+    const { paid, detail } = await retrieveCheckoutSession(booking.paymongo_checkout_id)
+    if (!paid || !detail) return { paid: false }
 
     const { error: updateErr } = await admin
       .from('bookings')
       .update({
         payment_status: 'paid',
         paid_at: new Date().toISOString(),
-        paymongo_payment_id: paymentId,
+        ...paymentDetailColumns(detail),
       })
       .eq('id', booking.id)
     if (updateErr) return { paid: false }

@@ -215,17 +215,16 @@ export default function NewCleanerPage() {
     return d.toISOString().slice(0, 10)
   })()
 
-  // The account exists but can't sign in until the cleaner confirms their
-  // email (createCleanerAccount no longer redirects straight to Cleaners on
-  // success) — this is the "still needs a step" state the admin needs to
-  // see, not a silent redirect implying everything's already usable.
+  // Account creation no longer redirects straight to Cleaners on success —
+  // this confirmation state exists so the admin can read back the password
+  // reminder and email before navigating away.
   if (state?.success) {
     return (
       <div className="max-w-2xl">
         <div className="bg-white rounded-xl border border-gray-200 p-8 text-center space-y-4">
-          <div className="w-12 h-12 rounded-full bg-amber-50 flex items-center justify-center mx-auto">
-            <svg className="w-6 h-6 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+          <div className="w-12 h-12 rounded-full bg-emerald-50 flex items-center justify-center mx-auto">
+            <svg className="w-6 h-6 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
             </svg>
           </div>
           <div>

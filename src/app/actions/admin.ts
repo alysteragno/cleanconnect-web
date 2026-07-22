@@ -273,15 +273,17 @@ export async function createCleanerAccount(
   }
   const f = (parsed as { data: CleanerFields }).data
 
-  // email_confirm: false — the cleaner must confirm their email before they
-  // can sign in at all; Supabase's Auth layer blocks sign-in for
-  // unconfirmed accounts on its own, so no app-side gating is needed for
-  // that part. The account is still created with the password the admin
-  // just set, so nothing else about account setup waits on confirmation.
+  // email_confirm: true — the account is usable immediately with the
+  // password the admin just set. A click-to-confirm gate was tried and
+  // reverted: every Supabase-native way to deliver that confirmation link
+  // (code exchange, token_hash verification) requires opening a web page to
+  // complete it, which isn't wanted here — there's no way to "confirm an
+  // email" without some link being opened somewhere, so instant access is
+  // the simpler, working alternative.
   const { data: signUpData, error: signUpError } = await adminClient.auth.admin.createUser({
     email,
     password,
-    email_confirm: false,
+    email_confirm: true,
   })
 
   if (signUpError) {
@@ -317,18 +319,17 @@ export async function createCleanerAccount(
     return { error: profileError.message }
   }
 
-  // createUser() never sends email on its own regardless of email_confirm —
-  // resend() is what actually triggers Supabase's "Confirm signup" template
-  // (a genuinely different email from the "Reset Password" one used
-  // elsewhere) for the still-unconfirmed account just created above.
-  // Non-blocking: if this fails to send, the account still exists and the
-  // admin can be told to have the cleaner use "Resend confirmation" (or the
-  // admin can re-trigger this) rather than losing the whole submission.
-  await supabase.auth.resend({ type: 'signup', email })
-
+  // No automated email is sent here. Every Supabase-native trigger
+  // (resend/resetPasswordForEmail/inviteUserByEmail) is a clickable-link
+  // email that opens a web page to complete — which was explicitly not
+  // wanted. Sending a plain, link-free "your account is ready" notification
+  // instead would require a real transactional email service (Resend/
+  // Brevo — see HANDOFF.md), not yet wired into this project. Until that
+  // exists, the admin communicates the login (this screen) to the cleaner
+  // directly.
   revalidatePath('/admin/cleaners')
   return {
-    success: `Cleaner account created. ${f.full_name} must confirm their email (${email}) before they can sign in — a confirmation link has been sent to that address.`,
+    success: `Cleaner account created. ${f.full_name} can sign in now on the mobile app using ${email} and the password you set.`,
   }
 }
 
@@ -1368,7 +1369,19 @@ export async function createManualBooking(
     .select('id')
     .single()
 
-  if (insertError) return { error: insertError.message }
+  if (insertError) {
+    // Last line of defense: the application-level check above (lines ~1276-1289)
+    // has a TOCTOU gap between the read and this insert — two concurrent
+    // requests for the same customer/date/time can both pass it. The DB-level
+    // uq_bookings_customer_no_double_booking unique index (see
+    // supabase/migration_prevent_customer_double_booking.sql) is what actually
+    // blocks the second insert; surface the same friendly message here instead
+    // of the raw Postgres constraint-violation text.
+    if (insertError.code === '23505' && insertError.message.includes('uq_bookings_customer_no_double_booking')) {
+      return { error: 'This customer already has a booking on this date and time. Pick a different date or time.' }
+    }
+    return { error: insertError.message }
+  }
   if (!newBooking) return { error: 'Booking created but failed to retrieve ID.' }
 
   await adminClient

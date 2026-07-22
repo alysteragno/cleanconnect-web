@@ -11,6 +11,7 @@ import PayMongoCheckout from './paymongo-checkout'
 import CleanersForm from './cleaners-form'
 import FurniturePhotoGrid from './furniture-photo-grid'
 import { serviceNeedsSqm } from '@/lib/booking-pricing'
+import { fetchLivePaymentDetail } from '@/lib/paymongo'
 
 type Booking = {
   id: string
@@ -149,15 +150,72 @@ export default async function AdminBookingDetailPage({
   const cleanerEnRouteAt: string | null = (enRouteRow as { cleaner_en_route_at?: string | null } | null)?.cleaner_en_route_at ?? null
 
   // Same graceful pattern for the PayMongo columns — degrades to null if the
-  // migration_paymongo.sql migration has not been applied yet.
+  // migration_paymongo.sql / migration_paymongo_payment_detail.sql migrations
+  // have not been applied yet.
   const { data: paymongoRow } = await adminClient
     .from('bookings')
-    .select('paymongo_checkout_url, paymongo_payment_id')
+    .select(`
+      paymongo_checkout_id, paymongo_payment_intent_id, paymongo_payment_id,
+      paymongo_amount, paymongo_fee, paymongo_net_amount, paymongo_currency,
+      paymongo_source_type, paymongo_status, paymongo_paid_at
+    `)
     .eq('id', id)
     .maybeSingle()
-  const paymongoData = (paymongoRow as { paymongo_checkout_url?: string | null; paymongo_payment_id?: string | null } | null)
-  const paymongoCheckoutUrl: string | null = paymongoData?.paymongo_checkout_url ?? null
-  const paymongoPaymentId: string | null = paymongoData?.paymongo_payment_id ?? null
+  type PaymongoRow = {
+    paymongo_checkout_id: string | null
+    paymongo_payment_intent_id: string | null
+    paymongo_payment_id: string | null
+    paymongo_amount: number | null
+    paymongo_fee: number | null
+    paymongo_net_amount: number | null
+    paymongo_currency: string | null
+    paymongo_source_type: string | null
+    paymongo_status: string | null
+    paymongo_paid_at: string | null
+  }
+  const pm = paymongoRow as PaymongoRow | null
+  const cachedPaymongoDetail = pm && (pm.paymongo_payment_id || pm.paymongo_payment_intent_id)
+    ? {
+        paymentId: pm.paymongo_payment_id,
+        paymentIntentId: pm.paymongo_payment_intent_id,
+        checkoutId: pm.paymongo_checkout_id,
+        amount: pm.paymongo_amount,
+        fee: pm.paymongo_fee,
+        netAmount: pm.paymongo_net_amount,
+        currency: pm.paymongo_currency,
+        sourceType: pm.paymongo_source_type,
+        status: pm.paymongo_status,
+        paidAt: pm.paymongo_paid_at,
+      }
+    : null
+
+  // Once paid, fetch the current detail directly from PayMongo rather than
+  // only trusting whatever the webhook/confirm path cached at settlement
+  // time — see the doc comment on fetchLivePaymentDetail for why that cache
+  // can't be assumed complete. Falls back to the cached row if PayMongo
+  // can't be reached or neither id is on file (e.g. manually marked paid).
+  const liveDetail =
+    booking.payment_status === 'paid' && pm && (pm.paymongo_payment_intent_id || pm.paymongo_checkout_id)
+      ? await fetchLivePaymentDetail({
+          bookingId: id,
+          paymentIntentId: pm.paymongo_payment_intent_id,
+          checkoutId: pm.paymongo_checkout_id,
+        })
+      : null
+  const paymongoDetail = liveDetail
+    ? {
+        paymentId: liveDetail.id,
+        paymentIntentId: pm?.paymongo_payment_intent_id ?? null,
+        checkoutId: pm?.paymongo_checkout_id ?? null,
+        amount: liveDetail.amount,
+        fee: liveDetail.fee,
+        netAmount: liveDetail.netAmount,
+        currency: liveDetail.currency,
+        sourceType: liveDetail.sourceType,
+        status: liveDetail.status,
+        paidAt: liveDetail.paidAt,
+      }
+    : cachedPaymongoDetail
 
   // Same graceful pattern again for the per-cleaner geotag columns — degrades
   // to no geotags if migration_cleaner_geotags.sql has not been applied yet.
@@ -426,11 +484,9 @@ export default async function AdminBookingDetailPage({
 
                 <div className="pt-4 border-t border-gray-100">
                   <PayMongoCheckout
-                    bookingId={b.id}
                     paymentMethod={b.payment_method}
                     paymentStatus={b.payment_status}
-                    checkoutUrl={paymongoCheckoutUrl}
-                    paymentId={paymongoPaymentId}
+                    detail={paymongoDetail}
                   />
                 </div>
               </div>

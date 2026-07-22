@@ -40,8 +40,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Forbidden.' }, { status: 403 })
     }
 
-    const { paid } = await confirmQrPhPayment(booking_id)
-    return NextResponse.json({ paid })
+    const { paid, detail } = await confirmQrPhPayment(booking_id)
+    return NextResponse.json({ paid, detail })
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unexpected error.'
     return NextResponse.json({ error: message }, { status: 500 })

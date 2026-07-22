@@ -173,7 +173,7 @@ export default function PaymentVerificationCard({
             )}
 
             {!paymentReference && !paymentProofUrl && (
-              <p className="text-xs text-gray-400 italic">No reference number or proof on file — paid through the PayMongo checkout link below.</p>
+              <p className="text-xs text-gray-400 italic">No reference number or proof on file — paid through the PayMongo QR code below.</p>
             )}
           </div>
         )}
@@ -200,7 +200,7 @@ export default function PaymentVerificationCard({
               {isPending ? 'Updating...' : 'Mark as Paid (manual override)'}
             </button>
             <p className="text-[11px] text-gray-400 leading-snug">
-              Digital payments settle automatically via PayMongo. Use this only to reconcile a payment confirmed outside the checkout link.
+              Digital payments settle automatically via PayMongo. Use this only to reconcile a payment confirmed outside the QR flow.
             </p>
           </div>
         )}
