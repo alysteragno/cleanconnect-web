@@ -4,6 +4,12 @@ import { useActionState, useState } from 'react'
 import { register } from '@/app/actions/auth'
 import { AuthField, AuthButton, AuthError } from '@/components/auth/auth-ui'
 
+// PH mobile numbers are digits only — pattern="09[0-9]{9}" only catches this
+// at submit time, and type="tel" doesn't block keystrokes on its own.
+function sanitizePhoneInput(value: string) {
+  return value.replace(/[^0-9]/g, '')
+}
+
 const PASSWORD_REQUIREMENTS = [
   { label: 'Minimum 8 characters',          test: (p: string) => p.length >= 8 },
   { label: 'At least one uppercase letter', test: (p: string) => /[A-Z]/.test(p) },
@@ -60,6 +66,7 @@ export default function RegisterForm() {
         placeholder="09XX XXX XXXX"
         defaultValue={state?.fields?.phone}
         error={fe?.phone}
+        onChange={(e) => { e.target.value = sanitizePhoneInput(e.target.value) }}
       />
 
       <div>

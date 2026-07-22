@@ -10,6 +10,23 @@ type Props = {
   defaultPhone: string | null
 }
 
+// Mirrors NAME_TEXT_RE / ADDRESS_TEXT_RE in src/app/actions/admin.ts —
+// strips <, @, %, and other markup/injection characters as typed.
+const NAME_UNSAFE_CHARS_RE = /[^a-zA-ZÀ-ÿ' .-]/g
+function sanitizeNameInput(value: string) {
+  return value.replace(NAME_UNSAFE_CHARS_RE, '')
+}
+const ADDRESS_UNSAFE_CHARS_RE = /[^a-zA-Z0-9À-ÿ.,'#\-/() ]/g
+function sanitizeAddressInput(value: string) {
+  return value.replace(ADDRESS_UNSAFE_CHARS_RE, '')
+}
+// PH mobile numbers are digits only — pattern only catches this at submit
+// time, and type="tel" doesn't block keystrokes on its own.
+const PHONE_UNSAFE_CHARS_RE = /[^0-9]/g
+function sanitizePhoneInput(value: string) {
+  return value.replace(PHONE_UNSAFE_CHARS_RE, '')
+}
+
 function Field({
   label,
   name,
@@ -20,6 +37,7 @@ function Field({
   maxLength,
   pattern,
   hint,
+  sanitize,
 }: {
   label: string
   name: string
@@ -30,6 +48,8 @@ function Field({
   maxLength?: number
   pattern?: string
   hint?: string
+  /** Strips disallowed characters as the user types (imperative — works even on uncontrolled inputs). */
+  sanitize?: (value: string) => string
 }) {
   return (
     <div>
@@ -45,6 +65,7 @@ function Field({
         max={max}
         maxLength={maxLength}
         pattern={pattern}
+        onChangeCapture={sanitize ? (e) => { e.currentTarget.value = sanitize(e.currentTarget.value) } : undefined}
         className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-pink-500"
       />
       {hint && <p className="text-xs text-gray-400 mt-1">{hint}</p>}
@@ -105,6 +126,7 @@ export default function ConvertToCleanerForm({ customerId, fullName, defaultPhon
           maxLength={11}
           pattern="09[0-9]{9}"
           hint="09XXXXXXXXX"
+          sanitize={sanitizePhoneInput}
         />
         <Field
           label="Date of Birth"
@@ -115,14 +137,14 @@ export default function ConvertToCleanerForm({ customerId, fullName, defaultPhon
         />
       </div>
 
-      <Field label="Street Address" name="address_street" placeholder="123 Sampaguita St., Brgy. Malaya" />
+      <Field label="Street Address" name="address_street" placeholder="123 Sampaguita St., Brgy. Malaya" sanitize={sanitizeAddressInput} maxLength={200} />
       <div className="grid grid-cols-2 gap-4">
-        <Field label="City / Municipality" name="address_city" placeholder="Quezon City" />
-        <Field label="Province" name="address_province" placeholder="Metro Manila" />
+        <Field label="City / Municipality" name="address_city" placeholder="Quezon City" sanitize={sanitizeAddressInput} maxLength={100} />
+        <Field label="Province" name="address_province" placeholder="Metro Manila" sanitize={sanitizeAddressInput} maxLength={100} />
       </div>
 
       <div className="grid grid-cols-2 gap-4">
-        <Field label="Emergency Contact Name" name="emergency_contact_name" placeholder="Juan Santos" />
+        <Field label="Emergency Contact Name" name="emergency_contact_name" placeholder="Juan Santos" sanitize={sanitizeNameInput} maxLength={100} />
         <Field
           label="Emergency Contact Phone"
           name="emergency_contact_phone"
@@ -130,6 +152,7 @@ export default function ConvertToCleanerForm({ customerId, fullName, defaultPhon
           placeholder="09XX XXX XXXX"
           maxLength={11}
           pattern="09[0-9]{9}"
+          sanitize={sanitizePhoneInput}
         />
       </div>
 

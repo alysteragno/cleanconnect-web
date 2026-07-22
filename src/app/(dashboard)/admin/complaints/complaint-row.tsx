@@ -15,6 +15,7 @@ import { useBasePath } from '@/components/dashboard/base-path-context'
 // tap-to-reveal icon button still works as before.
 export default function ComplaintRow({
   complaintId,
+  ticketLabel,
   subject,
   customerName,
   dateLabel,
@@ -23,6 +24,7 @@ export default function ComplaintRow({
   archived,
 }: {
   complaintId: string
+  ticketLabel: string
   subject: string
   customerName: string
   dateLabel: string
@@ -86,7 +88,9 @@ export default function ComplaintRow({
 
         <div className="flex-1 min-w-0 pointer-events-none">
           <p className="text-sm font-medium text-gray-900 truncate">{subject}</p>
-          <p className="text-xs text-gray-400 mt-0.5 truncate">{customerName} · {dateLabel}</p>
+          <p className="text-xs text-gray-400 mt-0.5 truncate">
+            <span className="font-mono text-gray-500">{ticketLabel}</span> · {customerName} · {dateLabel}
+          </p>
         </div>
         <span className={`text-xs px-2 py-0.5 rounded-full border font-medium shrink-0 pointer-events-none ${statusClass}`}>
           {statusLabel}

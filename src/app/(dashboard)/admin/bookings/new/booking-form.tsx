@@ -1,8 +1,9 @@
 'use client'
 
 import { useActionState, useEffect, useMemo, useRef, useState, useTransition } from 'react'
-import { createManualBooking, createCustomerAccount } from '@/app/actions/admin'
+import { createManualBooking, createCustomerAccount, getCustomerBookingSlots } from '@/app/actions/admin'
 import { serviceNeedsSqm, estimateBookingPrice, paymentStatusLabel } from '@/lib/booking-pricing'
+import { SPACE_TYPES, METRO_MANILA_CITIES as METRO_MANILA_CITY_NAMES, PAYMENT_METHODS } from '@/lib/booking-constants'
 import { SelectDropdown } from '@/components/dashboard/select-dropdown'
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -19,9 +20,9 @@ const inputClass =
   'w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent transition'
 
 function Field({
-  label, name, required, hint, children, ...rest
+  label, name, required, hint, error, children, ...rest
 }: {
-  label: string; name: string; required?: boolean; hint?: string
+  label: string; name: string; required?: boolean; hint?: string; error?: string
   type?: string; placeholder?: string; min?: number; max?: number
   step?: string; maxLength?: number; defaultValue?: string
   value?: string; onChange?: (e: React.ChangeEvent<HTMLInputElement>) => void
@@ -34,8 +35,17 @@ function Field({
           {label}{required && <span className="text-red-400 ml-0.5">*</span>}
           {!required && <span className="text-gray-400 font-normal text-xs ml-1">(optional)</span>}
         </label>
-        {children}
-        {hint && <p className="text-xs text-gray-400 mt-1">{hint}</p>}
+        <div className={error ? 'rounded-lg ring-2 ring-red-400/70' : ''}>
+          {children}
+        </div>
+        {error ? (
+          <p className="text-xs text-red-600 mt-1 flex items-center gap-1">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" className="shrink-0">
+              <circle cx="12" cy="12" r="9" /><path d="M12 8v5M12 16h.01" />
+            </svg>
+            {error}
+          </p>
+        ) : hint && <p className="text-xs text-gray-400 mt-1">{hint}</p>}
       </div>
     )
   }
@@ -45,31 +55,41 @@ function Field({
         {label}{required && <span className="text-red-400 ml-0.5">*</span>}
         {!required && <span className="text-gray-400 font-normal text-xs ml-1">(optional)</span>}
       </label>
-      <input name={name} required={required} className={inputClass} {...rest} />
-      {hint && <p className="text-xs text-gray-400 mt-1">{hint}</p>}
+      <input
+        name={name} required={required}
+        className={`${inputClass} ${error ? 'border-red-400 focus:ring-red-400' : ''}`}
+        {...rest}
+      />
+      {error ? (
+        <p className="text-xs text-red-600 mt-1 flex items-center gap-1">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" className="shrink-0">
+            <circle cx="12" cy="12" r="9" /><path d="M12 8v5M12 16h.01" />
+          </svg>
+          {error}
+        </p>
+      ) : hint && <p className="text-xs text-gray-400 mt-1">{hint}</p>}
     </div>
   )
 }
 
-const PAYMENT_METHODS = [
-  { value: 'cash',       label: 'Cash' },
-  { value: 'gcash',      label: 'Online Payment (QRPh)' },
-  { value: 'bank_check', label: 'Bank Check' },
-]
 const DIGITAL_PAYMENT_METHODS = new Set(['gcash'])
 
-const SPACE_TYPE_OPTIONS = [
-  { value: 'residential', label: 'Residential' },
-  { value: 'condo',       label: 'Condo' },
-  { value: 'office',      label: 'Office' },
-  { value: 'commercial',  label: 'Commercial' },
-]
+const FIELD_LABELS: Record<string, string> = {
+  customer: 'Customer',
+  service: 'Service',
+  serviceDate: 'Service date',
+  serviceTime: 'Service time',
+  propertySqm: 'Property size',
+  addressUnit: 'Unit / Suite',
+  addressStreet: 'Street',
+  addressBarangay: 'Barangay',
+  addressCity: 'City',
+  addressProvince: 'Province',
+}
 
-const METRO_MANILA_CITIES = [
-  'Caloocan', 'Las Piñas', 'Makati', 'Malabon', 'Mandaluyong', 'Manila',
-  'Marikina', 'Muntinlupa', 'Navotas', 'Parañaque', 'Pasay', 'Pasig',
-  'Pateros', 'Quezon City', 'San Juan', 'Taguig', 'Valenzuela',
-].map(city => ({ value: city, label: city }))
+const SPACE_TYPE_OPTIONS = SPACE_TYPES.map((s) => ({ value: s.value, label: s.label }))
+
+const METRO_MANILA_CITIES = METRO_MANILA_CITY_NAMES.map(city => ({ value: city, label: city }))
 
 // ── Service date / time pickers (same calendar design as the reports custom range picker) ──
 
@@ -78,6 +98,32 @@ const MONTH_LABELS = [
   'January', 'February', 'March', 'April', 'May', 'June',
   'July', 'August', 'September', 'October', 'November', 'December',
 ]
+
+// Bookings must be made at least 24 hours ahead of the service slot.
+function minBookableDateTime() {
+  return new Date(Date.now() + 24 * 60 * 60 * 1000)
+}
+
+// Address text: letters (incl. accented PH names), digits, spaces, and common
+// address punctuation only — strips <, @, %, and other markup/injection characters as typed.
+const ADDRESS_UNSAFE_CHARS_RE = /[^a-zA-Z0-9À-ÿ.,'#\-/() ]/g
+function sanitizeAddressInput(value: string) {
+  return value.replace(ADDRESS_UNSAFE_CHARS_RE, '')
+}
+
+// Full name: letters (incl. accented PH names), spaces, periods, apostrophes,
+// and hyphens only — same idea as sanitizeAddressInput but for a person's name.
+const NAME_UNSAFE_CHARS_RE = /[^a-zA-ZÀ-ÿ' .-]/g
+function sanitizeNameInput(value: string) {
+  return value.replace(NAME_UNSAFE_CHARS_RE, '')
+}
+
+// PH mobile numbers are digits only — pattern="09[0-9]{9}" only catches this
+// at submit time, and type="tel" doesn't block keystrokes on its own.
+const PHONE_UNSAFE_CHARS_RE = /[^0-9]/g
+function sanitizePhoneInput(value: string) {
+  return value.replace(PHONE_UNSAFE_CHARS_RE, '')
+}
 
 function toISO(d: Date) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
@@ -90,12 +136,23 @@ function fmtDateLabel(s: string) {
   return fromISO(s).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
-function ServiceDatePicker({ value, onChange }: { value: string; onChange: (iso: string) => void }) {
+function ServiceDatePicker({
+  value, onChange, bookedDates,
+}: { value: string; onChange: (iso: string) => void; bookedDates?: Set<string> }) {
   const [open, setOpen] = useState(false)
   const [closing, setClosing] = useState(false)
   const [viewMonth, setViewMonth] = useState(() => { const d = value ? fromISO(value) : new Date(); d.setDate(1); return d })
   const ref = useRef<HTMLDivElement>(null)
   const todayISO = toISO(new Date())
+  const minBookable = minBookableDateTime()
+
+  // A day is bookable only if it's not a Sunday (no service on Sundays) and
+  // its last available slot (5:00 PM) still meets the 24-hour lead time.
+  function isDayBookable(day: Date) {
+    if (day.getDay() === 0) return false
+    const dayLastSlot = new Date(day.getFullYear(), day.getMonth(), day.getDate(), 17, 0, 0)
+    return dayLastSlot >= minBookable
+  }
 
   function closeDropdown() { setClosing(true) }
 
@@ -116,7 +173,7 @@ function ServiceDatePicker({ value, onChange }: { value: string; onChange: (iso:
   }
 
   function pickDay(iso: string) {
-    if (iso < todayISO) return
+    if (!isDayBookable(fromISO(iso)) || bookedDates?.has(iso)) return
     onChange(iso)
     closeDropdown()
   }
@@ -188,17 +245,23 @@ function ServiceDatePicker({ value, onChange }: { value: string; onChange: (iso:
             {weeks.flat().map((day) => {
               const iso = toISO(day)
               const inMonth = day.getMonth() === viewMonth.getMonth()
-              const isPast = iso < todayISO
+              const isPast = !isDayBookable(day)
+              const isBooked = !isPast && !!bookedDates?.has(iso)
+              const isBlocked = isPast || isBooked
               const isSelected = iso === value
               const isToday = iso === todayISO
               return (
                 <button
                   key={iso}
                   type="button"
-                  disabled={isPast}
+                  disabled={isBlocked}
                   onClick={() => pickDay(iso)}
+                  title={isBooked ? 'This customer already has a booking on this date — blocked' : undefined}
                   className={`relative h-7 text-[11px] flex items-center justify-center transition-colors
-                    ${!inMonth ? 'text-gray-300' : isPast ? 'text-gray-200 cursor-not-allowed' : 'text-gray-700'}
+                    ${!inMonth ? 'text-gray-300'
+                      : isPast ? 'text-gray-200 cursor-not-allowed'
+                      : isBooked ? 'text-red-300 line-through cursor-not-allowed'
+                      : 'text-gray-700'}
                     ${isSelected ? 'bg-pink-600 text-white font-semibold rounded-full z-10' : 'rounded-full hover:bg-pink-50'}
                     ${isToday && !isSelected ? 'ring-1 ring-inset ring-pink-300' : ''}
                   `}
@@ -208,6 +271,13 @@ function ServiceDatePicker({ value, onChange }: { value: string; onChange: (iso:
               )
             })}
           </div>
+
+          {bookedDates && bookedDates.size > 0 && (
+            <div className="flex items-center gap-1.5 mt-3 pt-2.5 border-t border-gray-100">
+              <span className="w-1.5 h-1.5 rounded-full bg-red-300 shrink-0" />
+              <p className="text-[10px] text-gray-400">Dates the customer is already booked on are blocked</p>
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -228,7 +298,9 @@ const SERVICE_TIME_OPTIONS = (() => {
   return opts
 })()
 
-function ServiceTimePicker({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+function ServiceTimePicker({
+  value, onChange, dateISO,
+}: { value: string; onChange: (v: string) => void; dateISO: string }) {
   const [open, setOpen] = useState(false)
   const [closing, setClosing] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
@@ -243,6 +315,13 @@ function ServiceTimePicker({ value, onChange }: { value: string; onChange: (v: s
     document.addEventListener('mousedown', onClickOutside)
     return () => document.removeEventListener('mousedown', onClickOutside)
   }, [open, closing])
+
+  // Only offer times that still satisfy the 24-hour lead time for the chosen date.
+  const availableOptions = useMemo(() => {
+    if (!dateISO) return SERVICE_TIME_OPTIONS
+    const minBookable = minBookableDateTime()
+    return SERVICE_TIME_OPTIONS.filter(o => new Date(`${dateISO}T${o.value}:00`) >= minBookable)
+  }, [dateISO])
 
   const activeLabel = SERVICE_TIME_OPTIONS.find(o => o.value === value)?.label
 
@@ -274,7 +353,10 @@ function ServiceTimePicker({ value, onChange }: { value: string; onChange: (v: s
                      ${closing ? 'animate-dropdown-out' : 'animate-dropdown-in'}`}
           onAnimationEnd={() => { if (closing) { setClosing(false); setOpen(false) } }}
         >
-          {SERVICE_TIME_OPTIONS.map((o) => {
+          {availableOptions.length === 0 && (
+            <p className="px-3 py-3 text-xs text-gray-400 text-center">No times available for this date.</p>
+          )}
+          {availableOptions.map((o) => {
             const isActive = o.value === value
             return (
               <button
@@ -450,6 +532,17 @@ export default function BookingForm({ services, customers }: { services: Service
   // Payment
   const [paymentMethod, setPaymentMethod] = useState('cash')
 
+  // Clear an already-picked time if a newly picked date makes it fall short
+  // of the 24-hour lead time requirement.
+  function handleServiceDateChange(iso: string) {
+    setServiceDate(iso)
+    setServiceTime((prevTime) => {
+      if (!prevTime) return prevTime
+      const dt = new Date(`${iso}T${prevTime}:00`)
+      return dt < minBookableDateTime() ? '' : prevTime
+    })
+  }
+
   const selectedService = services.find(s => s.id === selectedServiceId)
   const needsSqm = serviceNeedsSqm(selectedService?.slug)
   const isSofaService = selectedService?.slug === 'sofa_couch_deep_cleaning'
@@ -460,6 +553,81 @@ export default function BookingForm({ services, customers }: { services: Service
     const sqm = needsSqm ? (parseFloat(propertySqm) || 0) : 0
     return estimateBookingPrice(selectedService.slug, sqm, Number(selectedService.starting_price))
   }, [selectedService, needsSqm, propertySqm])
+
+  // Every required field the submit button silently used to gate on, now
+  // surfaced individually — so instead of a disabled button with no
+  // explanation, the user sees exactly what's missing and where.
+  const [attemptedSubmit, setAttemptedSubmit] = useState(false)
+
+  const fieldErrors = useMemo(() => {
+    const errors: Record<string, string> = {}
+    if (!selectedCustomer) errors.customer = 'Select an existing customer, or create a new one, before continuing.'
+    if (!selectedServiceId) errors.service = 'Select a service.'
+    if (!serviceDate) errors.serviceDate = 'Select a service date at least 24 hours from now.'
+    if (!serviceTime) errors.serviceTime = 'Select a service time.'
+    if (needsSqm) {
+      const sqm = parseFloat(propertySqm)
+      if (!propertySqm || isNaN(sqm) || sqm <= 0) errors.propertySqm = 'Enter a valid property size in sqm.'
+    }
+    if (!addressUnit.trim())     errors.addressUnit = 'Unit / suite is required.'
+    if (!addressStreet.trim())   errors.addressStreet = 'Street address is required.'
+    if (!addressBarangay.trim()) errors.addressBarangay = 'Barangay is required.'
+    if (!addressCity)            errors.addressCity = 'Select a city.'
+    if (!addressProvince.trim()) errors.addressProvince = 'Province is required.'
+    return errors
+  }, [
+    selectedCustomer, selectedServiceId, serviceDate, serviceTime, needsSqm, propertySqm,
+    addressUnit, addressStreet, addressBarangay, addressCity, addressProvince,
+  ])
+
+  const missingFieldCount = Object.keys(fieldErrors).length
+  const showFieldErrors = attemptedSubmit && missingFieldCount > 0
+
+  // Load the selected customer's existing (non-cancelled, upcoming) booking
+  // dates once, as soon as they're picked, so the calendar can block those
+  // dates outright — the customer simply can't be double-booked through
+  // this form. createManualBooking still re-checks the exact same thing at
+  // write time regardless, since this list can go stale the moment another
+  // tab/admin books a slot for this customer.
+  const [checkingCustomerSlots, startLoadCustomerSlots] = useTransition()
+  const [customerBookedSlots, setCustomerBookedSlots] = useState<{ date: string; time: string }[]>([])
+  const latestCustomerSlotsRequest = useRef('')
+  const serviceDateRef = useRef(serviceDate)
+  useEffect(() => { serviceDateRef.current = serviceDate }, [serviceDate])
+
+  useEffect(() => {
+    if (!selectedCustomer) return
+    const customerId = selectedCustomer.id
+    latestCustomerSlotsRequest.current = customerId
+    startLoadCustomerSlots(async () => {
+      const slots = await getCustomerBookingSlots(customerId)
+      // Discard a response that resolved out of order — only the most
+      // recently selected customer's slots should ever win.
+      if (latestCustomerSlotsRequest.current !== customerId) return
+      setCustomerBookedSlots(slots)
+      // A date picked before this customer was selected (or before their
+      // slots finished loading) might now be one of their booked dates —
+      // clear it rather than leave a blocked date sitting selected.
+      if (serviceDateRef.current && slots.some((s) => s.date === serviceDateRef.current)) {
+        setServiceDate('')
+        setServiceTime('')
+      }
+    })
+  }, [selectedCustomer])
+
+  // Gated on selectedCustomer so a stale set can never render once the
+  // customer that produced it is no longer selected (e.g. "Change" clicked).
+  const bookedDates = useMemo(
+    () => (selectedCustomer ? new Set(customerBookedSlots.map((s) => s.date)) : new Set<string>()),
+    [selectedCustomer, customerBookedSlots]
+  )
+
+  function handleFormSubmit(e: React.FormEvent<HTMLFormElement>) {
+    if (missingFieldCount > 0 || checkingCustomerSlots) {
+      e.preventDefault()
+      setAttemptedSubmit(true)
+    }
+  }
 
   function selectCustomer(c: Customer) {
     setSelectedCustomer(c)
@@ -487,7 +655,7 @@ export default function BookingForm({ services, customers }: { services: Service
   }
 
   return (
-    <form action={action} className="space-y-5">
+    <form action={action} onSubmit={handleFormSubmit} className="space-y-5" noValidate>
       <input type="hidden" name="customer_id" value={selectedCustomer?.id ?? ''} />
       <input type="hidden" name="service_id" value={selectedServiceId} />
       <input type="hidden" name="service_date" value={serviceDate} />
@@ -553,7 +721,11 @@ export default function BookingForm({ services, customers }: { services: Service
               <div className="space-y-3 border border-gray-200 rounded-lg p-4 bg-gray-50/50">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Full name<span className="text-red-400 ml-0.5">*</span></label>
-                  <input ref={newFullNameRef} name="new_full_name" required className={`${inputClass} bg-white`} placeholder="Juan dela Cruz" />
+                  <input
+                    ref={newFullNameRef} name="new_full_name" required maxLength={100}
+                    className={`${inputClass} bg-white`} placeholder="Juan dela Cruz"
+                    onChange={(e) => { e.target.value = sanitizeNameInput(e.target.value) }}
+                  />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Email<span className="text-red-400 ml-0.5">*</span></label>
@@ -561,7 +733,11 @@ export default function BookingForm({ services, customers }: { services: Service
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Phone<span className="text-red-400 ml-0.5">*</span></label>
-                  <input ref={newPhoneRef} name="new_phone" type="tel" required maxLength={11} pattern="09[0-9]{9}" className={`${inputClass} bg-white`} placeholder="09XX XXX XXXX" />
+                  <input
+                    ref={newPhoneRef} name="new_phone" type="tel" required maxLength={11} pattern="09[0-9]{9}"
+                    className={`${inputClass} bg-white`} placeholder="09XX XXX XXXX"
+                    onChange={(e) => { e.target.value = sanitizePhoneInput(e.target.value) }}
+                  />
                 </div>
 
                 {createError && (
@@ -590,13 +766,22 @@ export default function BookingForm({ services, customers }: { services: Service
             )}
           </>
         )}
+
+        {showFieldErrors && fieldErrors.customer && (
+          <p className="text-xs text-red-600 flex items-center gap-1">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" className="shrink-0">
+              <circle cx="12" cy="12" r="9" /><path d="M12 8v5M12 16h.01" />
+            </svg>
+            {fieldErrors.customer}
+          </p>
+        )}
       </div>
 
       {/* ── Service Details ── */}
       <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
         <SectionLabel>Service Details</SectionLabel>
 
-        <Field label="Service" name="service_id_select" required>
+        <Field label="Service" name="service_id_select" required error={showFieldErrors ? fieldErrors.service : undefined}>
           <SelectDropdown
             value={selectedServiceId}
             onChange={setSelectedServiceId}
@@ -620,13 +805,25 @@ export default function BookingForm({ services, customers }: { services: Service
         )}
 
         <div className="grid grid-cols-2 gap-3">
-          <Field label="Service date" name="service_date_select" required>
-            <ServiceDatePicker value={serviceDate} onChange={setServiceDate} />
+          <Field label="Service date" name="service_date_select" required error={showFieldErrors ? fieldErrors.serviceDate : undefined}>
+            <ServiceDatePicker value={serviceDate} onChange={handleServiceDateChange} bookedDates={bookedDates} />
           </Field>
-          <Field label="Service time" name="service_time_select" required hint="8:00 AM – 5:00 PM">
-            <ServiceTimePicker value={serviceTime} onChange={setServiceTime} />
+          <Field
+            label="Service time" name="service_time_select" required hint="8:00 AM – 5:00 PM"
+            error={showFieldErrors ? fieldErrors.serviceTime : undefined}
+          >
+            <ServiceTimePicker value={serviceTime} onChange={setServiceTime} dateISO={serviceDate} />
           </Field>
         </div>
+
+        {checkingCustomerSlots && (
+          <p className="text-xs text-gray-400 flex items-center gap-1.5">
+            <svg className="animate-spin" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+              <path d="M12 3a9 9 0 1 0 9 9" />
+            </svg>
+            Loading this customer&apos;s existing bookings...
+          </p>
+        )}
 
         {needsSqm && (
           <div className="grid grid-cols-2 gap-3">
@@ -648,6 +845,7 @@ export default function BookingForm({ services, customers }: { services: Service
               onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPropertySqm(e.target.value)}
               placeholder="e.g. 50"
               hint="Price auto-calculated from sqm"
+              error={showFieldErrors ? fieldErrors.propertySqm : undefined}
             />
           </div>
         )}
@@ -671,20 +869,26 @@ export default function BookingForm({ services, customers }: { services: Service
         <SectionLabel>Address</SectionLabel>
         <Field
           label="Unit / Suite" name="address_unit" required placeholder="e.g. Unit 5B"
-          value={addressUnit} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setAddressUnit(e.target.value)}
+          maxLength={50}
+          value={addressUnit} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setAddressUnit(sanitizeAddressInput(e.target.value))}
+          error={showFieldErrors ? fieldErrors.addressUnit : undefined}
         />
         <div className="grid grid-cols-2 gap-3">
           <Field
             label="Street" name="address_street" required placeholder="e.g. 123 Rizal Ave"
-            value={addressStreet} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setAddressStreet(e.target.value)}
+            maxLength={150}
+            value={addressStreet} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setAddressStreet(sanitizeAddressInput(e.target.value))}
+            error={showFieldErrors ? fieldErrors.addressStreet : undefined}
           />
           <Field
             label="Barangay" name="address_barangay" required placeholder="e.g. Malaya"
-            value={addressBarangay} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setAddressBarangay(e.target.value)}
+            maxLength={100}
+            value={addressBarangay} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setAddressBarangay(sanitizeAddressInput(e.target.value))}
+            error={showFieldErrors ? fieldErrors.addressBarangay : undefined}
           />
         </div>
         <div className="grid grid-cols-2 gap-3">
-          <Field label="City" name="address_city_select" required>
+          <Field label="City" name="address_city_select" required error={showFieldErrors ? fieldErrors.addressCity : undefined}>
             <SelectDropdown
               value={addressCity}
               onChange={setAddressCity}
@@ -694,7 +898,9 @@ export default function BookingForm({ services, customers }: { services: Service
           </Field>
           <Field
             label="Province" name="address_province" required placeholder="e.g. Metro Manila"
-            value={addressProvince} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setAddressProvince(e.target.value)}
+            maxLength={100}
+            value={addressProvince} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setAddressProvince(sanitizeAddressInput(e.target.value))}
+            error={showFieldErrors ? fieldErrors.addressProvince : undefined}
           />
         </div>
       </div>
@@ -752,6 +958,21 @@ export default function BookingForm({ services, customers }: { services: Service
         </p>
       </div>
 
+      {/* ── Missing/invalid fields summary ── */}
+      {showFieldErrors && (
+        <div className="px-4 py-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800 flex items-start gap-2">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 mt-0.5">
+            <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z" />
+            <path d="M12 9v4M12 17h.01" />
+          </svg>
+          <span>
+            <strong>{missingFieldCount} field{missingFieldCount > 1 ? 's need' : ' needs'} your attention:</strong>{' '}
+            {Object.keys(fieldErrors).map((k) => FIELD_LABELS[k] ?? k).join(', ')}.{' '}
+            Fix the highlighted fields above, then try again.
+          </span>
+        </div>
+      )}
+
       {/* ── Error ── */}
       {state?.error && (
         <div className="px-4 py-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
@@ -762,10 +983,10 @@ export default function BookingForm({ services, customers }: { services: Service
       {/* ── Submit ── */}
       <button
         type="submit"
-        disabled={pending || !selectedCustomer || !selectedServiceId || !serviceDate || !serviceTime || !addressCity}
+        disabled={pending || checkingCustomerSlots}
         className="w-full py-3 bg-pink-600 text-white rounded-xl text-sm font-semibold hover:bg-pink-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-sm"
       >
-        {pending ? 'Creating booking...' : 'Create Booking'}
+        {pending ? 'Creating booking...' : checkingCustomerSlots ? 'Loading customer bookings...' : 'Create Booking'}
       </button>
     </form>
   )

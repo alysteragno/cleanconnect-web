@@ -4,6 +4,23 @@ import { useActionState, useState } from 'react'
 import { updateCleanerProfile } from '@/app/actions/admin'
 import CleanerPhotoField from '../cleaner-photo-field'
 
+// Mirrors NAME_TEXT_RE / ADDRESS_TEXT_RE in src/app/actions/admin.ts —
+// strips <, @, %, and other markup/injection characters as typed.
+const NAME_UNSAFE_CHARS_RE = /[^a-zA-ZÀ-ÿ' .-]/g
+function sanitizeNameInput(value: string) {
+  return value.replace(NAME_UNSAFE_CHARS_RE, '')
+}
+const ADDRESS_UNSAFE_CHARS_RE = /[^a-zA-Z0-9À-ÿ.,'#\-/() ]/g
+function sanitizeAddressInput(value: string) {
+  return value.replace(ADDRESS_UNSAFE_CHARS_RE, '')
+}
+// PH mobile numbers are digits only — pattern only catches this at submit
+// time, and type="tel" doesn't block keystrokes on its own.
+const PHONE_UNSAFE_CHARS_RE = /[^0-9]/g
+function sanitizePhoneInput(value: string) {
+  return value.replace(PHONE_UNSAFE_CHARS_RE, '')
+}
+
 export type Cleaner = {
   id: string
   full_name: string
@@ -42,6 +59,7 @@ function Field({
   maxLength,
   pattern,
   hint,
+  sanitize,
 }: {
   label: string
   name: string
@@ -55,6 +73,8 @@ function Field({
   maxLength?: number
   pattern?: string
   hint?: string
+  /** Strips disallowed characters as the user types (imperative — works even on uncontrolled inputs). */
+  sanitize?: (value: string) => string
 }) {
   const isControlled = value !== undefined
   return (
@@ -77,14 +97,13 @@ function Field({
         max={max}
         maxLength={maxLength}
         pattern={pattern}
+        onChangeCapture={sanitize ? (e) => { e.currentTarget.value = sanitize(e.currentTarget.value) } : undefined}
         className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-pink-500"
       />
       {hint && <p className="text-xs text-gray-400 mt-1">{hint}</p>}
     </div>
   )
 }
-
-type GeocodeStatus = 'idle' | 'loading' | 'found' | 'not_found'
 
 export default function CleanerEditForm({ cleaner }: { cleaner: Cleaner }) {
   const [editState, editAction, editPending] = useActionState(updateCleanerProfile, undefined)
@@ -93,36 +112,12 @@ export default function CleanerEditForm({ cleaner }: { cleaner: Cleaner }) {
   const [addressCity,     setAddressCity]     = useState(cleaner.address_city ?? '')
   const [addressProvince, setAddressProvince] = useState(cleaner.address_province ?? '')
 
-  const [homeLat,        setHomeLat]        = useState<number | null>(cleaner.home_lat ?? null)
-  const [homeLng,        setHomeLng]        = useState<number | null>(cleaner.home_lng ?? null)
-  const [geocodeStatus,  setGeocodeStatus]  = useState<GeocodeStatus>('idle')
-
   // Latest DOB that still makes the cleaner 18 today.
   const maxDob = (() => {
     const d = new Date()
     d.setFullYear(d.getFullYear() - 18)
     return d.toISOString().slice(0, 10)
   })()
-
-  async function geocodeAddress() {
-    const parts = [addressStreet, addressCity, addressProvince, 'Philippines'].filter(Boolean)
-    if (parts.length < 2) return
-    setGeocodeStatus('loading')
-    try {
-      const q = encodeURIComponent(parts.join(', '))
-      const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${q}&format=json&limit=1&countrycodes=ph`)
-      const data = await res.json()
-      if (data[0]) {
-        setHomeLat(parseFloat(data[0].lat))
-        setHomeLng(parseFloat(data[0].lon))
-        setGeocodeStatus('found')
-      } else {
-        setGeocodeStatus('not_found')
-      }
-    } catch {
-      setGeocodeStatus('not_found')
-    }
-  }
 
   return (
     <div className="space-y-6">
@@ -132,9 +127,9 @@ export default function CleanerEditForm({ cleaner }: { cleaner: Cleaner }) {
         {/* ── Personal Information ─────────────────────────────────────── */}
         <SectionLabel>Personal Information</SectionLabel>
         <CleanerPhotoField initialUrl={cleaner.photo_url} required />
-        <Field label="Full Name" name="full_name" defaultValue={cleaner.full_name} required />
+        <Field label="Full Name" name="full_name" defaultValue={cleaner.full_name} required sanitize={sanitizeNameInput} maxLength={100} />
         <div className="grid grid-cols-2 gap-4">
-          <Field label="Phone" name="phone" type="tel" defaultValue={cleaner.phone} required placeholder="09XX XXX XXXX" maxLength={11} pattern="09[0-9]{9}" hint="Philippine mobile number (09XXXXXXXXX)" />
+          <Field label="Phone" name="phone" type="tel" defaultValue={cleaner.phone} required placeholder="09XX XXX XXXX" maxLength={11} pattern="09[0-9]{9}" hint="Philippine mobile number (09XXXXXXXXX)" sanitize={sanitizePhoneInput} />
           <Field label="Date of Birth" name="date_of_birth" type="date" defaultValue={cleaner.date_of_birth} required max={maxDob} hint="Must be at least 18 years old" />
         </div>
 
@@ -144,71 +139,41 @@ export default function CleanerEditForm({ cleaner }: { cleaner: Cleaner }) {
           label="Street Address" name="address_street" required
           value={addressStreet} onChange={e => setAddressStreet(e.target.value)}
           placeholder="123 Sampaguita St., Brgy. Malaya"
+          sanitize={sanitizeAddressInput} maxLength={200}
         />
         <div className="grid grid-cols-2 gap-4">
           <Field
             label="City / Municipality" name="address_city" required
             value={addressCity} onChange={e => setAddressCity(e.target.value)}
             placeholder="Quezon City"
+            sanitize={sanitizeAddressInput} maxLength={100}
           />
           <Field
             label="Province" name="address_province" required
             value={addressProvince} onChange={e => setAddressProvince(e.target.value)}
             placeholder="Metro Manila"
+            sanitize={sanitizeAddressInput} maxLength={100}
           />
         </div>
 
-        {/* ── Geocode button ────────────────────────────────────────────── */}
-        <div className="flex items-center gap-3 flex-wrap">
-          <button
-            type="button"
-            onClick={geocodeAddress}
-            disabled={geocodeStatus === 'loading' || !addressCity}
-            className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 border border-gray-200 rounded-lg text-gray-600 hover:border-gray-400 hover:text-gray-900 disabled:opacity-40 transition-colors"
-          >
-            {geocodeStatus === 'loading' ? (
-              <>
-                <span className="w-3 h-3 border-2 border-gray-300 border-t-gray-600 rounded-full animate-spin" />
-                Locating...
-              </>
-            ) : (
-              <>
-                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                    d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                </svg>
-                Pin Home Location
-              </>
-            )}
-          </button>
-
-          {geocodeStatus === 'found' && homeLat != null && homeLng != null && (
-            <span className="inline-flex items-center gap-1 text-xs text-emerald-600">
-              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-              </svg>
-              Located ({homeLat.toFixed(5)}, {homeLng.toFixed(5)})
-            </span>
-          )}
-          {geocodeStatus === 'not_found' && (
-            <span className="text-xs text-red-500">Address not found — try adding more detail.</span>
-          )}
-          {geocodeStatus === 'idle' && cleaner.home_lat != null && (
-            <span className="text-xs text-gray-400">
-              Saved: ({cleaner.home_lat.toFixed(5)}, {cleaner.home_lng?.toFixed(5)})
-            </span>
-          )}
-        </div>
-
-        <input type="hidden" name="home_lat" value={homeLat ?? ''} />
-        <input type="hidden" name="home_lng" value={homeLng ?? ''} />
+        {/*
+          Pin Home Location (client-side Nominatim geocoding) was removed as
+          redundant — dispatch proximity already prefers the cleaner's live
+          last_seen ping over this, only falling back to home_lat/lng when
+          that's stale (src/lib/ai-assignment.ts). These hidden inputs just
+          round-trip whatever was already saved so existing values aren't
+          wiped on an unrelated profile edit; updateCleanerProfile omits the
+          columns from its UPDATE entirely if they don't parse, so there is
+          no longer any UI path that writes new home coordinates.
+        */}
+        <input type="hidden" name="home_lat" value={cleaner.home_lat ?? ''} />
+        <input type="hidden" name="home_lng" value={cleaner.home_lng ?? ''} />
 
         {/* ── Emergency Contact ─────────────────────────────────────────── */}
         <SectionLabel>Emergency Contact</SectionLabel>
         <div className="grid grid-cols-2 gap-4">
-          <Field label="Contact Name" name="emergency_contact_name" defaultValue={cleaner.emergency_contact_name} required placeholder="Juan Santos" />
-          <Field label="Contact Phone" name="emergency_contact_phone" type="tel" defaultValue={cleaner.emergency_contact_phone} required placeholder="09XX XXX XXXX" maxLength={11} pattern="09[0-9]{9}" />
+          <Field label="Contact Name" name="emergency_contact_name" defaultValue={cleaner.emergency_contact_name} required placeholder="Juan Santos" sanitize={sanitizeNameInput} maxLength={100} />
+          <Field label="Contact Phone" name="emergency_contact_phone" type="tel" defaultValue={cleaner.emergency_contact_phone} required placeholder="09XX XXX XXXX" maxLength={11} pattern="09[0-9]{9}" sanitize={sanitizePhoneInput} />
         </div>
 
         {editState?.error && (

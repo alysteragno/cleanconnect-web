@@ -5,6 +5,7 @@ import { getBasePath } from '@/utils/base-path'
 import ComplaintThread from '@/components/dashboard/complaint-thread'
 import ArchiveComplaintButton from './archive-button'
 import ComplaintStatusControls from './status-controls'
+import { formatTicketNumber } from '@/lib/complaint-ticket'
 
 const STATUS_STYLES: Record<string, string> = {
   open:        'bg-yellow-50 text-yellow-700 border-yellow-200',
@@ -52,6 +53,13 @@ export default async function AdminComplaintDetailPage({
     .maybeSingle()
   const isArchived = Boolean((archiveRow as { archived_at?: string | null } | null)?.archived_at)
 
+  const { data: ticketRow } = await adminDb
+    .from('complaints')
+    .select('ticket_number')
+    .eq('id', id)
+    .maybeSingle()
+  const ticketLabel = formatTicketNumber((ticketRow as { ticket_number?: number | null } | null)?.ticket_number ?? null)
+
   const { data: staffMsgs } = await adminDb
     .from('staff_complaint_messages')
     .select('id, message, created_at, sender_id')
@@ -91,6 +99,9 @@ export default async function AdminComplaintDetailPage({
 
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-xs font-mono font-semibold text-pink-600 bg-pink-50 border border-pink-100 rounded px-1.5 py-0.5 shrink-0">
+              {ticketLabel}
+            </span>
             <p className="text-sm font-semibold text-gray-900 truncate">{complaint.subject}</p>
             <span className={`text-xs px-2 py-0.5 rounded-full border font-medium shrink-0 ${STATUS_STYLES[complaint.status] ?? ''}`}>
               {complaint.status.replace('_', ' ')}

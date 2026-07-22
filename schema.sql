@@ -27,6 +27,10 @@ CREATE TABLE profiles (
     full_name   TEXT        NOT NULL,
     phone       TEXT,
     is_active   BOOLEAN     NOT NULL DEFAULT true,
+    -- When a cleaner (or customer) was last deactivated; NULL while active.
+    -- Cleared back to NULL on reactivation — powers the cleaners archive
+    -- history view (src/app/(dashboard)/admin/cleaners/archive/page.tsx).
+    deactivated_at TIMESTAMPTZ,
     home_lat    NUMERIC,
     home_lng    NUMERIC,
     created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -60,13 +64,24 @@ CREATE TABLE bookings (
     created_at          TIMESTAMPTZ     NOT NULL DEFAULT NOW()
 );
 
+-- Needed for the EXCLUDE constraint below (equality column + range column
+-- in one GiST index).
+CREATE EXTENSION IF NOT EXISTS btree_gist;
+
 CREATE TABLE cleaner_assignments (
-    id          UUID                PRIMARY KEY DEFAULT gen_random_uuid(),
-    booking_id  UUID                NOT NULL REFERENCES bookings(id) ON DELETE CASCADE,
-    cleaner_id  UUID                NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
-    status      assignment_status   NOT NULL DEFAULT 'offered',
-    assigned_at TIMESTAMPTZ         NOT NULL DEFAULT NOW(),
-    UNIQUE(booking_id, cleaner_id)
+    id              UUID                PRIMARY KEY DEFAULT gen_random_uuid(),
+    booking_id      UUID                NOT NULL REFERENCES bookings(id) ON DELETE CASCADE,
+    cleaner_id      UUID                NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+    status          assignment_status   NOT NULL DEFAULT 'offered',
+    assigned_at     TIMESTAMPTZ         NOT NULL DEFAULT NOW(),
+    -- [service start - 2h, service end + 2h), synced from bookings by
+    -- trigger_sync_cleaner_assignment_window below (section 3c).
+    schedule_window TSRANGE,
+    UNIQUE(booking_id, cleaner_id),
+    -- No two 'assigned' rows for the same cleaner may have overlapping
+    -- windows — the DB-level guarantee behind the app's own conflict checks
+    -- in dispatchCleaners / forceAssignCleaner / confirmAIDispatch.
+    EXCLUDE USING gist (cleaner_id WITH =, schedule_window WITH &&) WHERE (status = 'assigned')
 );
 
 CREATE TABLE cleaner_availability (
@@ -89,12 +104,16 @@ CREATE TABLE feedback (
 );
 
 CREATE TABLE complaints (
-    id          UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
-    customer_id UUID        NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
-    booking_id  UUID        REFERENCES bookings(id) ON DELETE SET NULL,
-    subject     TEXT        NOT NULL,
-    status      TEXT        NOT NULL DEFAULT 'open',   -- open | in_progress | resolved
-    created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    id             UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+    customer_id    UUID        NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+    booking_id     UUID        REFERENCES bookings(id) ON DELETE SET NULL,
+    -- Human-readable sequential reference, displayed as "CMP-000123"
+    -- (src/lib/complaint-ticket.ts) — a bank-queue-style ticket number so
+    -- admins/customers can reference a complaint without its UUID.
+    ticket_number  SERIAL      UNIQUE,
+    subject        TEXT        NOT NULL,
+    status         TEXT        NOT NULL DEFAULT 'open',   -- open | in_progress | resolved
+    created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 CREATE TABLE notifications (
@@ -161,7 +180,61 @@ FOR EACH ROW EXECUTE FUNCTION apply_cleanconnect_operational_rules();
 
 
 -- ─────────────────────────────────────────────────────────────────────────────
--- 3b. INDEXES
+-- 3b. DOUBLE-BOOKING PREVENTION (cleaner_assignments.schedule_window)
+-- ─────────────────────────────────────────────────────────────────────────────
+-- Keeps schedule_window (declared on cleaner_assignments above) in sync with
+-- its booking's service_date/service_time/duration_hours, so the EXCLUDE
+-- constraint on that column always reflects the real schedule. Mirrors the
+-- ±2h conflict buffer in src/lib/ai-assignment.ts hasTimeConflict().
+CREATE OR REPLACE FUNCTION sync_cleaner_assignment_window()
+RETURNS TRIGGER AS $$
+DECLARE
+    b RECORD;
+    start_ts TIMESTAMP;
+    end_ts   TIMESTAMP;
+BEGIN
+    SELECT service_date, service_time, duration_hours INTO b
+      FROM bookings WHERE id = NEW.booking_id;
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'Booking % not found for cleaner_assignments row', NEW.booking_id;
+    END IF;
+
+    start_ts := (b.service_date + b.service_time) - INTERVAL '120 minutes';
+    end_ts   := (b.service_date + b.service_time)
+                + make_interval(mins => (COALESCE(b.duration_hours, 2) * 60)::int)
+                + INTERVAL '120 minutes';
+
+    -- Half-open range so back-to-back slots that only touch at the boundary
+    -- don't count as a conflict — matches hasTimeConflict's strict '<'/'>'.
+    NEW.schedule_window := tsrange(start_ts, end_ts, '[)');
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trigger_sync_cleaner_assignment_window
+BEFORE INSERT OR UPDATE ON cleaner_assignments
+FOR EACH ROW EXECUTE FUNCTION sync_cleaner_assignment_window();
+
+-- If a booking's own schedule changes after a cleaner is already assigned,
+-- refresh the dependent assignment rows so schedule_window (and the
+-- constraint) stay accurate. (No reschedule UI exists in the app today, but
+-- this keeps the constraint correct if one is added later, or against a
+-- direct DB edit.)
+CREATE OR REPLACE FUNCTION resync_dependent_cleaner_assignment_windows()
+RETURNS TRIGGER AS $$
+BEGIN
+    UPDATE cleaner_assignments SET status = status WHERE booking_id = NEW.id;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trigger_resync_cleaner_assignment_windows
+AFTER UPDATE OF service_date, service_time, duration_hours ON bookings
+FOR EACH ROW EXECUTE FUNCTION resync_dependent_cleaner_assignment_windows();
+
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- 3c. INDEXES
 -- ─────────────────────────────────────────────────────────────────────────────
 -- Admin bookings list filters/sorts by these columns per request (period tabs
 -- + status chips) instead of loading the whole table — see
@@ -169,6 +242,13 @@ FOR EACH ROW EXECUTE FUNCTION apply_cleanconnect_operational_rules();
 CREATE INDEX IF NOT EXISTS idx_bookings_service_date ON bookings (service_date);
 CREATE INDEX IF NOT EXISTS idx_bookings_created_at   ON bookings (created_at);
 CREATE INDEX IF NOT EXISTS idx_bookings_status        ON bookings (status);
+
+-- Prevents the same customer from being double-booked into the exact same
+-- date + time slot. Partial (WHERE status <> 'cancelled') so a cancelled
+-- booking never blocks rebooking that same slot.
+CREATE UNIQUE INDEX IF NOT EXISTS uq_bookings_customer_no_double_booking
+  ON bookings (customer_id, service_date, service_time)
+  WHERE status <> 'cancelled';
 
 
 -- ─────────────────────────────────────────────────────────────────────────────

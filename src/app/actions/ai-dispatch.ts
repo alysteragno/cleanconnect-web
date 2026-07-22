@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient, createAdminClient } from '@/utils/supabase/server'
-import { runAIDispatch, type RankedCleaner } from '@/lib/ai-assignment'
+import { runAIDispatch, findConflictingCleaners, type RankedCleaner } from '@/lib/ai-assignment'
 import type { CleanerLocation } from '../(dashboard)/admin/bookings/[id]/all-cleaners-map'
 
 // ── Preview (dry-run): evaluate without writing assignments ──────────────────
@@ -84,6 +84,14 @@ export async function confirmAIDispatch(
 
   if (!bookingId)            return { error: 'Missing booking ID.' }
   if (cleanerIds.length === 0) return { error: 'No cleaners to dispatch.' }
+
+  // The AI preview's conflict filter ran before this confirm step, on a
+  // possibly stale snapshot — re-check now, right before the write, to
+  // close that race instead of trusting the client-submitted ID list.
+  const conflicts = await findConflictingCleaners(bookingId, cleanerIds)
+  if (conflicts.length > 0) {
+    return { error: `${conflicts.map((c) => c.fullName).join(', ')} already ${conflicts.length === 1 ? 'has' : 'have'} an overlapping booking around this time — refresh and try again.` }
+  }
 
   const adminClient = createAdminClient()
   const { error } = await adminClient.from('cleaner_assignments').upsert(

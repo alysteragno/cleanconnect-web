@@ -395,6 +395,81 @@ export async function runAIDispatch(bookingId: string, dryRun = false): Promise<
   return { rankedCleaners, dispatched: toDispatch.length, bookingLat, bookingLng, reasoning }
 }
 
+// ── Shared conflict guard (used by every assignment write path) ────────────
+//
+// runAIDispatch filters conflicting cleaners out of its own candidate pool
+// before writing (Step 3b above), but dispatchCleaners, forceAssignCleaner,
+// and confirmAIDispatch all write cleaner_assignments straight from
+// client-submitted cleaner IDs with no server-side re-check — so a cleaner
+// could otherwise be double-booked onto two overlapping jobs. Call this
+// immediately before any cleaner_assignments insert/upsert.
+
+/**
+ * Returns the subset of candidateCleanerIds that already have an 'assigned'
+ * cleaner_assignments row on another booking whose time window overlaps
+ * bookingId's (± 2-hour buffer, same rule as the AI engine), with each
+ * conflicting cleaner's name for a readable error message.
+ */
+export async function findConflictingCleaners(
+  bookingId: string,
+  candidateCleanerIds: string[]
+): Promise<{ cleanerId: string; fullName: string }[]> {
+  if (candidateCleanerIds.length === 0) return []
+
+  const adminClient = createAdminClient()
+
+  const { data: booking } = await adminClient
+    .from('bookings')
+    .select('service_date, service_time, duration_hours')
+    .eq('id', bookingId)
+    .single()
+  if (!booking) return []
+
+  const newStart = timeToMinutes(booking.service_time)
+  const newDuration = Number(booking.duration_hours) || 2
+
+  const { data: sameDayBookings } = await adminClient
+    .from('bookings')
+    .select('id, service_time, duration_hours')
+    .eq('service_date', booking.service_date)
+    .neq('id', bookingId)
+
+  const sameDayIds = (sameDayBookings ?? []).map((b: { id: string }) => b.id)
+  if (sameDayIds.length === 0) return []
+
+  const timeMap: Record<string, { service_time: string; duration_hours: number }> = {}
+  for (const b of sameDayBookings ?? []) {
+    timeMap[b.id] = { service_time: b.service_time, duration_hours: b.duration_hours }
+  }
+
+  const { data: existingAssignments } = await adminClient
+    .from('cleaner_assignments')
+    .select('cleaner_id, booking_id')
+    .eq('status', 'assigned')
+    .in('cleaner_id', candidateCleanerIds)
+    .in('booking_id', sameDayIds)
+
+  const conflictingIds = new Set<string>()
+  for (const a of existingAssignments ?? []) {
+    const bData = timeMap[a.booking_id]
+    if (!bData) continue
+    const existingStart = timeToMinutes(bData.service_time)
+    const existingDuration = Number(bData.duration_hours) || 2
+    if (hasTimeConflict(newStart, newDuration, existingStart, existingDuration)) {
+      conflictingIds.add(a.cleaner_id)
+    }
+  }
+
+  if (conflictingIds.size === 0) return []
+
+  const { data: names } = await adminClient
+    .from('profiles')
+    .select('id, full_name')
+    .in('id', Array.from(conflictingIds))
+
+  return (names ?? []).map((n: { id: string; full_name: string }) => ({ cleanerId: n.id, fullName: n.full_name }))
+}
+
 // ── Utilities ────────────────────────────────────────────────────────────────
 
 function timeToMinutes(timeStr: string): number {

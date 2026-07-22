@@ -99,6 +99,177 @@ export async function createCheckoutSession(opts: {
   }
 }
 
+// ── Native QR Ph via Payment Intents (no hosted page / redirect) ────────────
+// Used by the mobile app to render the QR code directly in-app instead of
+// opening any browser/webview. Flow: create a Payment Intent, create a qrph
+// Payment Method, attach it — the attach response carries the QR image.
+//
+// Field-name caveat: PayMongo's own docs place the QR image at
+// `next_action.code.image_url`, but this has not been verified against a
+// live API response in this environment (sandbox calls were blocked here).
+// `createQrPhIntent` below checks a couple of plausible shapes and returns
+// `qrImageUrl: null` + the raw `next_action` if none match, so a first real
+// test fails loudly instead of silently — check `raw_next_action` in that
+// case and adjust the field path.
+//
+// Confirmation deliberately does NOT rely on a webhook event payload shape
+// for this flow (also unverified) — it uses `confirmQrPhPayment`, which
+// actively retrieves the Payment Intent from PayMongo and checks its
+// `payments[]` array (a field confirmed present on the Payment Intent
+// resource). This mirrors the existing `confirmCheckoutPayment` fallback
+// below, just promoted to be the primary confirmation path instead of a
+// fallback — the mobile QR screen polls it while the code is on screen.
+
+export type QrPhIntent = {
+  id: string
+  clientKey: string
+  qrImageUrl: string | null
+  /**
+   * PayMongo's sandbox-only "authorize this test payment" page
+   * (`next_action.code.test_url`). Only present when using `sk_test_...`
+   * keys — a real e-wallet app can't scan a sandbox QR, so PayMongo hands
+   * back this hosted page instead as the way to simulate a scan during
+   * development. Never present in live mode.
+   */
+  testUrl: string | null
+  status: string
+  rawNextAction?: unknown
+}
+
+/** Creates a fresh Payment Intent + qrph Payment Method and attaches them. */
+export async function createQrPhIntent(opts: {
+  amount: number // pesos
+  description: string
+  bookingId: string
+  billing?: { name?: string; email?: string; phone?: string }
+}): Promise<QrPhIntent> {
+  const toCentavos = (peso: number) => Math.round(peso * 100)
+
+  const intentRes = await fetch(`${PAYMONGO_API}/payment_intents`, {
+    method: 'POST',
+    headers: { Authorization: authHeader(), 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      data: {
+        attributes: {
+          amount: toCentavos(opts.amount),
+          currency: 'PHP',
+          capture_type: 'automatic',
+          description: opts.description,
+          payment_method_allowed: ['qrph'],
+          payment_method_options: { qrph: {} },
+          metadata: { booking_id: opts.bookingId },
+        },
+      },
+    }),
+  })
+  const intentJson = await intentRes.json()
+  if (!intentRes.ok) {
+    throw new Error(intentJson?.errors?.[0]?.detail ?? 'Failed to create PayMongo payment intent.')
+  }
+  const intentId = intentJson.data.id as string
+  const clientKey = intentJson.data.attributes.client_key as string
+
+  const pmRes = await fetch(`${PAYMONGO_API}/payment_methods`, {
+    method: 'POST',
+    headers: { Authorization: authHeader(), 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      data: { attributes: { type: 'qrph', billing: opts.billing ?? {} } },
+    }),
+  })
+  const pmJson = await pmRes.json()
+  if (!pmRes.ok) {
+    throw new Error(pmJson?.errors?.[0]?.detail ?? 'Failed to create QR Ph payment method.')
+  }
+  const paymentMethodId = pmJson.data.id as string
+
+  const attachRes = await fetch(`${PAYMONGO_API}/payment_intents/${intentId}/attach`, {
+    method: 'POST',
+    headers: { Authorization: authHeader(), 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      data: { attributes: { payment_method: paymentMethodId, client_key: clientKey } },
+    }),
+  })
+  const attachJson = await attachRes.json()
+  if (!attachRes.ok) {
+    throw new Error(attachJson?.errors?.[0]?.detail ?? 'Failed to attach QR Ph payment method.')
+  }
+
+  const attrs = attachJson.data.attributes
+  const nextAction = attrs.next_action ?? {}
+  const qrImageUrl: string | null =
+    nextAction?.code?.image_url ??
+    nextAction?.code?.image ??
+    nextAction?.qrph?.image_url ??
+    null
+  const testUrl: string | null =
+    nextAction?.code?.test_url ??
+    nextAction?.qrph?.test_url ??
+    null
+
+  return {
+    id: intentId,
+    clientKey,
+    qrImageUrl,
+    testUrl,
+    status: attrs.status,
+    rawNextAction: qrImageUrl ? undefined : nextAction,
+  }
+}
+
+/**
+ * Retrieves a Payment Intent from PayMongo directly and reports whether it
+ * has a settled payment. This is the primary confirmation path for the QR Ph
+ * native flow (see caveat above) — the mobile QR screen polls the
+ * `/api/paymongo/qrph-intent/confirm` route that wraps this while the code
+ * is on screen.
+ */
+export async function confirmQrPhPayment(bookingId: string): Promise<{ paid: boolean }> {
+  const admin = createAdminClient()
+  const { data: booking } = await admin
+    .from('bookings')
+    .select('id, customer_id, service_date, payment_status, paymongo_payment_intent_id')
+    .eq('id', bookingId)
+    .maybeSingle()
+
+  if (!booking) return { paid: false }
+  if (booking.payment_status === 'paid') return { paid: true }
+  if (!booking.paymongo_payment_intent_id) return { paid: false }
+
+  const res = await fetch(`${PAYMONGO_API}/payment_intents/${booking.paymongo_payment_intent_id}`, {
+    headers: { Authorization: authHeader() },
+  })
+  if (!res.ok) return { paid: false }
+
+  const json = await res.json()
+  const attrs = json?.data?.attributes
+  const payments = attrs?.payments as Array<{ id: string; attributes?: { status?: string } }> | undefined
+  const paidPayment = payments?.find((p) => p.attributes?.status === 'paid')
+  if (!paidPayment) return { paid: false }
+
+  const { error: updateErr } = await admin
+    .from('bookings')
+    .update({
+      payment_status: 'paid',
+      paid_at: new Date().toISOString(),
+      paymongo_payment_id: paidPayment.id,
+    })
+    .eq('id', booking.id)
+  if (updateErr) return { paid: false }
+
+  const dateStr = new Date(booking.service_date).toLocaleDateString('en-PH', {
+    month: 'short', day: 'numeric',
+  })
+  await createNotification({
+    userId: booking.customer_id,
+    title: 'Payment Confirmed',
+    body: `Your payment for the appointment on ${dateStr} has been received. Thank you!`,
+    type: 'payment_confirmed',
+    bookingId: booking.id,
+  })
+
+  return { paid: true }
+}
+
 /** Looks up a Checkout Session directly on PayMongo and reports whether it has a settled payment. */
 async function retrieveCheckoutSession(sessionId: string): Promise<{ paid: boolean; paymentId: string | null }> {
   const res = await fetch(`${PAYMONGO_API}/checkout_sessions/${sessionId}`, {
